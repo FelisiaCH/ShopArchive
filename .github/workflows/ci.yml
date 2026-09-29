@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  JVM_TESTS: ":shared:jvmTest :shoparchive-api:test :server-launcher:test :server:test"
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Install Android platform 37 (API level 37.0)
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0"'
+      # build = JVM tests + Android build + checkI18nParity (wired into check)
+      - run: ./gradlew build
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew $JVM_TESTS :composeApp:packageMsi
+        shell: bash
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ShopArchive-msi
+          path: composeApp/build/compose/binaries/main/msi/*.msi
+          if-no-files-found: error
+
+  # Manual only: GitHub-hosted arm64 runners may be unavailable to private repos.
+  linux-arm64:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew $JVM_TESTS
