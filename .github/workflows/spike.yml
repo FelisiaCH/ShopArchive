@@ -1,0 +1,70 @@
+name: spike
+
+# Device-test spike artifacts (see docs/device-tests.md). Manual only; delete with spike/.
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  server-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Android SDK packages
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;36.0.0"
+      - name: Server jar, pinning tests, Android debug APK
+        working-directory: spike
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :server:dist :app:desktopTest :androidApp:assembleDebug
+      - uses: actions/upload-artifact@v7
+        with:
+          name: spike-server
+          path: spike/server/build/dist/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          name: spike-android-apk
+          path: spike/androidApp/build/outputs/apk/debug/androidApp-debug.apk
+          if-no-files-found: error
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Generate Xcode project
+        working-directory: spike/iosApp
+        run: |
+          chmod +x ../gradlew
+          brew install xcodegen
+          xcodegen generate
+      - name: Archive (unsigned)
+        working-directory: spike/iosApp
+        run: |
+          xcodebuild archive \
+            -project SpikeApp.xcodeproj -scheme SpikeApp -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath build/SpikeApp.xcarchive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+      - name: Package .ipa
+        working-directory: spike/iosApp
+        run: |
+          mkdir -p ipa/Payload
+          cp -R build/SpikeApp.xcarchive/Products/Applications/SpikeApp.app ipa/Payload/
+          (cd ipa && zip -qry ../ShopArchive-spike.ipa Payload)
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ShopArchive-spike-ipa
+          path: spike/iosApp/ShopArchive-spike.ipa
+          if-no-files-found: error

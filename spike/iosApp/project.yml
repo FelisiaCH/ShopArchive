@@ -1,0 +1,75 @@
+# XcodeGen spec: `cd spike/iosApp && xcodegen generate` (no hand-written pbxproj; the .xcodeproj is git-ignored).
+name: SpikeApp
+
+options:
+  deploymentTarget:
+    iOS: "17.4"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    # The Kotlin build phase below shells out to Gradle, which the sandbox forbids.
+    ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+
+targets:
+  SpikeApp:
+    type: application
+    platform: iOS
+    sources:
+      - SpikeApp
+    info:
+      path: SpikeApp/Info.plist
+      properties:
+        CFBundleDisplayName: ShopArchive spike
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        CADisableMinimumFrameDurationOnPhone: true
+        # ATS: arbitrary loads ONLY (no NSAllowsLocalNetworking); trust comes from the SPKI pin in handleChallenge.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        NSLocalNetworkUsageDescription: ShopArchive spike connects to your ShopArchive server on the local network.
+        NSBonjourServices:
+          - _shoparchive._tcp
+    settings:
+      base:
+        # Never used in logic: AltStore rewrites it to <id>.<TEAMID>.
+        PRODUCT_BUNDLE_IDENTIFIER: xyz.felismp.shoparchive.spike
+        PRODUCT_NAME: SpikeApp
+        TARGETED_DEVICE_FAMILY: "1,2"
+        FRAMEWORK_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/../app/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)
+        # Kotlin framework is static: link it and the system frameworks/libs its code (Compose/Skiko, Ktor Darwin) uses.
+        OTHER_LDFLAGS:
+          - $(inherited)
+          - -framework
+          - SpikeShared
+          - -framework
+          - Metal
+          - -framework
+          - MetalKit
+          - -framework
+          - CoreGraphics
+          - -framework
+          - CoreText
+          - -framework
+          - QuartzCore
+          - -framework
+          - UIKit
+          - -framework
+          - Security
+          - -framework
+          - CFNetwork
+          - -lc++
+    preBuildScripts:
+      - name: Compile Kotlin framework
+        script: |
+          cd "$SRCROOT/.."
+          ./gradlew :app:embedAndSignAppleFrameworkForXcode
+        basedOnDependencyAnalysis: false
