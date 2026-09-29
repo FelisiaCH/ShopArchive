@@ -32,6 +32,13 @@ Stable เท่านั้น · version จริงอยู่ที่ `gr
 
 ตรวจแล้ว (probe ชั่วคราว · ไม่ commit): navigation 2.9.2 + lifecycle 2.11.0 + CMP 1.12.1 รันบน Desktop ได้ (NavHost + `viewModel`) · ชุด server ทั้งหมด compile + รันได้บน JDK 21 · ใน catalog แต่ยังไม่มี module ไหนใช้: ktor, koin, kaml, bouncycastle, log4j, terminalconsoleappender, serialization, datetime, navigation, lifecycle
 
+## Spike (`spike/` · ลบพร้อม spike)
+| Library | Version | เหตุผล |
+|---|---|---|
+| JmDNS | 3.6.3 | mDNS `_shoparchive._tcp` สำหรับ T2 · ตัวเดียวกับที่ P05 ระบุ |
+| JLine (reader, terminal, terminal-jna) | 3.30.17 | TerminalConsoleAppender 1.3.0 ใช้สาย 3.x · `terminal-jna` ทดสอบ native load (T3) |
+| JNA | 5.19.1 (resolved) | มากับ `jline-terminal-jna` |
+
 ## Deviations จาก P00 / MASTER
 | เรื่อง | ที่ทำ | เหตุผล |
 |---|---|---|

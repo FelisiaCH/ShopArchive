@@ -6,6 +6,7 @@
 - [ ] Stage 1 ตั้ง property ก่อน library โหลด → `<root>/tmp/…`: `jna.tmpdir`, `jline.tmpdir`, `jansi.tmpdir`, `io.netty.native.workdir`, `io.netty.tmpdir`
 - [ ] Stage 2: extract core + libraries → `versions/<build>/`, `libraries/` (checksum · ข้ามถ้าไม่เปลี่ยน) → classloader ของ ShopArchive เอง (ใช้ต่อใน P13) → start core
 - [ ] Root resolver: โฟลเดอร์ของ jar (ไม่ใช่ cwd) · `--root <dir>` · root เขียนไม่ได้ → error + exit
+- [ ] Windows: root path มีอักขระนอก ASCII → warn (JDK-8195129) · `--root` มี `?` → error ชัดเจน (argv เสียอักขระ)
 - [ ] Filesystem check: FAT32 / exFAT / network share → ไม่ start · root บน SD card (`/dev/mmcblk*`) → warn
 - [ ] ล้าง `tmp/` ตอน start
 - [ ] First run สร้าง layout ตาม `MASTER.md` · ไม่ overwrite ของเดิม
@@ -26,7 +27,7 @@
 - Java 17 → error ชัดเจน
 - รันตัวที่ 2 → ถูกปฏิเสธ · `stop` → exit 0
 - Start ผ่าน script → ไม่มีไฟล์ถูกเขียนนอก root (Process Monitor บน Windows · `strace` บน WSL2/Linux)
-- Root path มีช่องว่าง + อักษรลาว/ไทย → ใช้ได้ทั้ง Windows และ Linux
+- Root path มีช่องว่าง → ใช้ได้ทั้ง Windows และ Linux · อักษรลาว/ไทย → Linux ใช้ได้ · Windows start ได้ + warn
 - Console ใน Windows Terminal แสดงลาว/ไทยถูก
 - Copy โฟลเดอร์ Windows ↔ Linux (WSL2) → start ได้
 - Raspberry Pi 64-bit → `Done` (ถ้าใช้ Pi)

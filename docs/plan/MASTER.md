@@ -36,7 +36,7 @@ Repo: `FelisiaCH/ShopArchive` (private) · `E:\Project\ShopArchive` · plan อ�
 - `shoparchive-api`: interfaces ของ service registry, interceptors, events, commands, scheduler, permission nodes · core ใช้ตั้งแต่ P03 · plugin ใช้ตั้งแต่ P10
 - `server-launcher`: launcher แบบ Paperclip
 - `server`: core
-- `composeApp` (android, ios, desktop → package เฉพาะ Windows), `iosApp`: clients
+- `composeApp` (android library, ios, desktop → package เฉพาะ Windows), `androidApp` (Android application · AGP 9 แยกจาก KMP), `iosApp`: clients
 - `plugins/telegram`, `plugins/example-discord`, `plugins/import`
 
 ## Root layout (โฟลเดอร์ของ jar)
@@ -53,7 +53,8 @@ Repo: `FelisiaCH/ShopArchive` (private) · `E:\Project\ShopArchive` · plan อ�
 ## Locked decisions
 
 ### Runtime
-- Root = โฟลเดอร์ของ jar (resolve จาก jar location ไม่ใช่ cwd) · `--root` ใช้ตอน dev
+- Root = โฟลเดอร์ของ jar (resolve จาก jar location ไม่ใช่ cwd) · `--root` ใช้ตอน dev (Windows: ASCII เท่านั้น · argv ที่ไม่ใช่ ANSI กลายเป็น `?`)
+- Windows: root path มีอักขระนอก ASCII → warn ตอน start (JDK-8195129: `System.load` จาก path unicode ไม่ได้ → native lib ไม่โหลด) · แนะนำ root ASCII ใน README
 - Start ผ่าน `start.sh` / `start.bat` / service template → ไม่มีไฟล์ถูกเขียนนอก root (script ส่ง JVM flags ย้าย tmp, perf data, crash log เข้า root)
 - `start.bat` ตั้ง console เป็น UTF-8 · แนะนำ Windows Terminal
 - Portable: stop → copy ทั้งโฟลเดอร์ = ย้าย server (Windows ↔ Linux ได้)

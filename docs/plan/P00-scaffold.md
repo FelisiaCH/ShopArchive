@@ -13,7 +13,7 @@
 - [ ] Modules:
   - `shared` (jvm, android, iosArm64, iosSimulatorArm64)
   - `shoparchive-api` · `server-launcher` · `server`
-  - `composeApp` (android, ios, desktop → package เฉพาะ Windows) · `iosApp` (Xcode project · build บน CI)
+  - `composeApp` (android library, ios, desktop → package เฉพาะ Windows) · `androidApp` (Android application · AGP 9) · `iosApp` (Xcode project · build บน CI)
   - `plugins/telegram`, `plugins/example-discord`, `plugins/import` (ว่างไว้)
 - [ ] `run/` = server root ตอน dev
 - [ ] `.gitignore`: `run/`, build outputs, IDE, `local.properties`, secrets
