@@ -2,7 +2,7 @@
 อ่าน: `MASTER.md` · Depends: —
 
 ## Tasks: environment (Windows)
-- [ ] Repo `FelisiaCH/ShopArchive` (private) ที่ `E:\Project\ShopArchive` · `git init` + remote · เปิด long paths (Windows `LongPathsEnabled` + `git config core.longpaths true`)
+- [ ] Repo `FelisiaCH/ShopArchive` (public · Apache-2.0) ที่ `E:\Project\ShopArchive` · `git init` + remote · เปิด long paths (Windows `LongPathsEnabled` + `git config core.longpaths true`)
 - [ ] Claude Code รันบน Windows (Git Bash) · WSL2 (Ubuntu) ใช้ทดสอบ server บน Linux เท่านั้น
 - [ ] JDK 21 (Temurin) · Android Studio + emulator Android 17
 - [ ] `.gitattributes`: `* text=auto eol=lf` · `*.bat eol=crlf`

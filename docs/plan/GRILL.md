@@ -24,3 +24,4 @@
 | Q18 | AGP 9 ไม่ให้ `com.android.application` อยู่ร่วม KMP (audit P00) | เพิ่ม module `androidApp` (Activity) · `composeApp`/`shared` ใช้ `com.android.kotlin.multiplatform.library` · ทดสอบแล้วบน API 33 + 37 |
 | Q19 | Windows ใช้ root path นอก ASCII ไม่ได้เต็มที่ (spike P00: argv → `?`, JDK-8195129 `System.load` unicode path) | root ASCII แนะนำใน README · start warn ถ้าไม่ใช่ ASCII · `--root` ASCII เท่านั้น · ยืนยันผลด้วย T3 |
 | Q20 | P01 เริ่มได้ระหว่างรอ device test | P01 พึ่งแค่ P00 · P02/P06 รอ T3 · P08 รอ T1, T2, T5 |
+| Q21 | Repo เป็น public + Apache-2.0 (audit P00 · แทน "private" ใน Q17) | CI ฟรีรวม macOS + arm64 · ห้าม commit secrets/ข้อมูลร้านจริง (เดิมก็ห้ามอยู่แล้ว) · ข้อมูล/config ของร้านอยู่ใน root ของ jar ไม่ใช่ใน repo |

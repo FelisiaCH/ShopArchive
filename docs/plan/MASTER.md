@@ -1,7 +1,7 @@
 # ShopArchive — MASTER (draft)
 
 Self-hosted server แบบ PaperMC (`shoparchive-server.jar`) + client apps: Android · iOS · Windows
-Repo: `FelisiaCH/ShopArchive` (private) · `E:\Project\ShopArchive` · plan อยู่ที่ `docs/plan/`
+Repo: `FelisiaCH/ShopArchive` (public · Apache-2.0) · `E:\Project\ShopArchive` · plan อยู่ที่ `docs/plan/`
 สถานะ: draft · ยังไม่มีโค้ด · 1 phase = 1 ไฟล์ · decision log: `GRILL.md` · research: `research/` (อ้างเลข phase ชุดก่อน grill)
 
 ## ⏳ Open
