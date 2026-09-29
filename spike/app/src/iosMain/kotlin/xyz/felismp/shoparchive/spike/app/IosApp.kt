@@ -11,7 +11,7 @@ import androidx.compose.ui.window.ComposeUIViewController
 import platform.Foundation.NSDate
 import platform.Foundation.NSISO8601DateFormatter
 
-/** Entry point for the Swift host (`MainViewControllerKt.MainViewController()`). */
+/** Entry point for the Swift host (`IosAppKt.MainViewController()`). */
 fun MainViewController() = ComposeUIViewController { App() }
 
 private fun readItem(): String = try {

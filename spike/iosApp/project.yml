@@ -16,6 +16,7 @@ targets:
   SpikeApp:
     type: application
     platform: iOS
+    scheme: {}
     sources:
       - SpikeApp
     info:

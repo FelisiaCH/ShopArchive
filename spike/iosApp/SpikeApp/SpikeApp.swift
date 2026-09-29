@@ -13,7 +13,7 @@ struct ShopArchiveSpikeApp: App {
 // Hosts the Compose Multiplatform UI from the Kotlin framework (app/src/iosMain/.../IosApp.kt).
 struct ComposeView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
-        MainViewControllerKt.MainViewController()
+        IosAppKt.MainViewController()
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}

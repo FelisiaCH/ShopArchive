@@ -25,7 +25,7 @@ Prerequisites: iPhone iOS ≥ 17.4 · AltStore ติดตั้งแล้ว
 
 1. Download artifact `ShopArchive-spike-ipa` → unzip → ส่ง `ShopArchive-spike.ipa` เข้า iPhone (iCloud Drive/Files) → AltStore → My Apps → **+** → เลือกไฟล์
 2. เปิด app · Base URL = `https://<LAN IP ของ PC>:8443` · Pin = จาก console
-3. กด **HTTPS /ping** → iOS ถาม Local Network → Allow → ต้องได้ `✅ 200 {"ok":true,...}`
+3. กด **HTTPS /ping** → iOS ถาม Local Network → Allow → ต้องได้ `✅ 200 {"ok":true,...}` · ถ้ากดครั้งแรกได้ ❌ ขณะ prompt ยังค้าง → กดซ้ำหลัง Allow แล้วนับผลครั้งหลัง
 4. กด **WS echo** → ต้องได้ `✅ echo OK: hello ສະບາຍດີ สวัสดี`
 5. Negative: แก้ pin 1 ตัว → กดทั้งสองปุ่ม → ต้อง ❌ ทั้งคู่ (จด error text)
 6. Negative: Settings → ShopArchive spike → ปิด Local Network → กด **HTTPS /ping** → ต้อง ❌ (จด error text) → เปิดกลับ → ✅
