@@ -1,0 +1,106 @@
+# Telegram channel. Copied to plugins/Telegram/config.yml the first time the plugin runs; your edits are kept.
+# `reload Telegram` in the server console reads this file again.
+#
+# The plugin is used only when bot-token and chat-ids are filled in and every event it sends has a template in the chosen
+# language. Otherwise it warns at start and does not take over: the server then sends to the next channel (at worst only its
+# own log), so nothing is lost. Messages wait in the server's outbox until a channel takes them.
+
+# The bot's token from @BotFather. A secret: shown as *** by `plugins info Telegram` and never written to a log or a message status.
+bot-token: ""
+
+# Who gets the message: a number such as 123456789 (a person) or -1001234567890 (a group or channel), or @channelname.
+# One message counts as sent when every chat here accepted it. Add the bot to the group first, and press Start in a private chat.
+chat-ids: []
+
+# The language of the messages: lo, th or en.
+language: lo
+
+# Which events are sent. The server's own notify.events decides which events reach any channel at all; this lists what this channel sends of them.
+# entry.created = a line was recorded, day.closed = the day was closed.
+events:
+  - day.closed
+  - entry.created
+
+# Where the Bot API lives. Change it only for a self-hosted Bot API server. Must be https (http only for localhost); otherwise the plugin is not used.
+api-url: https://api.telegram.org
+
+# How long to wait for Telegram, per chat, in seconds (2 to 25). Keep it below notify.timeout-seconds in config/shoparchive.yml (default 30).
+http-timeout-seconds: 10
+
+# How long the plugin remembers which chats already got a message, in days (1 to 90). A message the server tries again goes only to the chats
+# that have not had it; the record is removed after this many days. It is the plugin's own file (plugins/Telegram/pending/), not shop data.
+ledger-keep-days: 7
+
+# The text of each message, by event and language. Plain text, one line per line.
+# Words in braces are replaced by the message's data:
+#   {type} (income / expense, in the language above)  {category}  {item}  {amount}  {currency}  {branch}  {user}  {time}  {date}  {code}
+#   day.closed also has {closedBy} {entries} {slips} {note} and, per currency (one text, e.g. "LAK 150000; THB 20.50"):
+#   {income} {expense} {net} {cashIn} {cashOut} {onlineIn} {onlineOut} {float} {counted} {expected} {variance} {kept} {handover}
+# A line whose words are all empty (no {category}, no {note}) is left out. An unknown word becomes empty.
+# {code} names the entry or the day: a message that arrives twice has the same code both times.
+templates:
+  entry-created:
+    lo: |-
+      {type} · {branch}
+      {amount} {currency}
+      {category} {item}
+      {user} · {time}
+      ລະຫັດ {code}
+    th: |-
+      {type} · {branch}
+      {amount} {currency}
+      {category} {item}
+      {user} · {time}
+      รหัส {code}
+    en: |-
+      {type} · {branch}
+      {amount} {currency}
+      {category} {item}
+      {user} · {time}
+      Code {code}
+  day-closed:
+    lo: |-
+      ປິດຍອດ {date} · {branch}
+      ປິດໂດຍ {closedBy} · {entries} ລາຍການ
+      ລາຍຮັບ {income}
+      ລາຍຈ່າຍ {expense}
+      ສຸດທິ {net}
+      ເງິນສົດເຂົ້າ {cashIn} / ອອກ {cashOut}
+      ໂອນເຂົ້າ {onlineIn} / ອອກ {onlineOut}
+      ເງິນທອນເປີດວັນ {float}
+      ນັບໄດ້ {counted} (ຄວນມີ {expected}) ຜິດຍອດ {variance}
+      ເກັບເງິນທອນໄວ້ {kept}
+      ຍອດສົ່ງ {handover}
+      ສະລິບ {slips}
+      {note}
+      ລະຫັດ {code}
+    th: |-
+      ปิดยอด {date} · {branch}
+      ปิดโดย {closedBy} · {entries} รายการ
+      รายรับ {income}
+      รายจ่าย {expense}
+      สุทธิ {net}
+      เงินสดเข้า {cashIn} / ออก {cashOut}
+      โอนเข้า {onlineIn} / ออก {onlineOut}
+      เงินทอนเปิดวัน {float}
+      นับได้ {counted} (ควรมี {expected}) ส่วนต่าง {variance}
+      เก็บเงินทอนไว้ {kept}
+      ยอดส่ง {handover}
+      สลิป {slips}
+      {note}
+      รหัส {code}
+    en: |-
+      Day closed {date} · {branch}
+      Closed by {closedBy} · {entries} entries
+      Income {income}
+      Expense {expense}
+      Net {net}
+      Cash in {cashIn} / out {cashOut}
+      Transfer in {onlineIn} / out {onlineOut}
+      Opening float {float}
+      Counted {counted} (expected {expected}) variance {variance}
+      Float kept {kept}
+      Handover {handover}
+      Slips {slips}
+      {note}
+      Code {code}

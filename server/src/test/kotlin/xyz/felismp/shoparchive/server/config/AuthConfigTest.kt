@@ -1,0 +1,182 @@
+package xyz.felismp.shoparchive.server.config
+
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Path
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class AuthConfigTest {
+    @TempDir
+    lateinit var root: Path
+
+    private val log = RecordingLog()
+
+    @BeforeTest
+    fun setUp() = prepareRoot(root)
+
+    private fun loaded(auth: String? = null): ConfigService {
+        if (auth != null) root.write("config/shoparchive.yml", "config-version: 1\n\nauth:\n$auth")
+        return ConfigService(root, log = log, clock = FIXED_CLOCK).also { it.load() }
+    }
+
+    @Test
+    fun theDefaultsAreThePlansAndAreWrittenUnderAuth() {
+        val auth = loaded().auth
+
+        assertEquals(10, auth.pairingTtlMinutes)
+        assertEquals(5, auth.manualCodeAttempts)
+        assertTrue(auth.manualCode)
+        assertEquals(listOf("console", "admin", "self"), auth.pairingSources)
+        assertEquals(6, auth.pinLength)
+        assertEquals(10, auth.pinMaxFailures)
+        assertEquals(emptyList(), auth.passwordRequiredFor)
+        assertEquals(8, auth.passwordMin)
+        assertEquals(128, auth.passwordMax)
+        assertEquals(15, auth.accessTokenMinutes)
+        assertEquals(5, auth.reauthWindowMinutes)
+        assertEquals(2, auth.hashConcurrency)
+
+        val text = root.text("config/shoparchive.yml")
+        val tail = text.substring(text.indexOf("\nauth:\n"))
+        for (line in listOf(
+            "auth:\n", "\n  pairing:\n", "    ttl-minutes: 10\n", "    manual-code-attempts: 5\n", "    manual-code: true\n", "    sources: [console, admin, self]\n",
+            "\n  pin:\n", "    length: 6\n", "    max-failures: 10\n",
+            "\n  password:\n", "    required-for: []\n",
+            "    min: 8\n", "    max: 128\n",
+            "\n  session:\n", "    access-token-minutes: 15\n", "    reauth-window-minutes: 5\n",
+            "  hash-concurrency: 2\n",
+        )) assertTrue(line in tail, "missing ${line.trim()} in:\n$tail")
+        // Each key has its comment with the allowed range.
+        assertTrue("# Allowed: integer from 1 to 1440. Default: 10" in tail, tail)
+    }
+
+    @Test
+    fun theSectionsOfOneLevelStillRenderAsBefore() {
+        loaded()
+
+        val text = root.text("config/shoparchive.yml")
+        assertTrue("\nshutdown:\n  # How long a stop waits" in text, text)
+        assertTrue("\nnetwork:\n  # Domain names" in text, text)
+        assertEquals(text, root.text("config/shoparchive.yml").also { loaded() }, "a second load must not change the file")
+        assertTrue(root.backups().isEmpty(), root.backups().toString())
+    }
+
+    @Test
+    fun outOfRangeValuesAreClampedWithAWarning() {
+        val auth = loaded(
+            "  pairing:\n    ttl-minutes: 0\n    manual-code-attempts: 500\n" +
+                "  pin:\n    length: 2\n    max-failures: 1000\n" +
+                "  password:\n    min: 0\n    max: 3\n" +
+                "  session:\n    access-token-minutes: 99999\n    reauth-window-minutes: 0\n" +
+                "  hash-concurrency: 50\n",
+        ).auth
+
+        assertEquals(1, auth.pairingTtlMinutes)
+        assertEquals(20, auth.manualCodeAttempts)
+        assertEquals(4, auth.pinLength)
+        assertEquals(100, auth.pinMaxFailures)
+        assertEquals(1, auth.passwordMin)
+        assertEquals(1440, auth.accessTokenMinutes)
+        assertEquals(1, auth.reauthWindowMinutes)
+        assertEquals(8, auth.hashConcurrency)
+        assertEquals(1, log.warningsWith("auth.pairing.ttl-minutes", "'0'", "'1'").size, log.warnings.toString())
+        assertEquals(1, log.warningsWith("auth.password.min", "'0'", "'1'").size, log.warnings.toString())
+        assertEquals(1, log.warningsWith("auth.pin.max-failures", "'1000'", "'100'").size, log.warnings.toString())
+        assertEquals(1, log.warningsWith("auth.hash-concurrency", "'50'", "'8'").size, log.warnings.toString())
+    }
+
+    @Test
+    fun aMaxBelowTheMinimumIsRaisedSoAPasswordCanExist() {
+        val auth = loaded("  password:\n    min: 100\n    max: 64\n").auth
+
+        assertEquals(100, auth.passwordMax)
+        assertEquals(1, log.warningsWith("auth.password.max", "64", "100").size, log.warnings.toString())
+    }
+
+    @Test
+    fun aLeftoverMinOpKeyIsIgnoredWithAnUnknownKeyWarning() {
+        val auth = loaded("  password:\n    min: 10\n    min-op: 15\n").auth
+
+        assertEquals(10, auth.passwordMin)
+        assertEquals(1, log.warningsWith("unknown key", "auth.password.min-op").size, log.warnings.toString())
+    }
+
+    @Test
+    fun aSourceThatDoesNotExistMakesTheWholeListInvalidSoTheDefaultComesBack() {
+        val auth = loaded("  pairing:\n    sources: [console, everyone]\n").auth
+
+        assertEquals(listOf("console", "admin", "self"), auth.pairingSources)
+        assertEquals(1, log.warningsWith("auth.pairing.sources", "everyone").size, log.warnings.toString())
+    }
+
+    @Test
+    fun listsAreReadInLowerCaseWithoutRepeatsAndMayBeEmpty() {
+        val auth = loaded("  pairing:\n    sources: [Console, console]\n  password:\n    required-for: []\n").auth
+
+        assertEquals(listOf("console"), auth.pairingSources)
+        assertEquals(emptyList(), auth.passwordRequiredFor)
+        assertTrue("sources: [console]" in root.text("config/shoparchive.yml"))
+        assertTrue("required-for: []" in root.text("config/shoparchive.yml"))
+        assertFalse(log.warnings.any { "auth." in it }, log.warnings.toString())
+    }
+
+    @Test
+    fun aReloadBringsTheNewValuesInOneStep() {
+        val config = loaded()
+        assertEquals(10, config.auth.pairingTtlMinutes)
+        root.write("config/shoparchive.yml", "config-version: 1\nauth:\n  pairing:\n    ttl-minutes: 3\n")
+
+        val changed = config.reload()
+
+        assertEquals(3, config.auth.pairingTtlMinutes)
+        assertTrue("auth.pairing.ttl-minutes" in changed, changed.toString())
+    }
+
+    @Test
+    fun thePolicyKeysHaveTheirDefaultsAndAreWrittenInTheirSections() {
+        val auth = loaded().auth
+
+        assertEquals(90, auth.deviceIdleExpiryDays)
+        assertEquals(3, auth.autoLockSharedMinutes)
+        assertEquals(15, auth.autoLockPersonalMinutes)
+        assertTrue(auth.biometricsPersonal)
+        assertEquals(30, auth.reauthEveryDays)
+        assertEquals(14, auth.reauthIdleDays)
+        assertEquals(1, auth.backoffStartSeconds)
+        assertEquals(15, auth.backoffMaxMinutes)
+        assertEquals(100, auth.backoffDisableAt)
+        assertEquals(10, auth.rateLimitPerMinute)
+        val text = root.text("config/shoparchive.yml")
+        for (line in listOf(
+            "\n  device:\n", "    idle-expiry-days: 90\n", "    auto-lock-shared-minutes: 3\n", "    auto-lock-personal-minutes: 15\n", "    biometrics-personal: true\n",
+            "    reauth-every-days: 30\n", "    reauth-idle-days: 14\n",
+            "\n  backoff:\n", "    start-seconds: 1\n", "    max-minutes: 15\n", "    disable-at: 100\n", "  rate-limit-per-minute: 10\n",
+        )) assertTrue(line in text, "missing ${line.trim()} in:\n$text")
+    }
+
+    @Test
+    fun thePolicyKeysOutsideTheirRangeAreClampedWithAWarning() {
+        val auth = loaded(
+            "  device:\n    idle-expiry-days: 0\n    auto-lock-shared-minutes: 999\n    auto-lock-personal-minutes: 0\n" +
+                "  session:\n    reauth-every-days: 9999\n    reauth-idle-days: 0\n" +
+                "  backoff:\n    start-seconds: 600\n    max-minutes: 0\n    disable-at: 1\n" +
+                "  rate-limit-per-minute: 100000\n",
+        ).auth
+
+        assertEquals(1, auth.deviceIdleExpiryDays)
+        assertEquals(120, auth.autoLockSharedMinutes)
+        assertEquals(1, auth.autoLockPersonalMinutes)
+        assertEquals(365, auth.reauthEveryDays)
+        assertEquals(1, auth.reauthIdleDays)
+        assertEquals(60, auth.backoffStartSeconds)
+        assertEquals(1, auth.backoffMaxMinutes)
+        assertEquals(5, auth.backoffDisableAt)
+        assertEquals(1000, auth.rateLimitPerMinute)
+        assertEquals(1, log.warningsWith("auth.backoff.disable-at", "'1'", "'5'").size, log.warnings.toString())
+        assertEquals(1, log.warningsWith("auth.rate-limit-per-minute", "'100000'", "'1000'").size, log.warnings.toString())
+        assertEquals(1, log.warningsWith("auth.device.idle-expiry-days", "'0'", "'1'").size, log.warnings.toString())
+    }
+}

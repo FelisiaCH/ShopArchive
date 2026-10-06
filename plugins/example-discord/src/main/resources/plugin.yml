@@ -1,0 +1,4 @@
+name: ExampleDiscord
+version: "0.1.0"
+main: xyz.felismp.shoparchive.plugins.discord.DiscordPlugin
+api-version: 1

@@ -1,0 +1,7 @@
+# Read from the jar before any of its code runs.
+name: Template          # 1-32 characters: letters, digits, _ and -. The data folder plugins/<name>/ and the routes /api/v1/x/<name>/ use it
+version: "0.1.0"
+main: xyz.felismp.shoparchive.plugins.template.TemplatePlugin
+api-version: 1          # must equal the server's plugin api version, else the jar is not loaded
+# depend: [OtherPlugin]      # must be present and load first
+# softdepend: [OtherPlugin]  # only decides the order

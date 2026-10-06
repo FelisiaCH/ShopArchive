@@ -1,0 +1,7 @@
+# Read from the jar by the launcher before the core is loaded. A hotfix has no main class and no api-version.
+name: HotfixTemplate        # 1-32 characters: letters, digits, _ and -
+version: "0.1.0"
+hotfix: true
+fixes: [EXAMPLE-1]          # the IDs this fixes. When the core lists all of them in fixed-issues, this jar is skipped and can be removed
+severity: bug               # security: the server does not start if this cannot be applied (unless --ignore-hotfix <ID>). bug: warn and start without it
+target-build: 1             # the core build (gradle.properties buildNumber, shown by `status`) this was made for

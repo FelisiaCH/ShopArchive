@@ -1,0 +1,3 @@
+# IDs of the hotfixes whose fix is now part of the core: one per line, `#` starts a comment.
+# Add the ID in the same change that merges the fix; a hotfix whose IDs are all listed here is skipped at start
+# and `plugins` tells the admin it can be removed. Record the build in docs/fixes.md.

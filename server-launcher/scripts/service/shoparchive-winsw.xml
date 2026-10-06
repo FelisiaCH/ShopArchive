@@ -1,0 +1,26 @@
+<!--
+  WinSW template for running ShopArchive as a Windows service.
+
+  Runs java directly, not start.bat - start.bat's `pause` would hang a service with no console to
+  press a key in.
+
+  Setup: download WinSW (https://github.com/winsw/winsw/releases), rename WinSW.exe to
+  shoparchive.exe and place it next to this file (also renamed to shoparchive.xml) in the server
+  root, then from an elevated prompt:
+    shoparchive install
+    shoparchive start
+
+  Edit heap size below (-Xms/-Xmx) to change memory; the YAML config is read after the JVM starts,
+  so it can't hold this setting.
+-->
+<service>
+  <id>shoparchive</id>
+  <name>ShopArchive</name>
+  <description>ShopArchive server</description>
+  <executable>java</executable>
+  <arguments>-Xms1G -Xmx1G -Dshoparchive.start-script=true -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Djava.io.tmpdir=tmp\jvm -XX:-UsePerfData -XX:ErrorFile=crash-reports\hs_err_pid%p.log -jar shoparchive-server.jar</arguments>
+  <workingdirectory>%BASE%</workingdirectory>
+  <stoptimeout>60 sec</stoptimeout>
+  <onfailure action="restart" delay="10 sec"/>
+  <log mode="none"/>
+</service>

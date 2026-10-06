@@ -1,0 +1,34 @@
+# Dev server root
+run/
+
+# Build outputs / tool caches
+build/
+.gradle/
+.kotlin/
+*.class
+*.log
+hs_err_pid*
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.fleet/
+
+# Local machine config (SDK paths)
+local.properties
+
+# Secrets
+*.jks
+keystore.properties
+*.keystore
+*.p12
+*.pem
+*.key
+.env
+
+# Xcode / macOS user data and build products
+xcuserdata/
+DerivedData/
+*.xcuserstate
+.DS_Store

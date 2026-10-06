@@ -1,0 +1,82 @@
+package xyz.felismp.shoparchive.server.auth
+
+import xyz.felismp.shoparchive.api.Command
+import xyz.felismp.shoparchive.api.CommandRegistry
+import xyz.felismp.shoparchive.api.CommandSender
+import xyz.felismp.shoparchive.server.DataBarrier
+import xyz.felismp.shoparchive.server.RemoteSender
+import xyz.felismp.shoparchive.server.users.UserStore
+
+/** `user reset` and `devices`: what the admin does about a lost phone or a forgotten PIN. */
+internal class AccountConsole(
+    private val users: UserStore,
+    private val devices: DeviceStore,
+    private val sessions: Sessions,
+    private val audit: AuditLog,
+    private val pairings: DefaultPairingService,
+    private val pairing: PairingConsole,
+    private val barrier: DataBarrier = DataBarrier(),
+) {
+    /**
+     * Takes the user off every device, clears the password and PIN, ends the access tokens, and shows a new pairing (terminal only).
+     * The grants and pairings made before go first, under the enroll lock: with credentials gone, whoever still held one could
+     * enroll with a PIN of their own choosing. Only the pairing shown at the end is good.
+     */
+    fun reset(sender: CommandSender, name: String) {
+        val user = users.user(name)
+        // From the app the reset would end the very session the new pairing is asked with, leaving no way back in.
+        if (sender is RemoteSender && sender.principal.userId == user.id) {
+            sender.sendMessage("Your own account can only be reset on the server console.")
+            return
+        }
+        // The device files and the user file are one change for a backup: it must not hold the devices off and the user still with a PIN.
+        val removed = barrier.mutate {
+            sessions.withAccount(user.id) {
+                sessions.revokeEnrollments(user.id)
+                pairings.cancel(user.id)
+                val removed = devices.removeAccount(user.id)
+                users.resetCredentials(name)
+                sessions.revokeAccess(user.id, null)
+                removed
+            }
+        }
+        audit.record("account.reset", name, null, "console", "ok,devices=$removed")
+        sender.sendMessage("User '$name' reset: off $removed ${if (removed == 1) "device" else "devices"}, password and PIN cleared")
+        pairing.show(sender, name, png = false)
+    }
+
+    /** `user disable`: a disabled account must not be enrollable, and enabling it again must not bring back a grant or pairing made before. */
+    fun disable(sender: CommandSender, name: String) {
+        val user = users.user(name)
+        sessions.withAccount(user.id) {
+            sessions.revokeEnrollments(user.id)
+            pairings.cancel(user.id)
+            users.setEnabled(name, false)
+        }
+        sender.sendMessage("User '$name' disabled")
+    }
+
+    private fun list(sender: CommandSender, name: String) {
+        val user = users.find(name) ?: return sender.sendMessage("No user '$name'")
+        val found = devices.devicesOf(user.id)
+        if (found.isEmpty()) sender.sendMessage("'$name' is on no device")
+        for ((id, device) in found) {
+            val entry = device.users.values.first { it.userId == user.id }
+            sender.sendMessage("$id: ${device.label} (${device.platform}, ${device.mode.name.lowercase()}), last used ${entry.lastUsed}")
+        }
+    }
+
+    fun register(commands: CommandRegistry) {
+        commands.register(object : Command {
+            override val name = "devices"
+            override val description = "List the devices a user is on: devices <name>"
+
+            override fun complete(args: List<String>) = if (args.size == 1) users.userNames().filter { it.startsWith(args[0]) } else emptyList()
+
+            override fun execute(sender: CommandSender, args: List<String>) {
+                if (args.size != 1) return sender.sendMessage("Usage: devices <name>")
+                list(sender, args[0])
+            }
+        }, "core")
+    }
+}

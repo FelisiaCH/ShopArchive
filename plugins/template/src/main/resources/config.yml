@@ -1,0 +1,8 @@
+# Copied to plugins/Template/config.yml the first time the plugin runs (saveDefaultConfig); the admin's edits are kept.
+# `reload Template` in the server console reads it again.
+greeting: Hello
+shout: false
+
+# A value whose key ends in token, password, secret, key or webhook (the list is plugins.secret-keys in
+# config/shoparchive.yml) is shown as *** by `plugins info Template` and left out of this plugin's log lines.
+api-token: ""

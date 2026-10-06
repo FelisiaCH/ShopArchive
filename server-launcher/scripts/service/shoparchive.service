@@ -1,0 +1,23 @@
+# systemd unit template for ShopArchive.
+#
+# Copy to /etc/systemd/system/shoparchive.service, edit WorkingDirectory/ExecStart/User below to
+# match where you dropped the server, then:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now shoparchive
+
+[Unit]
+Description=ShopArchive server
+After=network-online.target
+
+[Service]
+Type=simple
+User=shoparchive
+WorkingDirectory=/opt/shoparchive
+ExecStart=/bin/sh /opt/shoparchive/start.sh
+Restart=on-failure
+KillSignal=SIGTERM
+TimeoutStopSec=60
+StandardInput=null
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Where the camera app writes a slip photo before it is compressed and sent. -->
+    <cache-path name="slips" path="slips/" />
+    <!-- The installer the app downloaded from the server, handed to the system's package installer. -->
+    <cache-path name="updates" path="updates/" />
+</paths>
