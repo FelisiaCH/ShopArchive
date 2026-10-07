@@ -3,10 +3,14 @@ package xyz.felismp.shoparchive.server.auth
 import xyz.felismp.shoparchive.api.ApiError
 import xyz.felismp.shoparchive.api.AuthService
 import xyz.felismp.shoparchive.api.EventService
+import xyz.felismp.shoparchive.api.NewDeviceEvent
 import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.api.ServiceRegistry
+import xyz.felismp.shoparchive.api.ShopEvents
 import xyz.felismp.shoparchive.server.config.ConfigService
 import xyz.felismp.shoparchive.server.DataBarrier
+import xyz.felismp.shoparchive.server.Log
+import xyz.felismp.shoparchive.server.records.stamp
 import xyz.felismp.shoparchive.server.users.UserData
 import xyz.felismp.shoparchive.server.users.UserStore
 import xyz.felismp.shoparchive.server.users.isUsableCredential
@@ -122,7 +126,23 @@ internal class DefaultAuthService(
             if (!isUsableCredential(user.pin) && request.newPin == null) {
                 throw ApiError(401, ErrorCode.UNAUTHORIZED, "Set a PIN.", reason = ErrorReasons.PIN_NOT_SET)
             }
-            addToDevice(username, user, shared, existing, newSecrets(username, user, shared), "login", ip)
+            // Already on the device (logging in again there): nothing new for the owner to hear about.
+            val wasOn = existing?.second?.users?.get(username)?.userId == user.id
+            addToDevice(username, user, shared, existing, newSecrets(username, user, shared), "login", ip).also {
+                if (!wasOn) publishNewDevice(username, user, it.deviceId)
+            }
+        }
+    }
+
+    /** Tells the listeners of the shop events that [username] is on the device [deviceId] now, after it was saved. It cannot fail the login that already wrote it. */
+    private fun publishNewDevice(username: String, user: UserData, deviceId: String) {
+        try {
+            val device = devices.get(deviceId) ?: return
+            services.get(ShopEvents::class.java)?.publish(
+                NewDeviceEvent(username, deviceId, device.label, device.platform, user.branches.firstOrNull() ?: "", stamp(clock, config)),
+            )
+        } catch (e: Exception) {
+            Log.warn("could not publish device.new: ${e.message}")
         }
     }
 

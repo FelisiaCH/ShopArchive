@@ -25,7 +25,7 @@ class NotifyConfigTest {
     fun theDefaultsAreThePlansAndAreWrittenUnderNotify() {
         val notify = loaded()
 
-        assertEquals(listOf("day.closed", "entry.created"), notify.events)
+        assertEquals(listOf("day.closed", "device.new", "entry.created"), notify.events)
         assertEquals(30, notify.timeoutSeconds)
         assertEquals(10, notify.maxAttempts)
         assertEquals(30, notify.backoffBaseSeconds)
@@ -34,8 +34,9 @@ class NotifyConfigTest {
         val text = root.text("config/shoparchive.yml")
         val tail = text.substring(text.indexOf("\nnotify:\n"))
         for (line in listOf(
-            "notify:\n", "  events: [day.closed, entry.created]\n", "  timeout-seconds: 30\n", "  max-attempts: 10\n", "  backoff:\n",
+            "notify:\n", "  events: [day.closed, device.new, entry.created]\n", "  timeout-seconds: 30\n", "  max-attempts: 10\n", "  backoff:\n",
             "    base-seconds: 30\n", "    max-seconds: 3600\n", "  reconcile-days: 2\n", "# Allowed: integer from 0 to 31. Default: 2", "# Allowed: integer from 1 to 600. Default: 30", "# Allowed: integer from 1 to 1000. Default: 10",
+            "# The events that put a message into the outbox for the channel plugin: entry.created, day.closed, device.new.",
         )) assertTrue(line in tail, "missing ${line.trim()} in:\n$tail")
         assertEquals(emptyList(), log.warnings)
     }

@@ -16,9 +16,10 @@ chat-ids: []
 language: lo
 
 # Which events are sent. The server's own notify.events decides which events reach any channel at all; this lists what this channel sends of them.
-# entry.created = a line was recorded, day.closed = the day was closed.
+# entry.created = a line was recorded, day.closed = the day was closed, device.new = someone logged in on a device they were not on before.
 events:
   - day.closed
+  - device.new
   - entry.created
 
 # Where the Bot API lives. Change it only for a self-hosted Bot API server. Must be https (http only for localhost); otherwise the plugin is not used.
@@ -36,8 +37,9 @@ ledger-keep-days: 7
 #   {type} (income / expense, in the language above)  {category}  {item}  {amount}  {currency}  {branch}  {user}  {time}  {date}  {code}
 #   day.closed also has {closedBy} {entries} {slips} {note} and, per currency (one text, e.g. "LAK 150000; THB 20.50"):
 #   {income} {expense} {net} {cashIn} {cashOut} {onlineIn} {onlineOut} {float} {counted} {expected} {variance} {kept} {handover}
+#   device.new has only {user} {device} (the device's name) {platform} {deviceId} and {code}.
 # A line whose words are all empty (no {category}, no {note}) is left out. An unknown word becomes empty.
-# {code} names the entry or the day: a message that arrives twice has the same code both times.
+# {code} names the entry, the day or the device: a message that arrives twice has the same code both times.
 templates:
   entry-created:
     lo: |-
@@ -104,3 +106,10 @@ templates:
       Slips {slips}
       {note}
       Code {code}
+  device-new:
+    lo: |-
+      ອຸປະກອນໃໝ່: {user} ເຂົ້າສູ່ລະບົບໃນ {device} ({platform})
+    th: |-
+      อุปกรณ์ใหม่: {user} เข้าสู่ระบบบน {device} ({platform})
+    en: |-
+      New device: {user} logged in on {device} ({platform})

@@ -8,9 +8,10 @@ import xyz.felismp.shoparchive.shared.SessionDto
 object ShopEventTypes {
     const val ENTRY_CREATED = "entry.created"
     const val DAY_CLOSED = "day.closed"
+    const val DEVICE_NEW = "device.new"
 
     /** The types the core publishes. */
-    val all: List<String> = listOf(ENTRY_CREATED, DAY_CLOSED)
+    val all: List<String> = listOf(ENTRY_CREATED, DAY_CLOSED, DEVICE_NEW)
 }
 
 /** Something that happened in the shop and was already saved. Events are facts: a listener cannot veto or change what they describe. */
@@ -70,6 +71,21 @@ class DayClosedEvent(
     override val type get() = ShopEventTypes.DAY_CLOSED
     override val branch get() = session.branch
     override val at get() = session.close?.closedAt ?: session.openedAt
+}
+
+/**
+ * A login put [username] on a device they were not on before: a new device, or a shared one that did not hold them. Logging in again on the same device is not one.
+ * [deviceLabel] and [platform] are what the device is called on the server; [branch] is the user's first branch, empty if they have none.
+ */
+class NewDeviceEvent(
+    val username: String,
+    val deviceId: String,
+    val deviceLabel: String,
+    val platform: String,
+    override val branch: String,
+    override val at: String,
+) : ShopEvent {
+    override val type get() = ShopEventTypes.DEVICE_NEW
 }
 
 fun interface ShopEventListener {

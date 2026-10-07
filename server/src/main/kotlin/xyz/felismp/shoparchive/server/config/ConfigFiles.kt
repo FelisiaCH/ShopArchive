@@ -192,7 +192,7 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
     )
 
     val notifyEvents = WordListKey(
-        "notify.events", listOf(ShopEventTypes.DAY_CLOSED, ShopEventTypes.ENTRY_CREATED),
+        "notify.events", listOf(ShopEventTypes.DAY_CLOSED, ShopEventTypes.DEVICE_NEW, ShopEventTypes.ENTRY_CREATED),
         "The events that put a message into the outbox for the channel plugin: ${ShopEventTypes.all.joinToString(", ")}. An empty list turns messages off. A name the server does not publish is ignored with a warning.",
     )
     val notifyTimeoutSeconds = IntKey(

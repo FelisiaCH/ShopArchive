@@ -3,7 +3,7 @@ package xyz.felismp.shoparchive.plugins.discord
 import xyz.felismp.shoparchive.api.plugin.PluginConfig
 
 val LANGUAGES = listOf("lo", "th", "en")
-val KNOWN_EVENTS = listOf("entry.created", "day.closed")
+val KNOWN_EVENTS = listOf("entry.created", "day.closed", "device.new")
 fun templateKey(event: String): String = event.replace('.', '-')
 
 /** Exactly `localhost`, the IPv6 literal `[::1]`, or an IPv4 literal of four plain decimal octets (0 to 255, no leading zeros) starting with 127. No name is resolved. */

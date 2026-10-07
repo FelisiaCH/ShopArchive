@@ -9,7 +9,8 @@ import xyz.felismp.shoparchive.shared.NotificationState
  * (the display name), `user` and `time`; for an entry paid in more than one currency [amount] and [currency] list each, in the same order, joined with `, `.
  * `day.closed` adds `date`, `closedBy`, `entries`, `slips`, `note` and, one text per field with the currencies joined by `; `
  * (`LAK 150000; THB 20.50`): `income`, `expense`, `net`, `cashIn`, `cashOut`, `onlineIn`, `onlineOut`, `float`, `counted`, `expected`, `variance`, `kept`, `handover`.
- * Every notification also has `code` and `date`. The words are data, not text: the channel decides the language and layout.
+ * `device.new` has only `user`, `device` (the device's label), `platform` and `deviceId`.
+ * Every notification also has `code` and, but for `device.new`, `date`. The words are data, not text: the channel decides the language and layout.
  */
 class Notification(
     /** The outbox id: unique and sortable, a new one for every message including a message sent again. */
@@ -21,7 +22,7 @@ class Notification(
     val createdAt: String,
     /** The branch key. */
     val branch: String,
-    /** The name of the user the event is about: who recorded the entry, who closed the day. */
+    /** The name of the user the event is about: who recorded the entry, who closed the day, who logged in on a new device. */
     val user: String,
     /** The language the server speaks (`lo`, `th` or `en`): a default for a channel that has no language of its own. */
     val locale: String,

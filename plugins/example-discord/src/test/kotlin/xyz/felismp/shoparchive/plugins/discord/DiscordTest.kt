@@ -25,12 +25,24 @@ private class Cfg(private val v: Map<String, Any>) : PluginConfig {
     override fun keys(section: String) = v.keys.toList()
 }
 
-private fun cfg(hook: String = HOOK) = Cfg(mapOf(
+private fun cfg(hook: String = HOOK, vararg extra: Pair<String, Any>) = Cfg(mapOf(
     "webhook-url" to hook, "language" to "en", "events" to listOf("entry.created"),
     "templates.entry-created.en" to "{type} {amount} {currency} #{code}",
-))
+) + extra)
 
 private val n = Notification("id1", "20261003-A3F9C", "entry.created", "t", "main", "noy", "lo", mapOf("type" to "expense", "amount" to "5", "currency" to "LAK"))
+
+/** The shipped config.yml as text: its `events:` list and the template of [event] in [language], read line by line. */
+private val shipped: List<String> = DiscordTest::class.java.getResourceAsStream("/config.yml")!!.bufferedReader(Charsets.UTF_8).readLines()
+
+private fun shippedEvents(): List<String> = shipped.drop(shipped.indexOf("events:") + 1).takeWhile { it.startsWith("  - ") }.map { it.removePrefix("  - ") }
+
+private fun shippedTemplate(event: String, language: String): String {
+    val block = shipped.indexOf("  ${templateKey(event)}:")
+    assertTrue(block >= 0, "no templates.${templateKey(event)} in config.yml")
+    val rest = shipped.drop(block + 1)
+    return rest.drop(rest.indexOf("    $language: |-") + 1).takeWhile { it.startsWith("      ") }.joinToString("\n") { it.removePrefix("      ") }
+}
 
 private class T(val answer: () -> HttpAnswer) : HttpTransport {
     val posted = mutableListOf<Pair<String, String>>()
@@ -72,6 +84,27 @@ class DiscordTest {
         assertTrue(net is DeliveryResult.Retry && !net.reason.contains("SECRETPART"))
         assertFailsWith<TimeoutException> { notifier(T { throw java.net.http.HttpTimeoutException(HOOK) }).deliver(n) }
         assertFalse(false)
+    }
+
+    @Test
+    fun theShippedDeviceNewTemplateRendersAndAConfigListingItIsAcceptedWithoutAWarning() {
+        val device = Notification("id2", "20261003-A3F9C", "device.new", "t", "main", "noy", "lo", mapOf("user" to "noy", "device" to "Phone of noy", "platform" to "android", "deviceId" to "d-a3f9c"))
+        val r = PlaceholderRenderer()
+        assertEquals("New device: noy logged in on Phone of noy (android)", r.render(shippedTemplate("device.new", "en"), device, "en"))
+        for (language in LANGUAGES) {
+            val text = r.render(shippedTemplate("device.new", language), device, language)
+            assertTrue("noy" in text && "Phone of noy" in text && "(android)" in text, "$language: $text")
+        }
+        assertTrue("device.new" in shippedEvents(), shippedEvents().toString())
+
+        val warns = mutableListOf<String>()
+        val templates = LANGUAGES.map { "templates.device-new.$it" to shippedTemplate("device.new", it) }.toTypedArray()
+        val config = cfg(HOOK, "events" to listOf("entry.created", "device.new"), *templates)
+        assertEquals(setOf("entry.created", "device.new"), DiscordSettings.read(config) { warns += it }!!.events)
+        assertEquals(emptyList(), warns)
+        val t = T { HttpAnswer(204, "") }
+        assertTrue(DiscordNotifier({ DiscordSettings.read(config) {} }, t).deliver(device) is DeliveryResult.Sent)
+        assertTrue(t.posted.single().second.contains("New device: noy logged in on Phone of noy (android)"), t.posted.single().second)
     }
 
     @Test

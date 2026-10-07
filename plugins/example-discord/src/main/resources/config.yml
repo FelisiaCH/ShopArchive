@@ -13,6 +13,7 @@ language: lo
 # Which events are sent (the server's notify.events decides which reach any channel).
 events:
   - day.closed
+  - device.new
   - entry.created
 
 # How long to wait for Discord, in seconds (2 to 25). Keep it below notify.timeout-seconds (default 30).
@@ -23,8 +24,9 @@ http-timeout-seconds: 10
 #   {type} (income / expense, in the language above)  {category}  {item}  {amount}  {currency}  {branch}  {user}  {time}  {date}  {code}
 #   day.closed also has {closedBy} {entries} {slips} {note} and, per currency (one text, e.g. "LAK 150000; THB 20.50"):
 #   {income} {expense} {net} {cashIn} {cashOut} {onlineIn} {onlineOut} {float} {counted} {expected} {variance} {kept} {handover}
+#   device.new has only {user} {device} (the device's name) {platform} {deviceId} and {code}.
 # A line whose words are all empty (no {category}, no {note}) is left out. An unknown word becomes empty.
-# {code} names the entry or the day: a message that arrives twice has the same code both times.
+# {code} names the entry, the day or the device: a message that arrives twice has the same code both times.
 templates:
   entry-created:
     lo: |-
@@ -91,3 +93,10 @@ templates:
       Slips {slips}
       {note}
       Code {code}
+  device-new:
+    lo: |-
+      ອຸປະກອນໃໝ່: {user} ເຂົ້າສູ່ລະບົບໃນ {device} ({platform})
+    th: |-
+      อุปกรณ์ใหม่: {user} เข้าสู่ระบบบน {device} ({platform})
+    en: |-
+      New device: {user} logged in on {device} ({platform})

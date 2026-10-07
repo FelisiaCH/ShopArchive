@@ -44,6 +44,18 @@ private fun note(id: String = "20261003-150000-001", event: String = "entry.crea
 
 private val entryFields = mapOf("type" to "income", "category" to "", "item" to "coffee", "amount" to "150000", "currency" to "LAK", "user" to "noy", "time" to "2026-10-03T15:00:12+07:00")
 
+/** The shipped config.yml as text: its `events:` list and the template of [event] in [language], read line by line. */
+private val shipped: List<String> = TelegramTest::class.java.getResourceAsStream("/config.yml")!!.bufferedReader(Charsets.UTF_8).readLines()
+
+private fun shippedEvents(): List<String> = shipped.drop(shipped.indexOf("events:") + 1).takeWhile { it.startsWith("  - ") }.map { it.removePrefix("  - ") }
+
+private fun shippedTemplate(event: String, language: String): String {
+    val block = shipped.indexOf("  ${templateKey(event)}:")
+    assertTrue(block >= 0, "no templates.${templateKey(event)} in config.yml")
+    val rest = shipped.drop(block + 1)
+    return rest.drop(rest.indexOf("    $language: |-") + 1).takeWhile { it.startsWith("      ") }.joinToString("\n") { it.removePrefix("      ") }
+}
+
 private class FakeTransport(val answers: ArrayDeque<() -> HttpAnswer> = ArrayDeque()) : HttpTransport {
     val posted = mutableListOf<Pair<String, String>>()
     override fun postJson(url: String, body: String, timeoutSeconds: Int): HttpAnswer {
@@ -252,6 +264,27 @@ class TelegramTest {
         val day = note(event = "day.closed", fields = mapOf("date" to "2026-10-03", "float" to "LAK 100000", "handover" to "LAK 400000", "note" to ""))
         assertEquals("Closed 2026-10-03 float LAK 100000 handover LAK 400000", r.render("Closed {date} float {float} handover {handover} {note}", day, "en"))
         assertEquals("{x}", r.render("{v}", note(fields = mapOf("v" to "{x}")), "en"))
+    }
+
+    @Test
+    fun theShippedDeviceNewTemplateRendersAndAConfigListingItIsAcceptedWithoutAWarning() {
+        val n = note(event = "device.new", fields = mapOf("user" to "noy", "device" to "Phone of noy", "platform" to "android", "deviceId" to "4f1c2d3e-0000-4000-8000-00000000a3f9c"))
+        val r = PlaceholderRenderer()
+        assertEquals("New device: noy logged in on Phone of noy (android)", r.render(shippedTemplate("device.new", "en"), n, "en"))
+        for (language in LANGUAGES) {
+            val text = r.render(shippedTemplate("device.new", language), n, language)
+            assertTrue("noy" in text && "Phone of noy" in text && "(android)" in text, "$language: $text")
+        }
+        assertTrue("device.new" in shippedEvents(), shippedEvents().toString())
+
+        val warns = mutableListOf<String>()
+        val templates = LANGUAGES.map { "templates.device-new.$it" to shippedTemplate("device.new", it) }.toTypedArray()
+        val cfg = config("events" to listOf("entry.created", "day.closed", "device.new"), *templates)
+        assertEquals(setOf("entry.created", "day.closed", "device.new"), TelegramSettings.read(cfg) { warns += it }!!.events)
+        assertEquals(emptyList(), warns)
+        val t = FakeTransport()
+        assertTrue(notifier(t, cfg = cfg).deliver(n) is DeliveryResult.Sent)
+        assertTrue(t.posted[0].second.contains("New device: noy logged in on Phone of noy (android)"), t.posted[0].second)
     }
 
     @Test

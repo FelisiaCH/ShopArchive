@@ -3,6 +3,7 @@ package xyz.felismp.shoparchive.server.notify
 import xyz.felismp.shoparchive.api.CurrencyDay
 import xyz.felismp.shoparchive.api.DayClosedEvent
 import xyz.felismp.shoparchive.api.EntryCreatedEvent
+import xyz.felismp.shoparchive.api.NewDeviceEvent
 import xyz.felismp.shoparchive.api.Notification
 import xyz.felismp.shoparchive.api.ShopEvent
 import xyz.felismp.shoparchive.api.ShopEventTypes
@@ -16,6 +17,7 @@ import java.util.Locale
 internal fun notificationFields(event: ShopEvent, locale: Locale): Map<String, String>? = when (event) {
     is EntryCreatedEvent -> entryFields(event, locale)
     is DayClosedEvent -> dayFields(event)
+    is NewDeviceEvent -> linkedMapOf("user" to event.username, "device" to event.deviceLabel, "platform" to event.platform, "deviceId" to event.deviceId)
     else -> null
 }
 
@@ -80,7 +82,7 @@ private fun dayFields(event: DayClosedEvent): Map<String, String> {
     return fields
 }
 
-/** The short code a message carries: the business date and the last five characters of the entry's or the day's id, so it names one subject and a repeat has the same one. */
+/** The short code a message carries: the business date and the last five characters of the entry's, the day's or the device's id, so it names one subject and a repeat has the same one. */
 internal fun notificationCode(date: String, subjectId: String): String = date.replace("-", "") + "-" + subjectId.takeLast(5).uppercase(Locale.ROOT)
 
 /** One line for the log, `notify list` and the app: what the message is about, whatever channel it goes to. */
@@ -95,6 +97,7 @@ internal fun describe(n: Notification): String {
         ShopEventTypes.DAY_CLOSED ->
             "[${n.code}] ${f["branch"]} ${f["date"]}: day closed by ${n.user}; net ${f["net"]}; counted ${f["counted"]}; variance ${f["variance"]}; handover ${f["handover"]}; ${f["entries"]} entries" +
                 if (f["recomputed"] == "true") " (figures added up from the entries as they are now: the day was closed before they were kept)" else ""
+        ShopEventTypes.DEVICE_NEW -> "[${n.code}] New device: ${n.user} on ${f["device"]} (${f["platform"]})"
         else -> "[${n.code}] ${n.event} ${f["branch"] ?: n.branch}"
     }
 }
@@ -105,6 +108,8 @@ internal fun draftFor(event: ShopEvent, locale: Locale, createdAt: String, resen
     val (code, subject) = when (event) {
         is EntryCreatedEvent -> notificationCode(event.entry.date, event.entry.id) to event.entry.id
         is DayClosedEvent -> notificationCode(event.session.businessDate, event.session.id) to event.session.id
+        // Not a record: reconciling never makes it again, so there is no subject to look for.
+        is NewDeviceEvent -> notificationCode(event.at.take(10), event.deviceId) to null
         else -> return null
     }
     return Draft(code, event.type, createdAt, event.branch, fields.getValue("user"), locale.toLanguageTag(), fields, resendOf, subject)

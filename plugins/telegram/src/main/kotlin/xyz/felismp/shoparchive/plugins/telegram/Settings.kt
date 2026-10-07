@@ -6,7 +6,7 @@ import xyz.felismp.shoparchive.api.plugin.PluginConfig
 val LANGUAGES = listOf("lo", "th", "en")
 
 /** The events this channel knows how to write; `notify.events` in the server's config decides which of them reach any channel. */
-val KNOWN_EVENTS = listOf("entry.created", "day.closed")
+val KNOWN_EVENTS = listOf("entry.created", "day.closed", "device.new")
 
 /** The key of an event's templates in config.yml: the dot of the event name would read as a level. */
 fun templateKey(event: String): String = event.replace('.', '-')
