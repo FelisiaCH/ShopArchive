@@ -31,7 +31,6 @@
     <string name="proto_versions">ໂປຣໂຕຄອນຂອງແອັບ: %1$s. ໂປຣໂຕຄອນຂອງເຊີບເວີ: %2$s.</string>
     <string name="proto_unknown">ບໍ່ຮູ້</string>
     <string name="err_unreachable">ເຊື່ອມຕໍ່ເຊີບເວີບໍ່ໄດ້. ກວດວ່າເຊີບເວີເປີດຢູ່, ຢູ່ເຄືອຂ່າຍດຽວກັນ ແລະ ທີ່ຢູ່ຖືກຕ້ອງ ແລ້ວລອງອີກເທື່ອ.</string>
-    <string name="err_pairing_invalid">ການຈັບຄູ່ນີ້ໃຊ້ບໍ່ໄດ້ ຫຼື ໝົດອາຍຸ. ຂໍລິ້ງ ຫຼື ລະຫັດໃໝ່ຈາກຜູ້ດູແລ.</string>
     <string name="err_too_many">ລອງຫຼາຍເທື່ອເກີນໄປ. ລໍ %1$s ວິນາທີ ແລ້ວລອງໃໝ່.</string>
     <string name="err_too_many_later">ລອງຫຼາຍເທື່ອເກີນໄປ. ລໍຖ້າສັກຄາວ ແລ້ວລອງໃໝ່.</string>
     <string name="err_banned">ເຊີບເວີບລັອກທີ່ຢູ່ນີ້. ຕິດຕໍ່ຜູ້ດູແລ.</string>
@@ -292,7 +291,6 @@
     <string name="code_entry_broken">ໄຟລ໌ຂອງລາຍການນີ້ເສຍຫາຍ ໃຫ້ຜູ້ດູແລກວດທີ່ເຊີບເວີ</string>
     <string name="code_storage_busy">ດິສກ໌ຂອງເຊີບເວີບໍ່ຫວ່າງ ແລະ ຍັງບໍ່ມີຫຍັງປ່ຽນແປງ ລອງອີກຄັ້ງ</string>
     <string name="code_internal">ເຊີບເວີຈັດການເລື່ອງນີ້ບໍ່ໄດ້ ລອງອີກຄັ້ງ ແລະ ແຈ້ງຜູ້ດູແລຖ້າເປັນຕໍ່ເນື່ອງ</string>
-    <string name="err_enroll_expired">ໝົດເວລາຕັ້ງຄ່າແລ້ວ ຂໍລິ້ງ ຫຼື ລະຫັດໃໝ່ຈາກຜູ້ດູແລ</string>
     <string name="reports_notifications">ການແຈ້ງເຕືອນ</string>
     <string name="notif_hint">ຂໍ້ຄວາມທີ່ເຊີບເວີສົ່ງໄປ Telegram ຫຼືຊ່ອງທາງອື່ນ ລຽງຈາກໃໝ່ສຸດ.</string>
     <string name="notif_empty">ຍັງບໍ່ມີຂໍ້ຄວາມ.</string>

@@ -66,7 +66,6 @@ internal fun codeWords(code: ErrorCode): StringResource = when (code) {
         ErrorCode.FORBIDDEN -> Res.string.code_forbidden
         ErrorCode.NOT_FOUND -> Res.string.code_not_found
         ErrorCode.INVALID_REQUEST -> Res.string.code_invalid_request
-        ErrorCode.PAIRING_INVALID -> Res.string.err_pairing_invalid
         ErrorCode.REAUTH_REQUIRED -> Res.string.code_reauth_required
         ErrorCode.CREDENTIALS_CHANGED -> Res.string.err_credentials_changed
         ErrorCode.PAYLOAD_TOO_LARGE -> Res.string.code_payload_too_large
@@ -78,7 +77,6 @@ internal fun codeWords(code: ErrorCode): StringResource = when (code) {
         ErrorCode.ENTRY_BROKEN -> Res.string.code_entry_broken
         ErrorCode.STORAGE_BUSY -> Res.string.code_storage_busy
         ErrorCode.INTERNAL -> Res.string.code_internal
-        ErrorCode.ENROLLMENT_EXPIRED -> Res.string.err_enroll_expired
         ErrorCode.DEVICE_NOT_RECOGNIZED -> Res.string.err_device_rejected
 }
 

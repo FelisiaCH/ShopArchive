@@ -64,31 +64,15 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
         min = 5, max = 300,
     )
 
-    val pairingTtlMinutes = IntKey(
-        "auth.pairing.ttl-minutes", 10,
-        "How long a pairing (QR, link and manual code) and the enrollment that follows it stay valid, in minutes.",
-        min = 1, max = 1440,
-    )
-    val manualCodeAttempts = IntKey(
-        "auth.pairing.manual-code-attempts", 5,
-        "Wrong manual codes a pairing takes before its manual code stops working (its QR and link still work until they expire).",
-        min = 1, max = 20,
-    )
-    val manualCode = BoolKey("auth.pairing.manual-code", true, "Let a device pair by typing the user name and the manual code, not only by QR or link.")
-    val pairingSources = WordListKey(
-        "auth.pairing.sources", listOf("console", "admin", "self"),
-        "Who may start a pairing. console: the server console. admin: a user with shoparchive.devices.pair, for another user. self: a user, for their own account.",
-        choices = listOf("console", "admin", "self"),
-    )
     val pinLength = IntKey("auth.pin.length", 6, "Number of digits in a new PIN. A PIN already set keeps working when this changes.", min = 4, max = 12)
     val pinMaxFailures = IntKey(
         "auth.pin.max-failures", 0,
-        "Wrong PINs or passwords on one device before that user is removed from that device (the user must pair it again). 0 turns this off.",
+        "Wrong PINs or passwords on one device before that user is removed from that device (the user must log in on it again). 0 turns this off.",
         min = 0, max = 100,
     )
     val deviceIdleExpiryDays = IntKey(
         "auth.device.idle-expiry-days", 0,
-        "A user not used on a device for this many days is taken off it (the user must pair it again), in days. 0 turns this off.",
+        "A user not used on a device for this many days is taken off it (the user must log in on it again), in days. 0 turns this off.",
         min = 0, max = 3650,
     )
     val autoLockSharedMinutes = IntKey(
@@ -123,7 +107,7 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
     )
     val reauthWindowMinutes = IntKey(
         "auth.session.reauth-window-minutes", 5,
-        "An important action (such as creating a pairing) needs the PIN or password to have been entered within this many minutes.",
+        "An important action (such as taking a device off) needs the PIN or password to have been entered within this many minutes.",
         min = 1, max = 60,
     )
     val reauthEveryDays = IntKey(
@@ -149,7 +133,7 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
     )
     val rateLimitPerMinute = IntKey(
         "auth.rate-limit-per-minute", 10,
-        "Requests per minute one address may send to the endpoints open to everyone (pairing, enrolling, unlocking); more get 429. Needs a restart.",
+        "Requests per minute one address may send to the endpoints open to everyone (logging in, unlocking); more get 429. Needs a restart.",
         min = 1, max = 1000,
     )
     val hashConcurrency = IntKey(
@@ -256,7 +240,7 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
 
     val keys: List<Key<*>> = listOf(
         timezone, locale, shutdownHookTimeoutMs, networkDomains, certValidityDays, maxBodyKb, requestTimeoutSeconds,
-        pairingTtlMinutes, manualCodeAttempts, manualCode, pairingSources, pinLength, pinMaxFailures,
+        pinLength, pinMaxFailures,
         deviceIdleExpiryDays, autoLockSharedMinutes, autoLockPersonalMinutes, biometricsPersonal, unlockWithoutPin,
         passwordRequiredFor, passwordMin, passwordMax, accessTokenMinutes, reauthWindowMinutes, reauthEveryDays, reauthIdleDays,
         backoffStartSeconds, backoffMaxMinutes, backoffDisableAt, rateLimitPerMinute, hashConcurrency,

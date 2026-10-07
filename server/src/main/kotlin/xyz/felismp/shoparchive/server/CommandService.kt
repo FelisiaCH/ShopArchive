@@ -54,7 +54,7 @@ internal fun registerCommandNodes(nodes: PermissionNodeRegistry) {
 
 /**
  * A sender who is not at the server: what a command tells them goes back in the answer to the request, so unlike the console it may carry
- * a secret (a pairing link), which then never reaches the log. What it does on someone's behalf is checked as that [principal], from [ip].
+ * a secret, which then never reaches the log. What it does on someone's behalf is checked as that [principal], from [ip].
  */
 internal interface RemoteSender : CommandSender {
     val principal: Principal

@@ -41,7 +41,7 @@ import java.util.Base64
 import java.util.Date
 import java.util.Locale
 
-/** The keystore in `certs/` exists but cannot be used. Never "fixed" by making a new key: that would break every paired device. */
+/** The keystore in `certs/` exists but cannot be used. Never "fixed" by making a new key: that would break every device that trusts the key. */
 internal class CertificateException(message: String) : Exception(message)
 
 /** The names a certificate has to be valid for: every address clients may use (as text) and the configured domains. `localhost` is always added. */
@@ -102,7 +102,7 @@ internal class CertificateManager(
         } catch (e: Exception) {
             if (e !is IOException && e !is GeneralSecurityException && e !is ClassCastException && e !is NullPointerException) throw e
             throw CertificateException(
-                "certs/keystore.p12 cannot be read (${e.message ?: e.javaClass.simpleName}). It holds the key every paired device " +
+                "certs/keystore.p12 cannot be read (${e.message ?: e.javaClass.simpleName}). It holds the key every device " +
                     "trusts, so it is left untouched and no new key is made. Restore certs/keystore.p12 and certs/keystore.pass from a backup."
             )
         }
@@ -113,7 +113,7 @@ internal class CertificateManager(
         val renewed = sign(KeyPair(certificate.publicKey, key), hosts, validityDays)
         store(renewed, key, password)
         val result = ServerCertificate(reload(password), ALIAS, password, renewed)
-        log.warn("Certificate replaced ($reason). Same key, so the fingerprint ${result.fingerprint} and paired devices stay valid; the old keystore is saved as $backup")
+        log.warn("Certificate replaced ($reason). Same key, so the fingerprint ${result.fingerprint} and the devices that trust it stay valid; the old keystore is saved as $backup")
         return result
     }
 

@@ -28,33 +28,11 @@ internal fun sha256Hex(text: String): String = sha256(text).joinToString("") { "
 internal class AccessSession(val userId: String, val username: String, val deviceId: String, val expiresAt: Instant, @Volatile var verifiedAt: Instant)
 
 /**
- * What a redeemed pairing leaves behind: the right to call `/enroll` once, as the account [userId] ([username] for display), until [expiresAt].
- * [ttl] is how long it was given for; after [expiresAt] the record stays for another [ttl] so a late caller is told "expired", not "wrong".
- */
-internal class Enrollment(val userId: String, val username: String, val expiresAt: Instant, val ttl: Duration) {
-    var wrongSecrets = 0
-}
-
-/** What [Sessions.enrollment] found for a token. */
-internal sealed interface EnrollmentLookup {
-    /** The token is good. */
-    class Valid(val enrollment: Enrollment) : EnrollmentLookup
-
-    /** The token was issued and its time ran out. [enrollment] is kept for the audit line only. */
-    class Expired(val enrollment: Enrollment) : EnrollmentLookup
-
-    /** Not a token, or one that was used up or revoked: nothing is said about which. */
-    data object Unknown : EnrollmentLookup
-}
-
-/**
- * Access tokens and enrollment tokens. Both are 256 random bits, live in memory only (a restart signs everyone out,
- * and the devices unlock again), and are kept under their SHA-256, so what sits in memory cannot be sent as a token.
- * An access token is not an enrollment token and the other way round: they are looked up in different maps.
+ * Access tokens. They are 256 random bits, live in memory only (a restart signs everyone out, and the devices unlock
+ * again), and are kept under their SHA-256, so what sits in memory cannot be sent as a token.
  */
 internal class Sessions(private val clock: Clock = Clock.systemUTC()) {
     private val access = ConcurrentHashMap<String, AccessSession>()
-    private val enrollments = ConcurrentHashMap<String, Enrollment>()
 
     /**
      * Returns the new token and the handle ([Principal.session][xyz.felismp.shoparchive.api.Principal.session]) that names it.
@@ -108,45 +86,12 @@ internal class Sessions(private val clock: Clock = Clock.systemUTC()) {
         access.values.removeIf { it.userId == userId && (deviceId == null || it.deviceId == deviceId) }
     }
 
-    fun issueEnrollment(userId: String, username: String, ttl: Duration): String {
-        val now = clock.instant()
-        enrollments.values.removeIf { !it.expiresAt.plus(it.ttl).isAfter(now) }
-        val token = randomToken(32)
-        enrollments[sha256Hex(token)] = Enrollment(userId, username, now.plus(ttl), ttl)
-        return token
-    }
-
-    /** Valid, expired (kept until it has been over for as long as it was good for) or unknown. */
-    fun enrollment(token: String): EnrollmentLookup {
-        if (token.length > MAX_TOKEN_CHARS) return EnrollmentLookup.Unknown
-        val key = sha256Hex(token)
-        val found = enrollments[key] ?: return EnrollmentLookup.Unknown
-        val now = clock.instant()
-        return when {
-            found.expiresAt.isAfter(now) -> EnrollmentLookup.Valid(found)
-            found.expiresAt.plus(found.ttl).isAfter(now) -> EnrollmentLookup.Expired(found)
-            else -> {
-                enrollments.remove(key, found)
-                EnrollmentLookup.Unknown
-            }
-        }
-    }
-
-    fun endEnrollment(token: String) {
-        enrollments.remove(sha256Hex(token))
-    }
-
-    /** Ends every enrollment grant of the account [userId]. Call it inside [withAccount], so no enroll is half-way through. */
-    fun revokeEnrollments(userId: String) {
-        enrollments.values.removeIf { it.userId == userId }
-    }
-
-    // One lock per account for everything that changes who the account is on a device: enroll, and the admin's reset and disable.
+    // One lock per account for everything that changes who the account is on a device: login, and the admin's reset and disable.
     private val accountLocks = ConcurrentHashMap<String, Any>()
 
     /**
-     * Runs [block] holding the enrollment lock of the account [userId]. An enroll in flight finishes before the block starts
-     * (and the block then undoes it); one that starts later finds its grant gone. Lock order is this one, then the user store's.
+     * Runs [block] holding the lock of the account [userId]. A login in flight finishes before the block starts (and the block
+     * then undoes it); one that starts later sees what the block did. Lock order is this one, then the user store's.
      */
     inline fun <T> withAccount(userId: String, block: () -> T): T = synchronized(accountLock(userId), block)
 

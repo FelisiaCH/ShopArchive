@@ -26,10 +26,6 @@ class AuthConfigTest {
     fun theDefaultsAreThePlansAndAreWrittenUnderAuth() {
         val auth = loaded().auth
 
-        assertEquals(10, auth.pairingTtlMinutes)
-        assertEquals(5, auth.manualCodeAttempts)
-        assertTrue(auth.manualCode)
-        assertEquals(listOf("console", "admin", "self"), auth.pairingSources)
         assertEquals(6, auth.pinLength)
         assertEquals(0, auth.pinMaxFailures)
         assertEquals(emptyList(), auth.passwordRequiredFor)
@@ -42,7 +38,7 @@ class AuthConfigTest {
         val text = root.text("config/shoparchive.yml")
         val tail = text.substring(text.indexOf("\nauth:\n"))
         for (line in listOf(
-            "auth:\n", "\n  pairing:\n", "    ttl-minutes: 10\n", "    manual-code-attempts: 5\n", "    manual-code: true\n", "    sources: [console, admin, self]\n",
+            "auth:\n",
             "\n  pin:\n", "    length: 6\n", "    max-failures: 0\n",
             "\n  password:\n", "    required-for: []\n",
             "    min: 8\n", "    max: 128\n",
@@ -50,7 +46,7 @@ class AuthConfigTest {
             "  hash-concurrency: 2\n",
         )) assertTrue(line in tail, "missing ${line.trim()} in:\n$tail")
         // Each key has its comment with the allowed range.
-        assertTrue("# Allowed: integer from 1 to 1440. Default: 10" in tail, tail)
+        assertTrue("# Allowed: integer from 1 to 1440. Default: 15" in tail, tail)
     }
 
     @Test
@@ -67,22 +63,19 @@ class AuthConfigTest {
     @Test
     fun outOfRangeValuesAreClampedWithAWarning() {
         val auth = loaded(
-            "  pairing:\n    ttl-minutes: 0\n    manual-code-attempts: 500\n" +
-                "  pin:\n    length: 2\n    max-failures: 1000\n" +
+            "  pin:\n    length: 2\n    max-failures: 1000\n" +
                 "  password:\n    min: 0\n    max: 3\n" +
                 "  session:\n    access-token-minutes: 99999\n    reauth-window-minutes: 0\n" +
                 "  hash-concurrency: 50\n",
         ).auth
 
-        assertEquals(1, auth.pairingTtlMinutes)
-        assertEquals(20, auth.manualCodeAttempts)
         assertEquals(4, auth.pinLength)
         assertEquals(100, auth.pinMaxFailures)
         assertEquals(1, auth.passwordMin)
         assertEquals(1440, auth.accessTokenMinutes)
         assertEquals(1, auth.reauthWindowMinutes)
         assertEquals(8, auth.hashConcurrency)
-        assertEquals(1, log.warningsWith("auth.pairing.ttl-minutes", "'0'", "'1'").size, log.warnings.toString())
+        assertEquals(1, log.warningsWith("auth.session.access-token-minutes", "'99999'", "'1440'").size, log.warnings.toString())
         assertEquals(1, log.warningsWith("auth.password.min", "'0'", "'1'").size, log.warnings.toString())
         assertEquals(1, log.warningsWith("auth.pin.max-failures", "'1000'", "'100'").size, log.warnings.toString())
         assertEquals(1, log.warningsWith("auth.hash-concurrency", "'50'", "'8'").size, log.warnings.toString())
@@ -105,20 +98,14 @@ class AuthConfigTest {
     }
 
     @Test
-    fun aSourceThatDoesNotExistMakesTheWholeListInvalidSoTheDefaultComesBack() {
-        val auth = loaded("  pairing:\n    sources: [console, everyone]\n").auth
-
-        assertEquals(listOf("console", "admin", "self"), auth.pairingSources)
-        assertEquals(1, log.warningsWith("auth.pairing.sources", "everyone").size, log.warnings.toString())
-    }
-
-    @Test
     fun listsAreReadInLowerCaseWithoutRepeatsAndMayBeEmpty() {
-        val auth = loaded("  pairing:\n    sources: [Console, console]\n  password:\n    required-for: []\n").auth
+        val auth = loaded("  password:\n    required-for: [OP, op, Shoparchive.Users.Manage]\n").auth
 
-        assertEquals(listOf("console"), auth.pairingSources)
-        assertEquals(emptyList(), auth.passwordRequiredFor)
-        assertTrue("sources: [console]" in root.text("config/shoparchive.yml"))
+        assertEquals(listOf("op", "shoparchive.users.manage"), auth.passwordRequiredFor)
+        assertTrue("required-for: [op, shoparchive.users.manage]" in root.text("config/shoparchive.yml"))
+        assertFalse(log.warnings.any { "auth." in it }, log.warnings.toString())
+
+        assertEquals(emptyList(), loaded("  password:\n    required-for: []\n").auth.passwordRequiredFor)
         assertTrue("required-for: []" in root.text("config/shoparchive.yml"))
         assertFalse(log.warnings.any { "auth." in it }, log.warnings.toString())
     }
@@ -126,13 +113,13 @@ class AuthConfigTest {
     @Test
     fun aReloadBringsTheNewValuesInOneStep() {
         val config = loaded()
-        assertEquals(10, config.auth.pairingTtlMinutes)
-        root.write("config/shoparchive.yml", "config-version: 1\nauth:\n  pairing:\n    ttl-minutes: 3\n")
+        assertEquals(15, config.auth.accessTokenMinutes)
+        root.write("config/shoparchive.yml", "config-version: 1\nauth:\n  session:\n    access-token-minutes: 3\n")
 
         val changed = config.reload()
 
-        assertEquals(3, config.auth.pairingTtlMinutes)
-        assertTrue("auth.pairing.ttl-minutes" in changed, changed.toString())
+        assertEquals(3, config.auth.accessTokenMinutes)
+        assertTrue("auth.session.access-token-minutes" in changed, changed.toString())
     }
 
     @Test

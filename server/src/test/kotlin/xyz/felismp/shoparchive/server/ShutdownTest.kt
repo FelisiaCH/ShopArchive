@@ -204,10 +204,10 @@ class ShutdownTest {
         val result = runChild("logging-stop")
 
         assertEquals(0, result.exitCode)
-        assertTrue("pairing-code-4711" in result.output, "the secret never reached the console; output:\n${result.output}")
+        assertTrue("secret-code-4711" in result.output, "the secret never reached the console; output:\n${result.output}")
         val latest = Files.readString(dir.resolve("log-root/logs/latest.log"))
         assertTrue("line-from-main" in latest && "line-from-hook" in latest, latest)
-        assertTrue("pairing-code-4711" !in latest, latest)
+        assertTrue("secret-code-4711" !in latest, latest)
     }
 
     @Test

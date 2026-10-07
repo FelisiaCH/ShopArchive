@@ -56,15 +56,12 @@ import xyz.felismp.shoparchive.api.DeviceService
 import xyz.felismp.shoparchive.api.EventService
 import xyz.felismp.shoparchive.api.InfoService
 import xyz.felismp.shoparchive.api.IpBanService
-import xyz.felismp.shoparchive.api.PairingService
 import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.api.ServiceRegistry
 import xyz.felismp.shoparchive.api.plugin.PluginRouteService
 import xyz.felismp.shoparchive.server.Log
 import xyz.felismp.shoparchive.server.auth.DEVICES_REVOKE_NODE
 import xyz.felismp.shoparchive.server.notify.notifyRoutes
-import xyz.felismp.shoparchive.shared.CreatePairingRequest
-import xyz.felismp.shoparchive.shared.EnrollRequest
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.ErrorResponse
@@ -72,7 +69,6 @@ import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.PROTOCOL_HEADER
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.ReauthRequest
-import xyz.felismp.shoparchive.shared.RedeemRequest
 import xyz.felismp.shoparchive.shared.SetModeRequest
 import xyz.felismp.shoparchive.shared.UnlockRequest
 
@@ -144,7 +140,7 @@ private class SignedInSelector : RouteSelector() {
     override fun toString() = "(signed in)"
 }
 
-/** A valid access token, else 401. An enrollment token is not one. */
+/** A valid access token, else 401. */
 private fun signedInCheck(services: ServiceRegistry) = createRouteScopedPlugin("ShopArchiveSignedIn") {
     onCall { call ->
         val principal = call.bearerToken()?.let { services.require<AuthService>().authenticate(it) } ?: throw unauthorized()
@@ -239,16 +235,6 @@ internal fun Application.apiModule(
         route("/api/v1") {
             get("/info") { call.respond(services.require<InfoService>().info()) }
             rateLimit(PUBLIC_LIMIT) {
-                post("/pair/redeem") {
-                    val body = call.receive<RedeemRequest>()
-                    call.respond(blocking { services.require<PairingService>().redeem(body, call.ip) })
-                }
-                // The enrollment token is the credential here; the service checks it, and it works nowhere else.
-                post("/enroll") {
-                    val token = call.bearerToken() ?: throw unauthorized("Pair first.")
-                    val body = call.receive<EnrollRequest>()
-                    call.respond(blocking { services.require<AuthService>().enroll(token, body, call.ip) })
-                }
                 // The name and the PIN or password in the body are the credential here.
                 post("/login") {
                     val body = call.receive<LoginRequest>()
@@ -298,12 +284,6 @@ private fun Route.protectedRoutes(services: ServiceRegistry) {
         val principal = call.attributes[PrincipalKey]
         blocking { services.require<DeviceService>().setMode(principal, call.parameters["id"].orEmpty(), body.mode, call.ip) }
         call.respond(HttpStatusCode.NoContent)
-    }
-
-    post("/pairings") {
-        val body = call.receive<CreatePairingRequest>()
-        val principal = call.attributes[PrincipalKey]
-        call.respond(HttpStatusCode.Created, blocking { services.require<PairingService>().create(principal, body, call.ip) })
     }
 
     recordRoutes(services)

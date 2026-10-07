@@ -31,7 +31,6 @@
     <string name="proto_versions">โปรโตคอลของแอป: %1$s โปรโตคอลของเซิร์ฟเวอร์: %2$s</string>
     <string name="proto_unknown">ไม่ทราบ</string>
     <string name="err_unreachable">เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจว่าเซิร์ฟเวอร์เปิดอยู่ อยู่ในเครือข่ายเดียวกัน และที่อยู่ถูกต้อง แล้วลองอีกครั้ง</string>
-    <string name="err_pairing_invalid">การจับคู่นี้ใช้ไม่ได้หรือหมดอายุ ขอลิงก์หรือรหัสใหม่จากผู้ดูแล</string>
     <string name="err_too_many">ลองหลายครั้งเกินไป รอ %1$s วินาทีแล้วลองใหม่</string>
     <string name="err_too_many_later">ลองหลายครั้งเกินไป รอสักครู่แล้วลองใหม่</string>
     <string name="err_banned">เซิร์ฟเวอร์บล็อกที่อยู่นี้ ติดต่อผู้ดูแล</string>
@@ -292,7 +291,6 @@
     <string name="code_entry_broken">ไฟล์ของรายการนี้เสียหาย ให้ผู้ดูแลตรวจสอบที่เซิร์ฟเวอร์</string>
     <string name="code_storage_busy">ดิสก์ของเซิร์ฟเวอร์ไม่ว่าง และยังไม่มีอะไรเปลี่ยนแปลง ลองอีกครั้ง</string>
     <string name="code_internal">เซิร์ฟเวอร์จัดการเรื่องนี้ไม่ได้ ลองอีกครั้ง และแจ้งผู้ดูแลหากเป็นต่อเนื่อง</string>
-    <string name="err_enroll_expired">หมดเวลาตั้งค่าแล้ว ขอลิงก์หรือรหัสใหม่จากผู้ดูแล</string>
     <string name="reports_notifications">การแจ้งเตือน</string>
     <string name="notif_hint">ข้อความที่เซิร์ฟเวอร์ส่งไป Telegram หรือช่องทางอื่น เรียงจากใหม่สุด</string>
     <string name="notif_empty">ยังไม่มีข้อความ</string>

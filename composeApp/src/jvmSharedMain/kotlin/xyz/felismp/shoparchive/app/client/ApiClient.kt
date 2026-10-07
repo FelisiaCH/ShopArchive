@@ -34,6 +34,7 @@ import xyz.felismp.shoparchive.shared.CompleteRequest
 import xyz.felismp.shoparchive.shared.CompleteResponse
 import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.HistoryItem
+import xyz.felismp.shoparchive.shared.LoginResponse
 import xyz.felismp.shoparchive.shared.NotificationDto
 import xyz.felismp.shoparchive.shared.SessionPreview
 import xyz.felismp.shoparchive.shared.MoveEntryRequest
@@ -45,7 +46,6 @@ import xyz.felismp.shoparchive.shared.OpenSessionRequest
 import xyz.felismp.shoparchive.shared.OpenSessionResponse
 import xyz.felismp.shoparchive.shared.SessionDto
 import xyz.felismp.shoparchive.shared.DeviceInfo
-import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorResponse
 import xyz.felismp.shoparchive.shared.InfoResponse
@@ -101,7 +101,7 @@ class ApiClient(
     override suspend fun info(): InfoResponse = decode(send(HttpMethod.Get, "/api/v1/info", null, Auth.None))
 
     /** The name and PIN in the body are the credential: no token is sent, so a 401 is a refusal ([ClientError.Api]), never [ClientError.Locked]. */
-    override suspend fun login(request: LoginRequest): EnrollResponse = post("/api/v1/login", request, auth = Auth.None)
+    override suspend fun login(request: LoginRequest): LoginResponse = post("/api/v1/login", request, auth = Auth.None)
 
     /** Keeps the access token in memory. */
     override suspend fun unlock(request: UnlockRequest): UnlockResponse =

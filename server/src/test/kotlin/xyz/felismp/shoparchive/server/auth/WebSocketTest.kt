@@ -14,11 +14,10 @@ import xyz.felismp.shoparchive.server.net.wsPingSeconds
 import xyz.felismp.shoparchive.server.tls.CertificateHosts
 import xyz.felismp.shoparchive.server.tls.CertificateManager
 import xyz.felismp.shoparchive.shared.DeviceMode
-import xyz.felismp.shoparchive.shared.EnrollRequest
-import xyz.felismp.shoparchive.shared.EnrollResponse
+import xyz.felismp.shoparchive.shared.LoginRequest
+import xyz.felismp.shoparchive.shared.LoginResponse
 import xyz.felismp.shoparchive.shared.PROTOCOL_HEADER
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
-import xyz.felismp.shoparchive.shared.RedeemRequest
 import xyz.felismp.shoparchive.shared.UnlockRequest
 import java.net.ServerSocket
 import java.net.URI
@@ -117,19 +116,17 @@ class WebSocketTest {
         return (cause as WebSocketHandshakeException).response.statusCode()
     }
 
-    // --- people, through the services (the HTTP side of login is AuthApiTest's) ---
+    // --- people, through the services (the HTTP side of login is LoginTest's) ---
 
-    private class Login(val device: EnrollResponse, val token: String)
+    private class Login(val device: LoginResponse, val token: String)
 
-    private fun AuthEnv.login(name: String, mode: DeviceMode = DeviceMode.PERSONAL, onto: EnrollResponse? = null): Login {
+    private fun AuthEnv.login(name: String, mode: DeviceMode = DeviceMode.PERSONAL, onto: LoginResponse? = null): Login {
         if (name !in users.userNames()) addUser(name)
         val auth = services.get(AuthService::class.java)!!
-        val redeemed = pairingService().redeem(RedeemRequest(secret = pair(name).secret), "127.0.0.1")
         val hasPin = users.find(name)!!.pin != null
-        val device = auth.enroll(
-            redeemed.enrollmentToken,
-            EnrollRequest(
-                "Phone of $name", "android", mode, pin = PIN.takeIf { hasPin }, newPin = PIN.takeUnless { hasPin },
+        val device = auth.login(
+            LoginRequest(
+                name, "Phone of $name", "android", mode, pin = PIN.takeIf { hasPin }, newPin = PIN.takeUnless { hasPin },
                 deviceId = onto?.deviceId, deviceCredential = onto?.credential,
             ),
             "127.0.0.1",
@@ -137,8 +134,6 @@ class WebSocketTest {
         val token = auth.unlock(UnlockRequest(device.deviceId, name, device.credential, pin = PIN), "127.0.0.1").accessToken
         return Login(device, token)
     }
-
-    private fun AuthEnv.pairingService() = services.get(xyz.felismp.shoparchive.api.PairingService::class.java)!!
 
     private fun Feed.next(): kotlinx.serialization.json.JsonObject =
         Json.parseToJsonElement(assertNotNull(texts.poll(10, TimeUnit.SECONDS), "no message arrived")).jsonObject
@@ -150,11 +145,9 @@ class WebSocketTest {
         val env = AuthEnv(root)
         val port = start(env)
         val login = env.login("mali")
-        val enrollmentToken = env.pairingService().redeem(RedeemRequest(secret = env.pair("mali").secret), "127.0.0.1").enrollmentToken
 
         assertEquals(401, handshakeStatus(port, null))
         assertEquals(401, handshakeStatus(port, "not-a-token"))
-        assertEquals(401, handshakeStatus(port, enrollmentToken))
         assertEquals(400, handshakeStatus(port, login.token, protocol = false))
         connect(port, login.token) // the right one gets in
         assertTrue(waitUntil { env.auth.events.openConnections() == 1 })
@@ -177,11 +170,11 @@ class WebSocketTest {
             assertEquals("shop closes at 6 pm", message["message"]!!.jsonPrimitive.content)
             assertEquals("console", message["from"]!!.jsonPrimitive.content)
         }
-        assertEquals(listOf("Pending pairings: 0", "WebSocket connections: 2"), env.auth.statusLines())
+        assertEquals(listOf("WebSocket connections: 2"), env.auth.statusLines())
     }
 
     @Test
-    fun pairingAnotherDeviceTellsTheOtherOpenSocketsOfThatUserOnly() {
+    fun loggingInOnAnotherDeviceTellsTheOtherOpenSocketsOfThatUserOnly() {
         val env = AuthEnv(root)
         val port = start(env)
         val first = env.login("mali")
@@ -199,7 +192,7 @@ class WebSocketTest {
     }
 
     @Test
-    fun enrollingAnotherUserOnASharedDeviceTellsNoOneElse() {
+    fun addingAnotherUserToASharedDeviceTellsNoOneElse() {
         val env = AuthEnv(root)
         val port = start(env)
         val shared = env.login("mali", DeviceMode.SHARED)

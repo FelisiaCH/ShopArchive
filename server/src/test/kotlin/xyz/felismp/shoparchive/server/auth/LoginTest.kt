@@ -8,11 +8,11 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import org.junit.jupiter.api.io.TempDir
 import xyz.felismp.shoparchive.api.ApiError
 import xyz.felismp.shoparchive.shared.DeviceMode
-import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.ErrorResponse
 import xyz.felismp.shoparchive.shared.LoginRequest
+import xyz.felismp.shoparchive.shared.LoginResponse
 import xyz.felismp.shoparchive.shared.UnlockRequest
 import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
@@ -27,25 +27,25 @@ import kotlin.test.assertTrue
 
 private const val OTHER_PIN = "905173"
 
-/** `POST /api/v1/login`: a name and a PIN give a device credential, with no pairing. */
+/** `POST /api/v1/login`: a name and a PIN give a device credential. */
 class LoginTest {
     @TempDir
     lateinit var root: Path
 
     private fun loginRequest(
-        name: String, pin: String? = null, newPin: String? = null, mode: DeviceMode = DeviceMode.PERSONAL, onto: EnrollResponse? = null,
+        name: String, pin: String? = null, newPin: String? = null, mode: DeviceMode = DeviceMode.PERSONAL, onto: LoginResponse? = null,
         deviceCredential: String? = onto?.credential,
     ) = LoginRequest(name, "Phone of $name", "android", mode, pin = pin, newPin = newPin, deviceId = onto?.deviceId, deviceCredential = deviceCredential)
 
     private suspend fun ApplicationTestBuilder.login(request: LoginRequest) = postJson("/api/v1/login", LoginRequest.serializer(), request)
 
-    private suspend fun ApplicationTestBuilder.loggedIn(request: LoginRequest): EnrollResponse {
+    private suspend fun ApplicationTestBuilder.loggedIn(request: LoginRequest): LoginResponse {
         val response = login(request)
         assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
-        return response.parsed(EnrollResponse.serializer())
+        return response.parsed(LoginResponse.serializer())
     }
 
-    private suspend fun ApplicationTestBuilder.unlock(device: EnrollResponse, name: String, pin: String) =
+    private suspend fun ApplicationTestBuilder.unlock(device: LoginResponse, name: String, pin: String) =
         postJson("/api/v1/unlock", UnlockRequest.serializer(), UnlockRequest(device.deviceId, name, device.credential, pin = pin))
 
     private suspend fun HttpResponse.answer() = status to parsed(ErrorResponse.serializer())
@@ -119,7 +119,6 @@ class LoginTest {
             assertEquals(ErrorReasons.PIN_NOT_SET, notSet.errorReason())
             val device = loggedIn(loginRequest("staff1", newPin = OTHER_PIN))
             assertEquals(HttpStatusCode.OK, unlock(device, "staff1", OTHER_PIN).status)
-            assertEquals(0, auth.pairing.pendingCount(), "no pairing was made")
         }
     }
 
@@ -141,7 +140,7 @@ class LoginTest {
         val pool = Executors.newFixedThreadPool(2)
         val results = try {
             pins.map { pin ->
-                pool.submit<Result<EnrollResponse>> { runCatching { env.authService().login(loginRequest("mali", newPin = pin), "127.0.0.1") } }
+                pool.submit<Result<LoginResponse>> { runCatching { env.authService().login(loginRequest("mali", newPin = pin), "127.0.0.1") } }
             }.map { it.get(30, TimeUnit.SECONDS) }
         } finally {
             pool.shutdownNow()

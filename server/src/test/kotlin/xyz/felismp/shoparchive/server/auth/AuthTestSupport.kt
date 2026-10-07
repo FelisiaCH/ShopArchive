@@ -22,7 +22,6 @@ import xyz.felismp.shoparchive.api.CommandSender
 import xyz.felismp.shoparchive.api.CommandService
 import xyz.felismp.shoparchive.api.InfoService
 import xyz.felismp.shoparchive.api.IpBanService
-import xyz.felismp.shoparchive.api.PairingService
 import xyz.felismp.shoparchive.api.PermissionNode
 import xyz.felismp.shoparchive.api.ShopEvents
 import xyz.felismp.shoparchive.api.UpdateService
@@ -48,17 +47,16 @@ import xyz.felismp.shoparchive.server.records.registerRecordCommands
 import xyz.felismp.shoparchive.server.records.registerRecordNodes
 import xyz.felismp.shoparchive.server.registerCoreCommands
 import xyz.felismp.shoparchive.server.users.UserStore
+import xyz.felismp.shoparchive.server.users.isUsableCredential
 import xyz.felismp.shoparchive.server.users.registerUserCommands
 import xyz.felismp.shoparchive.shared.DeviceMode
-import xyz.felismp.shoparchive.shared.EnrollRequest
-import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorResponse
 import xyz.felismp.shoparchive.shared.InfoResponse
+import xyz.felismp.shoparchive.shared.LoginRequest
+import xyz.felismp.shoparchive.shared.LoginResponse
 import xyz.felismp.shoparchive.shared.PROTOCOL_HEADER
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
-import xyz.felismp.shoparchive.shared.PairPayload
-import xyz.felismp.shoparchive.shared.RedeemRequest
 import xyz.felismp.shoparchive.shared.UnlockRequest
 import java.nio.file.Files
 import java.nio.file.Path
@@ -67,7 +65,6 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
-import java.util.Base64
 import java.util.UUID
 
 /** A clock the test moves by hand. */
@@ -156,13 +153,7 @@ internal class AuthEnv(
     val sender = RecordingSender()
 
     /** The device each user signed in on through [xyz.felismp.shoparchive.server.records.login], so a second sign-in unlocks the same one. */
-    val loginDevices = HashMap<String, EnrollResponse>()
-
-    /** What the console printed for the secrets: the pairing text, one entry per line. */
-    val terminal = mutableListOf<String>()
-
-    /** Shows pairings like the server's console does, printing to [terminal]. */
-    val pairingConsole: PairingConsole
+    val loginDevices = HashMap<String, LoginResponse>()
 
     init {
         prepareRoot(root)
@@ -184,11 +175,10 @@ internal class AuthEnv(
         services.register(ShopEvents::class.java, events, 0, "core")
         notify = if (withNotify) Notify(root, settings, services, records!!::closedDay, records::eventsSince, clock, deliverer, barrier).also { it.listen() } else null
         auth = Auth(
-            root, settings, users, services, SERVER_ID, { listOf("shop.example.com:25655", "192.168.1.20:25655") }, clock, TEST_COST,
+            root, settings, users, services, { listOf("shop.example.com:25655", "192.168.1.20:25655") }, clock, TEST_COST,
             hasher ?: Hasher(settings.auth.hashConcurrency, TEST_COST), records ?: NoRecords, barrier,
         )
         services.register(CommandService::class.java, DefaultCommandService(commands, auth.audit, services), 0, "core")
-        pairingConsole = PairingConsole(root, settings, auth.pairing) { terminal += it }
         registerCoreCommands(
             commands, settings, mapOf("devices" to auth.devices::load) + (if (records != null) mapOf("data" to records::loadData) else emptyMap()),
             alsoOnReload = setOf("devices"),
@@ -208,13 +198,6 @@ internal class AuthEnv(
         return sender.messages.toList()
     }
 
-    /** Shows a pairing for [name] as the console does and returns what it said to the sender. */
-    fun showPairing(name: String, png: Boolean = false): List<String> {
-        sender.messages.clear()
-        pairingConsole.show(sender, name, png)
-        return sender.messages.toList()
-    }
-
     /** What an admin does on a running server: writes [config] as the constructor does and reloads it. */
     fun reconfigure(config: String) {
         root.write("config/shoparchive.yml", withPasswordNodes(config))
@@ -225,12 +208,6 @@ internal class AuthEnv(
     fun addUser(name: String, op: Boolean = false) {
         users.addUser(name, "none", emptyList())
         if (op) users.setOp(name, true)
-    }
-
-    /** A new pairing from the console and what it holds. */
-    fun pair(name: String): Pairing {
-        val created = auth.pairing.createPairing(null, name, "127.0.0.1")
-        return Pairing(created.response.link, created.response.manualCode)
     }
 
     /** Everything stored under [relative] below the root, as text. */
@@ -257,14 +234,6 @@ internal fun removeUserBlock(file: Path, name: String): FileTime {
     Files.writeString(file, changed)
     Files.setLastModifiedTime(file, FileTime.fromMillis(before.toMillis() + 5_000))
     return before
-}
-
-internal class Pairing(val link: String, val manualCode: String?) {
-    val payload: PairPayload = Json.decodeFromString(
-        PairPayload.serializer(),
-        String(Base64.getUrlDecoder().decode(link.removePrefix("shoparchive://pair?d="))),
-    )
-    val secret: String get() = payload.sec
 }
 
 internal val testJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -314,35 +283,53 @@ internal suspend fun ApplicationTestBuilder.getPath(path: String, token: String?
     if (token != null) header(HttpHeaders.Authorization, "Bearer $token")
 }
 
-// --- people through the services, for tests of policy (the HTTP side of login is AuthApiTest's) ---
+// --- people through the services, for tests of policy (the HTTP side of login is LoginTest's and AuthApiTest's) ---
 
 internal const val TEST_PIN = "482915"
 internal const val TEST_PASSWORD = "Correct-Horse-Battery-9"
 
 internal fun AuthEnv.authService() = services.get(AuthService::class.java)!!
-internal fun AuthEnv.pairingService() = services.get(PairingService::class.java)!!
 
-/** A pairing for [name] (made if the user is new), redeemed and enrolled: the PIN (and the password if the policy asks) are the test ones. [onto] adds the user to a shared device. */
-internal fun AuthEnv.enroll(name: String, mode: DeviceMode = DeviceMode.PERSONAL, onto: EnrollResponse? = null): EnrollResponse {
+/**
+ * [name] (made if the user is new) logged in on a new device, or on [onto] to add the user to a shared device: the PIN (and the
+ * password, if the user has one or the policy asks for one) are the test ones, set at this login when the user has none yet.
+ */
+internal fun AuthEnv.signIn(name: String, mode: DeviceMode = DeviceMode.PERSONAL, onto: LoginResponse? = null): LoginResponse {
     if (name !in users.userNames()) addUser(name)
-    val redeemed = pairingService().redeem(RedeemRequest(secret = pair(name).secret), "127.0.0.1")
-    return authService().enroll(
-        redeemed.enrollmentToken,
-        EnrollRequest(
-            "Phone of $name", "android", mode,
-            password = TEST_PASSWORD.takeIf { redeemed.hasPassword }, newPassword = TEST_PASSWORD.takeIf { redeemed.passwordRequired && !redeemed.hasPassword },
-            pin = TEST_PIN.takeIf { redeemed.hasPin }, newPin = TEST_PIN.takeUnless { redeemed.hasPin },
+    val user = users.user(name)
+    val hasPassword = isUsableCredential(user.password)
+    val hasPin = isUsableCredential(user.pin)
+    return authService().login(
+        LoginRequest(
+            name, "Phone of $name", "android", mode,
+            pin = TEST_PIN.takeIf { hasPin }, newPin = TEST_PIN.takeUnless { hasPin },
+            // A new password is only read when the policy asks for one.
+            password = TEST_PASSWORD.takeIf { hasPassword }, newPassword = TEST_PASSWORD.takeUnless { hasPassword },
             deviceId = onto?.deviceId, deviceCredential = onto?.credential,
         ),
         "127.0.0.1",
     )
 }
 
-internal fun AuthEnv.unlock(device: EnrollResponse, name: String, pin: String? = TEST_PIN, password: String? = null) =
+/**
+ * [name] (made if the user is new) on a new device with the test PIN, and the test password where the policy asks for one, as a login
+ * leaves them but without the login's events: a fixture for tests of other things, where a login's `device.new` message would be noise.
+ */
+internal fun AuthEnv.onNewDevice(name: String): LoginResponse {
+    if (name !in users.userNames()) addUser(name)
+    val user = users.user(name)
+    val password = TEST_PASSWORD.takeIf { !isUsableCredential(user.password) && Policy(settings, users).passwordRequired(name) }
+    val pin = TEST_PIN.takeUnless { isUsableCredential(user.pin) }
+    if (password != null || pin != null) check(users.setCredentials(user.id, password?.let { auth.hasher.hash(normalizePassword(it)) }, pin?.let(auth.hasher::hash)))
+    val credential = randomToken(32)
+    return LoginResponse(auth.devices.create("Phone of $name", "android", DeviceMode.PERSONAL, name, user.id, credential), credential)
+}
+
+internal fun AuthEnv.unlock(device: LoginResponse, name: String, pin: String? = TEST_PIN, password: String? = null) =
     authService().unlock(UnlockRequest(device.deviceId, name, device.credential, pin = pin, password = password), "127.0.0.1")
 
 /** The access token of [name] on [device]. */
-internal fun AuthEnv.token(device: EnrollResponse, name: String, secretIsPassword: Boolean = false): String =
+internal fun AuthEnv.token(device: LoginResponse, name: String, secretIsPassword: Boolean = false): String =
     (if (secretIsPassword) unlock(device, name, pin = null, password = TEST_PASSWORD) else unlock(device, name)).accessToken
 
 /** Counts the secrets checked, so a test can tell that a refused try cost no hash. */

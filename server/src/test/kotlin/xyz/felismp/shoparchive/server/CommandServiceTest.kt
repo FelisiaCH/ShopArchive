@@ -5,13 +5,11 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import org.junit.jupiter.api.io.TempDir
 import xyz.felismp.shoparchive.api.Command
 import xyz.felismp.shoparchive.api.CommandSender
-import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.server.auth.AuthEnv
 import xyz.felismp.shoparchive.server.auth.NO_BACKOFF
 import xyz.felismp.shoparchive.server.auth.TEST_PASSWORD
 import xyz.felismp.shoparchive.server.auth.TEST_PIN
 import xyz.felismp.shoparchive.server.auth.api
-import xyz.felismp.shoparchive.server.auth.authService
 import xyz.felismp.shoparchive.server.auth.errorCode
 import xyz.felismp.shoparchive.server.auth.errorReason
 import xyz.felismp.shoparchive.server.auth.parsed
@@ -41,18 +39,6 @@ class CommandServiceTest {
     lateinit var root: Path
 
     private fun env(config: String = NO_BACKOFF) = AuthEnv(root, config)
-
-    /** A user in the app as the command service sees one, for what is still shown to such a sender without a command. */
-    private class AppUser(override val principal: Principal) : RemoteSender {
-        val lines = mutableListOf<String>()
-        override val ip = "127.0.0.1"
-        override val name get() = principal.username
-        override fun sendMessage(message: String) {
-            lines += message
-        }
-    }
-
-    private fun AuthEnv.appUser(token: String) = AppUser(authService().authenticate(token)!!)
 
     private suspend fun ApplicationTestBuilder.runLine(line: String, token: String) =
         postJson("/api/v1/command", CommandRequest.serializer(), CommandRequest(line), token)
@@ -209,7 +195,6 @@ class CommandServiceTest {
             }
             assertEquals(HttpStatusCode.Forbidden, completeLine("user info ", noy).status)
             assertEquals(emptyList(), candidates("", noy), "not offered to a non-op")
-            assertEquals(0, auth.pairing.pendingCount())
             assertEquals(1, auth.devices.devicesOf(users.user("owner").id).size, "the owner's device is still there")
             assertEquals(before, filesUnder("data").filterKeys { "audit" !in it }, "nothing changed")
             assertFalse("command.run" in audit())
@@ -219,32 +204,14 @@ class CommandServiceTest {
     }
 
     @Test
-    fun userPairFromTheAppIsGoneAndMakesNoPairing() = env().run {
+    fun anUnknownUserSubcommandFromTheAppAnswersWithTheUsageLine() = env().run {
         val boss = login("boss", op = true)
         addUser("mali")
         api {
-            val lines = runLine("user pair mali", boss).parsed(CommandResponse.serializer()).lines
+            val lines = runLine("user nonsense mali", boss).parsed(CommandResponse.serializer()).lines
 
             assertEquals(listOf("Usage: user add|list|info|enable|disable|unlock|reset|rename|role|branch ..."), lines)
-            assertEquals(0, auth.pairing.pendingCount())
-            assertTrue(terminal.isEmpty())
-            assertFalse("pair" in candidates("user ", boss))
         }
-    }
-
-    @Test
-    fun aPairingShownToAUserInTheAppAnswersWithTheLinkAndTheCodeAndTheLogAndTheTerminalHoldNeither() = env().run {
-        val boss = appUser(login("boss", op = true))
-        addUser("mali")
-
-        pairingConsole.show(boss, "mali", png = false)
-
-        assertTrue(boss.lines.any { it.startsWith("Link: shoparchive://pair?d=") }, boss.lines.toString())
-        assertTrue(boss.lines.any { it.startsWith("Manual code: ") })
-        assertTrue(terminal.isEmpty(), "nothing is printed on the server's own terminal")
-        assertFalse("shoparchive://" in audit() || "Manual" in audit())
-        assertEquals(1, auth.pairing.pendingCount())
-        assertContains(audit(), "source=admin,by=boss")
     }
 
     @Test
@@ -257,19 +224,6 @@ class CommandServiceTest {
             assertEquals(1, auth.devices.devicesOf(users.user("boss").id).size, "the device is still there")
             assertEquals(HttpStatusCode.OK, runLine("help", boss).status, "the session still works")
         }
-    }
-
-    @Test
-    fun aPairingShownToAUserInTheAppFollowsThePairingSourcesSettingLikeThePairingRoute() = env("config-version: 1\nauth:\n  pairing:\n    sources: [console]\n").run {
-        val boss = appUser(login("boss", op = true))
-        addUser("mali")
-
-        pairingConsole.show(boss, "mali", png = false)
-
-        assertEquals(listOf("Pairing from the admin is turned off (auth.pairing.sources)."), boss.lines)
-        assertEquals(0, auth.pairing.pendingCount())
-        assertEquals(1, showPairing("mali").size, "the console is still allowed")
-        assertEquals(1, auth.pairing.pendingCount())
     }
 
     @Test

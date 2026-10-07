@@ -6,17 +6,13 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.ApplicationTestBuilder
 import org.junit.jupiter.api.io.TempDir
-import xyz.felismp.shoparchive.shared.CreatePairingRequest
 import xyz.felismp.shoparchive.shared.DeviceMode
-import xyz.felismp.shoparchive.shared.EnrollRequest
-import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
+import xyz.felismp.shoparchive.shared.LoginRequest
+import xyz.felismp.shoparchive.shared.LoginResponse
 import xyz.felismp.shoparchive.shared.PROTOCOL_HEADER
-import xyz.felismp.shoparchive.shared.PairingResponse
 import xyz.felismp.shoparchive.shared.ReauthRequest
-import xyz.felismp.shoparchive.shared.RedeemRequest
-import xyz.felismp.shoparchive.shared.RedeemResponse
 import xyz.felismp.shoparchive.shared.UnlockRequest
 import xyz.felismp.shoparchive.shared.UnlockResponse
 import java.nio.file.Path
@@ -39,71 +35,50 @@ class AuthApiTest {
 
     // --- calls ---
 
-    private suspend fun ApplicationTestBuilder.redeem(request: RedeemRequest) = postJson("/api/v1/pair/redeem", RedeemRequest.serializer(), request)
-
-    /** A new pairing for [name] redeemed by its secret. */
-    private suspend fun ApplicationTestBuilder.redeemed(env: AuthEnv, name: String): RedeemResponse {
-        val response = redeem(RedeemRequest(secret = env.pair(name).secret))
-        assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
-        return response.parsed(RedeemResponse.serializer())
-    }
-
-    private fun enrollRequest(
-        mode: DeviceMode = DeviceMode.PERSONAL, password: String? = null, newPassword: String? = null, pin: String? = null, newPin: String? = null,
+    private fun loginRequest(
+        name: String, mode: DeviceMode = DeviceMode.PERSONAL, password: String? = null, newPassword: String? = null, pin: String? = null, newPin: String? = null,
         deviceId: String? = null, deviceCredential: String? = null,
-    ) = EnrollRequest("Test phone", "android", mode, password, newPassword, pin, newPin, deviceId, deviceCredential)
+    ) = LoginRequest(name, "Test phone", "android", mode, pin, newPin, password, newPassword, deviceId, deviceCredential)
 
-    private suspend fun ApplicationTestBuilder.enroll(token: String, request: EnrollRequest) =
-        postJson("/api/v1/enroll", EnrollRequest.serializer(), request, token)
+    private suspend fun ApplicationTestBuilder.login(request: LoginRequest) = postJson("/api/v1/login", LoginRequest.serializer(), request)
 
-    /** Pairs [name] (a new user) and enrolls a device: op users get [OP_PASSWORD], everyone a [PIN]. */
-    private suspend fun ApplicationTestBuilder.enrolled(env: AuthEnv, name: String, mode: DeviceMode = DeviceMode.PERSONAL): EnrollResponse {
-        val redeemed = redeemed(env, name)
-        val response = enroll(
-            redeemed.enrollmentToken,
-            enrollRequest(mode, newPassword = OP_PASSWORD.takeIf { redeemed.passwordRequired }, newPin = PIN),
-        )
+    /** [name] (a new user) logs in on a new device: [OP_PASSWORD] is set where the policy asks for a password, and everyone sets a [PIN]. */
+    private suspend fun ApplicationTestBuilder.loggedIn(name: String, mode: DeviceMode = DeviceMode.PERSONAL): LoginResponse {
+        val response = login(loginRequest(name, mode, newPassword = OP_PASSWORD, newPin = PIN))
         assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
-        return response.parsed(EnrollResponse.serializer())
+        return response.parsed(LoginResponse.serializer())
     }
 
-    private suspend fun ApplicationTestBuilder.unlock(device: EnrollResponse, name: String, secret: String, password: Boolean = false) =
+    private suspend fun ApplicationTestBuilder.unlock(device: LoginResponse, name: String, secret: String, password: Boolean = false) =
         postJson(
             "/api/v1/unlock", UnlockRequest.serializer(),
             UnlockRequest(device.deviceId, name, device.credential, pin = secret.takeUnless { password }, password = secret.takeIf { password }),
         )
 
-    private suspend fun ApplicationTestBuilder.accessToken(device: EnrollResponse, name: String, secret: String, password: Boolean = false): String {
+    private suspend fun ApplicationTestBuilder.accessToken(device: LoginResponse, name: String, secret: String, password: Boolean = false): String {
         val response = unlock(device, name, secret, password)
         assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
         return response.parsed(UnlockResponse.serializer()).accessToken
     }
 
     /** An unlock with the device credential and neither PIN nor password. */
-    private suspend fun ApplicationTestBuilder.credentialOnly(device: EnrollResponse, name: String) =
+    private suspend fun ApplicationTestBuilder.credentialOnly(device: LoginResponse, name: String) =
         postJson("/api/v1/unlock", UnlockRequest.serializer(), UnlockRequest(device.deviceId, name, device.credential))
 
     private suspend fun ApplicationTestBuilder.reauth(token: String?, request: ReauthRequest) =
         postJson("/api/v1/reauth", ReauthRequest.serializer(), request, token)
 
-    private suspend fun ApplicationTestBuilder.createPairing(token: String?, username: String) =
-        postJson("/api/v1/pairings", CreatePairingRequest.serializer(), CreatePairingRequest(username), token)
-
     // --- the credential gate ---
 
     @Test
-    fun everyProtectedEndpointIs401WithoutAnAccessTokenWhileInfoAndRedeemAreOpen() = env().run {
+    fun everyProtectedEndpointIs401WithoutAnAccessTokenWhileInfoAndLoginAreOpen() = env().run {
         addUser("noy", op = true)
         api {
-            val enrollmentToken = redeemed(this@run, "noy").enrollmentToken
-
             val protectedCalls = listOf<suspend () -> io.ktor.client.statement.HttpResponse>(
                 { reauth(null, ReauthRequest(pin = PIN)) },
-                { createPairing(null, "noy") },
-                // An enrollment token is not an access token.
-                { reauth(enrollmentToken, ReauthRequest(pin = PIN)) },
-                { createPairing(enrollmentToken, "noy") },
+                { getPath("/api/v1/devices") },
                 { reauth("not-a-token", ReauthRequest(pin = PIN)) },
+                { getPath("/api/v1/devices", "not-a-token") },
                 { reauth("x".repeat(5000), ReauthRequest(pin = PIN)) },
             )
             // GET /ws is the third protected endpoint; it needs a real upgrade, so WebSocketTest covers it.
@@ -114,18 +89,19 @@ class AuthApiTest {
             }
 
             assertEquals(HttpStatusCode.OK, client.get("/api/v1/info").status)
-            val redeem = redeem(RedeemRequest(secret = "nonsense"))
-            assertEquals(HttpStatusCode.Unauthorized, redeem.status)
-            assertEquals(ErrorCode.PAIRING_INVALID, redeem.errorCode())
+            // The login is reached without a token: it answers about the account.
+            val login = login(loginRequest("noy", pin = PIN))
+            assertEquals(HttpStatusCode.Unauthorized, login.status)
+            assertEquals(ErrorReasons.PIN_NOT_SET, login.errorReason())
         }
     }
 
     @Test
-    fun enrollAndUnlockNeedTheirOwnCredential() = env().run {
+    fun loginAndUnlockNeedTheirOwnCredential() = env().run {
         api {
-            assertEquals(ErrorCode.UNAUTHORIZED, enroll("nope", enrollRequest(newPin = PIN)).errorCode())
-            val noToken = postJson("/api/v1/enroll", EnrollRequest.serializer(), enrollRequest(newPin = PIN))
-            assertEquals(HttpStatusCode.Unauthorized, noToken.status)
+            val login = login(loginRequest("noy", newPin = PIN))
+            assertEquals(HttpStatusCode.Unauthorized, login.status)
+            assertEquals(ErrorCode.UNAUTHORIZED, login.errorCode())
             val unlock = postJson(
                 "/api/v1/unlock", UnlockRequest.serializer(),
                 UnlockRequest("11111111-2222-3333-4444-555555555555", "noy", "x", pin = PIN),
@@ -138,34 +114,30 @@ class AuthApiTest {
     @Test
     fun aBodyThatIsNotTheEndpointsJsonIs400() = env().run {
         api {
-            val broken = postRaw("/api/v1/pair/redeem", "{not json")
+            val broken = postRaw("/api/v1/login", "{not json")
             assertEquals(HttpStatusCode.BadRequest, broken.status)
             assertEquals(ErrorCode.INVALID_REQUEST, broken.errorCode())
             val wrongShape = postRaw("/api/v1/unlock", "{}")
             assertEquals(ErrorCode.INVALID_REQUEST, wrongShape.errorCode())
-            val unknownFieldsAreSkipped = postRaw("/api/v1/pair/redeem", """{"secret":"x","futureField":1}""")
-            assertEquals(ErrorCode.PAIRING_INVALID, unknownFieldsAreSkipped.errorCode())
+            val unknownFieldsAreSkipped = postRaw(
+                "/api/v1/login", """{"username":"ghost","deviceLabel":"x","platform":"android","mode":"personal","pin":"$PIN","futureField":1}""",
+            )
+            assertEquals(ErrorCode.UNAUTHORIZED, unknownFieldsAreSkipped.errorCode())
         }
     }
 
     // --- the whole way in ---
 
     @Test
-    fun anOpPairsEnrollsUnlocksAndUsesTheAccessToken() = env().run {
+    fun anOpLogsInUnlocksAndUsesTheAccessToken() = env().run {
         addUser("noy", op = true)
         api {
-            val redeemed = redeemed(this@run, "noy")
-            assertTrue(redeemed.passwordRequired && !redeemed.hasPassword && !redeemed.hasPin)
-            assertEquals("noy", redeemed.username)
-            assertEquals(6, redeemed.pinLength)
+            val noPin = login(loginRequest("noy", newPassword = OP_PASSWORD))
+            assertEquals(HttpStatusCode.Unauthorized, noPin.status)
+            assertEquals(ErrorReasons.PIN_NOT_SET, noPin.errorReason())
+            assertEquals(ErrorCode.INVALID_REQUEST, login(loginRequest("noy", newPin = PIN)).errorCode()) // no password
 
-            // Everyone, op or not, is told the same suggested length, and the server name for the app's hint.
-            assertEquals(8, redeemed.suggestedPasswordMin)
-            assertEquals("ShopArchive", redeemed.serverName)
-            assertEquals(ErrorCode.INVALID_REQUEST, enroll(redeemed.enrollmentToken, enrollRequest(newPassword = OP_PASSWORD)).errorCode()) // no PIN
-            assertEquals(ErrorCode.INVALID_REQUEST, enroll(redeemed.enrollmentToken, enrollRequest(newPin = PIN)).errorCode()) // no password
-
-            val device = enroll(redeemed.enrollmentToken, enrollRequest(newPassword = OP_PASSWORD, newPin = PIN)).parsed(EnrollResponse.serializer())
+            val device = login(loginRequest("noy", newPassword = OP_PASSWORD, newPin = PIN)).parsed(LoginResponse.serializer())
 
             val file = root.resolve("data/devices/${device.deviceId}.yml")
             val text = file.toFile().readText()
@@ -190,14 +162,11 @@ class AuthApiTest {
     fun aUserWithoutPasswordNodesSignsInWithThePinAlone() = env().run {
         addUser("mali")
         api {
-            val redeemed = redeemed(this@run, "mali")
-            assertFalse(redeemed.passwordRequired)
-            assertEquals(8, redeemed.suggestedPasswordMin)
             // A PIN of the wrong length or with other characters than digits is refused.
             for (bad in listOf("12345", "1234567", "48291a")) {
-                assertEquals(ErrorCode.INVALID_REQUEST, enroll(redeemed.enrollmentToken, enrollRequest(newPin = bad)).errorCode(), bad)
+                assertEquals(ErrorCode.INVALID_REQUEST, login(loginRequest("mali", newPin = bad)).errorCode(), bad)
             }
-            val device = enroll(redeemed.enrollmentToken, enrollRequest(newPin = PIN)).parsed(EnrollResponse.serializer())
+            val device = login(loginRequest("mali", newPin = PIN)).parsed(LoginResponse.serializer())
 
             val token = accessToken(device, "mali", PIN)
             assertEquals(HttpStatusCode.NoContent, reauth(token, ReauthRequest(pin = PIN)).status)
@@ -209,65 +178,9 @@ class AuthApiTest {
     fun aWeakPasswordAndAWeakPinAreAccepted() = env().run {
         addUser("noy", op = true)
         api {
-            val redeemed = redeemed(this@run, "noy")
-            val device = enroll(redeemed.enrollmentToken, enrollRequest(newPassword = "noy", newPin = "123456")).parsed(EnrollResponse.serializer())
+            val device = login(loginRequest("noy", newPassword = "noy", newPin = "123456")).parsed(LoginResponse.serializer())
 
             accessToken(device, "noy", "noy", password = true)
-        }
-    }
-
-    @Test
-    fun theEnrollmentTokenWorksOnceAndNotAfterwards() = env().run {
-        addUser("mali")
-        api {
-            val redeemed = redeemed(this@run, "mali")
-            assertEquals(HttpStatusCode.OK, enroll(redeemed.enrollmentToken, enrollRequest(newPin = PIN)).status)
-
-            val again = enroll(redeemed.enrollmentToken, enrollRequest(newPin = PIN))
-            assertEquals(HttpStatusCode.Unauthorized, again.status)
-        }
-    }
-
-    @Test
-    fun anEnrollmentTokenRunsOutWithThePairingTtl() = env().run {
-        addUser("mali")
-        api {
-            val redeemed = redeemed(this@run, "mali")
-            clock.advance(Duration.ofMinutes(11))
-
-            val late = enroll(redeemed.enrollmentToken, enrollRequest(newPin = PIN))
-            assertEquals(HttpStatusCode.Unauthorized, late.status)
-            assertEquals(ErrorCode.ENROLLMENT_EXPIRED, late.errorCode())
-            assertContains(audit(), "enroll.fail user=mali device=- ip=localhost result=expired")
-        }
-    }
-
-    @Test
-    fun anExpiredEnrollmentIsRememberedForAsLongAgainThenItIsJustUnknown() = env().run {
-        addUser("mali")
-        api {
-            val redeemed = redeemed(this@run, "mali")
-            assertEquals(600L, redeemed.expiresInSeconds)
-            clock.advance(Duration.ofMinutes(11))
-            assertEquals(ErrorCode.ENROLLMENT_EXPIRED, enroll(redeemed.enrollmentToken, enrollRequest(newPin = PIN)).errorCode())
-
-            clock.advance(Duration.ofMinutes(10))
-            val gone = enroll(redeemed.enrollmentToken, enrollRequest(newPin = PIN))
-            assertEquals(ErrorCode.UNAUTHORIZED, gone.errorCode())
-            assertEquals(EnrollmentLookup.Unknown, auth.sessions.enrollment(redeemed.enrollmentToken))
-        }
-    }
-
-    @Test
-    fun aUsedOrMadeUpTokenIsUnauthorizedNotExpired() = env().run {
-        addUser("mali")
-        api {
-            val redeemed = redeemed(this@run, "mali")
-            assertEquals(HttpStatusCode.OK, enroll(redeemed.enrollmentToken, enrollRequest(newPin = PIN)).status)
-            clock.advance(Duration.ofMinutes(11))
-
-            assertEquals(ErrorCode.UNAUTHORIZED, enroll(redeemed.enrollmentToken, enrollRequest(newPin = PIN)).errorCode())
-            assertEquals(ErrorCode.UNAUTHORIZED, enroll("made-up", enrollRequest(newPin = PIN)).errorCode())
         }
     }
 
@@ -275,179 +188,36 @@ class AuthApiTest {
     fun aPinOfTheWrongLengthComesBackWithAReasonKey() = env().run {
         addUser("mali")
         api {
-            val redeemed = redeemed(this@run, "mali")
-            val refused = enroll(redeemed.enrollmentToken, enrollRequest(newPin = "12345"))
+            val refused = login(loginRequest("mali", newPin = "12345"))
 
             assertEquals(ErrorCode.INVALID_REQUEST, refused.errorCode())
             assertEquals(ErrorReasons.PIN_LENGTH, refused.errorReason())
         }
     }
 
-    // --- pairings ---
-
-    @Test
-    fun aPairingCanBeUsedOnlyOnce() = env().run {
-        addUser("mali")
-        api {
-            val pairing = pair("mali")
-            assertEquals(HttpStatusCode.OK, redeem(RedeemRequest(secret = pairing.secret)).status)
-
-            val second = redeem(RedeemRequest(secret = pairing.secret))
-            assertEquals(HttpStatusCode.Unauthorized, second.status)
-            assertEquals(ErrorCode.PAIRING_INVALID, second.errorCode())
-            // The manual code of a used pairing is as dead as its secret.
-            assertEquals(ErrorCode.PAIRING_INVALID, redeem(RedeemRequest(username = "mali", code = pairing.manualCode)).errorCode())
-        }
-    }
-
-    @Test
-    fun aPairingExpiresAfterTheConfiguredTime() = env("config-version: 1\nauth:\n  pairing:\n    ttl-minutes: 3\n").run {
-        addUser("mali")
-        api {
-            pair("mali")
-            clock.advance(Duration.ofMinutes(2))
-            val stillGood = pair("mali") // a new one replaces it and starts its own three minutes
-            clock.advance(Duration.ofMinutes(2))
-            assertEquals(HttpStatusCode.OK, redeem(RedeemRequest(secret = stillGood.secret)).status)
-
-            val late = pair("mali")
-            clock.advance(Duration.ofMinutes(4))
-            assertEquals(ErrorCode.PAIRING_INVALID, redeem(RedeemRequest(secret = late.secret)).errorCode())
-            assertEquals(ErrorCode.PAIRING_INVALID, redeem(RedeemRequest(username = "mali", code = late.manualCode)).errorCode())
-            assertEquals(0, auth.pairing.pendingCount())
-        }
-    }
-
-    @Test
-    fun aNewPairingReplacesTheOldOneForTheSameUser() = env().run {
-        addUser("mali")
-        addUser("noy")
-        api {
-            val first = pair("mali")
-            val other = pair("noy")
-            val second = pair("mali")
-
-            assertEquals(ErrorCode.PAIRING_INVALID, redeem(RedeemRequest(secret = first.secret)).errorCode())
-            assertEquals(ErrorCode.PAIRING_INVALID, redeem(RedeemRequest(username = "mali", code = first.manualCode)).errorCode())
-            assertEquals(HttpStatusCode.OK, redeem(RedeemRequest(secret = second.secret)).status)
-            assertEquals(HttpStatusCode.OK, redeem(RedeemRequest(username = "noy", code = other.manualCode)).status)
-        }
-    }
-
-    @Test
-    fun theManualCodeDiesAfterTheConfiguredWrongTriesButTheQrSecretStillWorks() = env("config-version: 1\nauth:\n  pairing:\n    manual-code-attempts: 3\n").run {
-        addUser("mali")
-        api {
-            val pairing = pair("mali")
-            assertTrue(Regex("[BCDFGHJKLMNPQRSTVWXZ]{5}-[BCDFGHJKLMNPQRSTVWXZ]{5}").matches(pairing.manualCode!!), pairing.manualCode)
-
-            repeat(3) {
-                assertEquals(ErrorCode.PAIRING_INVALID, redeem(RedeemRequest(username = "mali", code = "BBBBB-BBBBB")).errorCode())
-            }
-            // The right code, typed any way a person might, is refused now.
-            for (typed in listOf(pairing.manualCode, pairing.manualCode.replace("-", "").lowercase())) {
-                assertEquals(ErrorCode.PAIRING_INVALID, redeem(RedeemRequest(username = "mali", code = typed)).errorCode())
-            }
-            assertEquals(HttpStatusCode.OK, redeem(RedeemRequest(secret = pairing.secret)).status)
-        }
-    }
-
-    @Test
-    fun theRightManualCodeWorksUntilTheTriesRunOutAndTheUserNameIsNotRevealed() = env().run {
-        addUser("mali")
-        api {
-            val pairing = pair("mali")
-            val unknownUser = redeem(RedeemRequest(username = "nobody", code = pairing.manualCode))
-            val wrongCode = redeem(RedeemRequest(username = "mali", code = "BBBBB-BBBBB"))
-            assertEquals(unknownUser.bodyAsText(), wrongCode.bodyAsText())
-
-            assertEquals(HttpStatusCode.OK, redeem(RedeemRequest(username = "mali", code = " ${pairing.manualCode!!.lowercase()} ")).status)
-        }
-    }
-
-    @Test
-    fun manualCodesCanBeTurnedOff() = env("config-version: 1\nauth:\n  pairing:\n    manual-code: false\n").run {
-        addUser("mali")
-        api {
-            val pairing = pair("mali")
-            assertEquals(null, pairing.manualCode)
-            assertEquals(ErrorCode.PAIRING_INVALID, redeem(RedeemRequest(username = "mali", code = "BCDFG-HJKLM")).errorCode())
-            assertEquals(HttpStatusCode.OK, redeem(RedeemRequest(secret = pairing.secret)).status)
-        }
-    }
-
-    @Test
-    fun aDisabledUserCannotBePairedOrRedeem() = env().run {
-        addUser("mali")
-        api {
-            val pairing = pair("mali")
-            users.setEnabled("mali", false)
-
-            assertEquals(ErrorCode.PAIRING_INVALID, redeem(RedeemRequest(secret = pairing.secret)).errorCode())
-            assertTrue(showPairing("mali").single().contains("disabled"))
-        }
-    }
-
     // --- existing users ---
 
     @Test
-    fun aUserWhoAlreadyHasSecretsCannotEnrollWithoutThem() = env().run {
+    fun aUserWhoAlreadyHasSecretsCannotLogInWithoutThem() = env().run {
         addUser("noy", op = true)
         api {
-            enrolled(this@run, "noy")
+            loggedIn("noy")
 
-            val again = redeemed(this@run, "noy")
-            assertTrue(again.hasPassword && again.hasPin)
             val tries = listOf(
-                enrollRequest(newPassword = "Another-Long-Pass-77", newPin = "135790"), // "setting" them again: refused, and not a wrong try
-                enrollRequest(password = OP_PASSWORD), // no PIN
-                enrollRequest(pin = PIN), // no password
-                enrollRequest(password = OP_PASSWORD, pin = "999111"),
-                enrollRequest(password = "Wrong-Long-Password-1", pin = PIN),
+                loginRequest("noy", newPassword = "Another-Long-Pass-77", newPin = "135790"), // "setting" them again proves nothing
+                loginRequest("noy", password = OP_PASSWORD), // no PIN
+                loginRequest("noy", pin = PIN), // no password
+                loginRequest("noy", password = OP_PASSWORD, pin = "999111"),
+                loginRequest("noy", password = "Wrong-Long-Password-1", pin = PIN),
             )
             for ((index, request) in tries.withIndex()) {
-                val response = enroll(again.enrollmentToken, request)
-                assertEquals(if (index == 0) HttpStatusCode.Conflict else HttpStatusCode.Unauthorized, response.status, "try $index")
-                if (index == 0) assertEquals(ErrorCode.CREDENTIALS_CHANGED, response.errorCode())
-                if (index == 3) break
+                val response = login(request)
+                assertEquals(HttpStatusCode.Unauthorized, response.status, "try $index")
+                assertEquals(ErrorCode.UNAUTHORIZED, response.errorCode(), "try $index")
             }
             // Nothing was changed by the refused tries.
-            val good = enroll(again.enrollmentToken, enrollRequest(password = OP_PASSWORD, pin = PIN))
+            val good = login(loginRequest("noy", password = OP_PASSWORD, pin = PIN))
             assertEquals(HttpStatusCode.OK, good.status, good.bodyAsText())
-        }
-    }
-
-    @Test
-    fun aGrantThatOnlyBringsANewPinForAnAccountThatHasOneNowIs409AndCostsNoWrongTry() = env().run {
-        addUser("mali")
-        api {
-            val stale = redeemed(this@run, "mali")
-            assertEquals(HttpStatusCode.OK, enroll(redeemed(this@run, "mali").enrollmentToken, enrollRequest(newPin = PIN)).status)
-
-            // The app is told to ask for the existing PIN; however often it is told, the token is not used up.
-            repeat(6) {
-                val response = enroll(stale.enrollmentToken, enrollRequest(newPin = "905173"))
-                assertEquals(HttpStatusCode.Conflict, response.status)
-                assertEquals(ErrorCode.CREDENTIALS_CHANGED, response.errorCode())
-            }
-            assertFalse("wrong-secret" in audit(), audit())
-            assertContains(audit(), "enroll.fail user=mali device=- ip=localhost result=credentials-changed")
-
-            assertEquals(HttpStatusCode.OK, enroll(stale.enrollmentToken, enrollRequest(pin = PIN)).status)
-        }
-    }
-
-    @Test
-    fun fiveWrongSecretsCancelTheEnrollmentToken() = env().run {
-        addUser("mali")
-        api {
-            enrolled(this@run, "mali")
-            val again = redeemed(this@run, "mali")
-
-            repeat(5) { assertEquals(HttpStatusCode.Unauthorized, enroll(again.enrollmentToken, enrollRequest(pin = "000000")).status) }
-            // Even the right PIN does not help now; the pairing has to be done again.
-            assertEquals(HttpStatusCode.Unauthorized, enroll(again.enrollmentToken, enrollRequest(pin = PIN)).status)
-            assertContains(audit(), "wrong-secret,cancelled")
         }
     }
 
@@ -458,12 +228,10 @@ class AuthApiTest {
         addUser("mali")
         addUser("kham")
         api {
-            val shared = enrolled(this@run, "mali", DeviceMode.SHARED)
-            val second = redeemed(this@run, "kham")
-            val added = enroll(
-                second.enrollmentToken,
-                enrollRequest(DeviceMode.PERSONAL, newPin = "246801", deviceId = shared.deviceId, deviceCredential = shared.credential),
-            ).parsed(EnrollResponse.serializer())
+            val shared = loggedIn("mali", DeviceMode.SHARED)
+            val added = login(
+                loginRequest("kham", DeviceMode.PERSONAL, newPin = "246801", deviceId = shared.deviceId, deviceCredential = shared.credential),
+            ).parsed(LoginResponse.serializer())
 
             assertEquals(shared.deviceId, added.deviceId)
             assertTrue(added.credential != shared.credential)
@@ -478,15 +246,14 @@ class AuthApiTest {
 
             // A personal device holds one user.
             addUser("nok")
-            val personal = enrolled(this@run, "nok", DeviceMode.PERSONAL)
+            val personal = loggedIn("nok", DeviceMode.PERSONAL)
             addUser("lek")
-            val third = redeemed(this@run, "lek")
-            val refused = enroll(third.enrollmentToken, enrollRequest(newPin = PIN, deviceId = personal.deviceId, deviceCredential = personal.credential))
+            val refused = login(loginRequest("lek", newPin = PIN, deviceId = personal.deviceId, deviceCredential = personal.credential))
             assertEquals(HttpStatusCode.Forbidden, refused.status)
             assertEquals(ErrorCode.FORBIDDEN, refused.errorCode())
             assertEquals(ErrorReasons.DEVICE_PERSONAL, refused.errorReason())
             // A wrong device credential is told apart from a wrong PIN.
-            val forged = enroll(third.enrollmentToken, enrollRequest(newPin = PIN, deviceId = shared.deviceId, deviceCredential = "forged"))
+            val forged = login(loginRequest("lek", newPin = PIN, deviceId = shared.deviceId, deviceCredential = "forged"))
             assertEquals(HttpStatusCode.Unauthorized, forged.status)
             assertEquals(ErrorCode.DEVICE_NOT_RECOGNIZED, forged.errorCode())
         }
@@ -497,15 +264,15 @@ class AuthApiTest {
         addUser("mali")
         addUser("kham")
         api {
-            val shared = enrolled(this@run, "mali", DeviceMode.SHARED)
-            val again = redeemed(this@run, "mali")
-            val wrongPin = enroll(again.enrollmentToken, enrollRequest(pin = "000000", deviceId = shared.deviceId, deviceCredential = "forged"))
+            val shared = loggedIn("mali", DeviceMode.SHARED)
+            val wrongPin = login(loginRequest("mali", pin = "000000", deviceId = shared.deviceId, deviceCredential = "forged"))
             assertEquals(ErrorCode.DEVICE_NOT_RECOGNIZED, wrongPin.errorCode())
-            assertContains(audit(), "enroll.fail user=mali device=${shared.deviceId} ip=localhost result=device-not-recognized")
+            assertContains(audit(), "login.fail user=mali device=${shared.deviceId} ip=localhost result=device-not-recognized")
 
             // The PIN was never tried, so the account has no wrong count and no delay; the device credential is the right one now.
-            val ok = enroll(again.enrollmentToken, enrollRequest(pin = PIN, deviceId = shared.deviceId, deviceCredential = shared.credential))
+            val ok = login(loginRequest("mali", pin = PIN, deviceId = shared.deviceId, deviceCredential = shared.credential))
             assertEquals(HttpStatusCode.OK, ok.status, ok.bodyAsText())
+            assertEquals(0, users.find("mali")!!.failedLogins)
         }
     }
 
@@ -513,25 +280,10 @@ class AuthApiTest {
     fun aWrongPinWithAGoodDeviceCredentialIsUnauthorized() = env().run {
         addUser("mali")
         api {
-            val shared = enrolled(this@run, "mali", DeviceMode.SHARED)
-            val again = redeemed(this@run, "mali")
-            val wrong = enroll(again.enrollmentToken, enrollRequest(pin = "000000", deviceId = shared.deviceId, deviceCredential = shared.credential))
+            val shared = loggedIn("mali", DeviceMode.SHARED)
+            val wrong = login(loginRequest("mali", pin = "000000", deviceId = shared.deviceId, deviceCredential = shared.credential))
 
             assertEquals(ErrorCode.UNAUTHORIZED, wrong.errorCode())
-        }
-    }
-
-    @Test
-    fun deviceCredentialsThatAreNotRecognizedCancelTheEnrollmentLikeWrongPinsDo() = env().run {
-        addUser("mali")
-        api {
-            val shared = enrolled(this@run, "mali", DeviceMode.SHARED)
-            val again = redeemed(this@run, "mali")
-
-            repeat(5) { enroll(again.enrollmentToken, enrollRequest(pin = PIN, deviceId = shared.deviceId, deviceCredential = "forged")) }
-
-            assertEquals(ErrorCode.UNAUTHORIZED, enroll(again.enrollmentToken, enrollRequest(pin = PIN, deviceId = shared.deviceId, deviceCredential = shared.credential)).errorCode())
-            assertContains(audit(), "device-not-recognized,cancelled")
         }
     }
 
@@ -540,15 +292,12 @@ class AuthApiTest {
         addUser("mali")
         addUser("kham")
         api {
-            val shared = enrolled(this@run, "mali", DeviceMode.SHARED)
-            val khamRedeemed = redeemed(this@run, "kham")
-            val khamOnShared = enroll(
-                khamRedeemed.enrollmentToken,
-                enrollRequest(newPin = "246801", deviceId = shared.deviceId, deviceCredential = shared.credential),
-            ).parsed(EnrollResponse.serializer())
+            val shared = loggedIn("mali", DeviceMode.SHARED)
+            val khamOnShared = login(
+                loginRequest("kham", newPin = "246801", deviceId = shared.deviceId, deviceCredential = shared.credential),
+            ).parsed(LoginResponse.serializer())
             // Mali has a second device: she is on it with the same PIN.
-            val pairedAgain = redeemed(this@run, "mali")
-            val malisPhone = enroll(pairedAgain.enrollmentToken, enrollRequest(pin = PIN)).parsed(EnrollResponse.serializer())
+            val malisPhone = login(loginRequest("mali", pin = PIN)).parsed(LoginResponse.serializer())
             val token = accessToken(shared, "mali", PIN)
 
             assertEquals(HttpStatusCode.Unauthorized, unlock(shared, "mali", "000000").status)
@@ -572,7 +321,7 @@ class AuthApiTest {
     fun aMaxFailuresOfZeroNeverRemovesTheUserButStillCounts() = env("$NO_BACKOFF  pin:\n    max-failures: 0\n").run {
         addUser("mali")
         api {
-            val device = enrolled(this@run, "mali")
+            val device = loggedIn("mali")
             val file = root.resolve("data/devices/${device.deviceId}.yml").toFile()
 
             repeat(20) { assertEquals(HttpStatusCode.Unauthorized, unlock(device, "mali", "000000").status) }
@@ -589,9 +338,9 @@ class AuthApiTest {
     fun theCountOfWrongPinsSurvivesARestart() {
         val first = env("$NO_BACKOFF  pin:\n    max-failures: 3\n")
         first.addUser("mali")
-        lateinit var device: EnrollResponse
+        lateinit var device: LoginResponse
         first.api {
-            device = enrolled(first, "mali")
+            device = loggedIn("mali")
             repeat(2) { assertEquals(HttpStatusCode.Unauthorized, unlock(device, "mali", "000000").status) }
         }
 
@@ -607,7 +356,7 @@ class AuthApiTest {
     fun aDisabledUserCannotUnlockAndAnExistingTokenStopsWorkingAtOnce() = env().run {
         addUser("mali")
         api {
-            val device = enrolled(this@run, "mali")
+            val device = loggedIn("mali")
             val token = accessToken(device, "mali", PIN)
             assertEquals(HttpStatusCode.NoContent, reauth(token, ReauthRequest(pin = PIN)).status)
 
@@ -625,7 +374,7 @@ class AuthApiTest {
     fun anAccessTokenExpiresAfterTheConfiguredTime() = env("config-version: 1\nauth:\n  session:\n    access-token-minutes: 2\n").run {
         addUser("mali")
         api {
-            val device = enrolled(this@run, "mali")
+            val device = loggedIn("mali")
             val token = accessToken(device, "mali", PIN)
             clock.advance(Duration.ofMinutes(1))
             assertEquals(HttpStatusCode.NoContent, reauth(token, ReauthRequest(pin = PIN)).status)
@@ -636,77 +385,29 @@ class AuthApiTest {
         }
     }
 
-    // --- the pairing API ---
+    // --- the re-auth window ---
 
     @Test
-    fun anAdminPairsAnotherUserWithThePermissionAndARecentPin() = env().run {
-        addUser("noy", op = true)
-        addUser("boss")
-        addUser("mali")
-        users.setUserPermission("boss", "shoparchive.devices.pair", true)
-        api {
-            val noy = enrolled(this@run, "noy")
-            val noyToken = accessToken(noy, "noy", OP_PASSWORD, password = true)
-
-            val response = createPairing(noyToken, "mali")
-            assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
-            val created = response.parsed(PairingResponse.serializer())
-            assertEquals(FINGERPRINT, created.fingerprint)
-            val pairing = Pairing(created.link, created.manualCode)
-            assertEquals("mali", pairing.payload.u)
-            assertEquals(1, pairing.payload.v)
-            assertEquals(FINGERPRINT.replace(" ", ""), pairing.payload.fp)
-            assertEquals(SERVER_ID.toString(), pairing.payload.sid)
-            assertEquals(listOf("shop.example.com:25655", "192.168.1.20:25655"), pairing.payload.ep)
-            // What the API returned is redeemable.
-            assertEquals(HttpStatusCode.OK, redeem(RedeemRequest(secret = pairing.secret)).status)
-
-            val boss = enrolled(this@run, "boss")
-            val bossToken = accessToken(boss, "boss", PIN)
-            assertEquals(HttpStatusCode.Created, createPairing(bossToken, "mali").status)
-            // Without the permission it is refused, and nothing is said about whether the user exists.
-            val malisDevice = enrolled(this@run, "mali")
-            val malisToken = accessToken(malisDevice, "mali", PIN)
-            assertEquals(HttpStatusCode.Forbidden, createPairing(malisToken, "boss").status)
-            assertEquals(HttpStatusCode.Forbidden, createPairing(malisToken, "nobody").status)
-            assertEquals(ErrorCode.FORBIDDEN, createPairing(malisToken, "boss").errorCode())
-            assertEquals(ErrorCode.NOT_FOUND, createPairing(bossToken, "nobody").errorCode())
-        }
-    }
-
-    @Test
-    fun creatingAPairingNeedsAPinEnteredWithinTheReauthWindow() = env().run {
+    fun takingADeviceOffNeedsAPinEnteredWithinTheReauthWindow() = env().run {
         addUser("mali")
         api {
-            val device = enrolled(this@run, "mali")
+            val device = loggedIn("mali")
+            val phone = login(loginRequest("mali", pin = PIN)).parsed(LoginResponse.serializer())
+            val tablet = login(loginRequest("mali", pin = PIN)).parsed(LoginResponse.serializer())
             val token = accessToken(device, "mali", PIN)
-            // A user may pair themselves (source "self"), straight after unlocking ...
-            assertEquals(HttpStatusCode.Created, createPairing(token, "mali").status)
+            // Straight after unlocking, the PIN was just entered ...
+            assertEquals(HttpStatusCode.NoContent, deletePath("/api/v1/devices/${tablet.deviceId}", token).status)
 
             clock.advance(Duration.ofMinutes(6)) // the window is 5, the token lives 15
-            val stale = createPairing(token, "mali")
+            val path = "/api/v1/devices/${phone.deviceId}"
+            val stale = deletePath(path, token)
             assertEquals(HttpStatusCode.Unauthorized, stale.status)
             assertEquals(ErrorCode.REAUTH_REQUIRED, stale.errorCode())
 
             assertEquals(HttpStatusCode.Unauthorized, reauth(token, ReauthRequest(pin = "000000")).status)
-            assertEquals(ErrorCode.REAUTH_REQUIRED, createPairing(token, "mali").errorCode())
+            assertEquals(ErrorCode.REAUTH_REQUIRED, deletePath(path, token).errorCode())
             assertEquals(HttpStatusCode.NoContent, reauth(token, ReauthRequest(pin = PIN)).status)
-            assertEquals(HttpStatusCode.Created, createPairing(token, "mali").status)
-        }
-    }
-
-    @Test
-    fun theSourcesSettingDecidesWhoMayStartAPairing() = env("config-version: 1\nauth:\n  pairing:\n    sources: [console]\n").run {
-        addUser("noy", op = true)
-        api {
-            val device = enrolled(this@run, "noy")
-            val token = accessToken(device, "noy", OP_PASSWORD, password = true)
-
-            assertEquals(HttpStatusCode.Forbidden, createPairing(token, "noy").status) // self
-            addUser("mali")
-            assertEquals(HttpStatusCode.Forbidden, createPairing(token, "mali").status) // admin
-            assertEquals(1, showPairing("mali").size) // the console is still allowed: one line, the rest is terminal-only
-            assertTrue(terminal.isNotEmpty())
+            assertEquals(HttpStatusCode.NoContent, deletePath(path, token).status)
         }
     }
 
@@ -716,16 +417,18 @@ class AuthApiTest {
     fun aOneUserDeviceUnlocksWithItsCredentialAloneButTheSessionIsNotRecentlyVerified() = env().run {
         addUser("mali")
         api {
-            val device = enrolled(this@run, "mali")
+            val device = loggedIn("mali")
+            val other = login(loginRequest("mali", pin = PIN)).parsed(LoginResponse.serializer())
 
             val unlocked = credentialOnly(device, "mali")
             assertEquals(HttpStatusCode.OK, unlocked.status, unlocked.bodyAsText())
             val token = unlocked.parsed(UnlockResponse.serializer()).accessToken
             assertContains(audit(), "unlock.ok user=mali device=${device.deviceId} ip=localhost result=ok,credential-only")
-            // Pairing someone needs a recent PIN: the credential alone is not one.
-            assertEquals(ErrorCode.REAUTH_REQUIRED, createPairing(token, "mali").errorCode())
+            // Taking a device off needs a recent PIN: the credential alone is not one.
+            val path = "/api/v1/devices/${other.deviceId}"
+            assertEquals(ErrorCode.REAUTH_REQUIRED, deletePath(path, token).errorCode())
             assertEquals(HttpStatusCode.NoContent, reauth(token, ReauthRequest(pin = PIN)).status)
-            assertEquals(HttpStatusCode.Created, createPairing(token, "mali").status)
+            assertEquals(HttpStatusCode.NoContent, deletePath(path, token).status)
         }
     }
 
@@ -733,7 +436,7 @@ class AuthApiTest {
     fun turnedOffAnUnlockWithoutThePinIsAWrongPin() = env("$NO_BACKOFF  device:\n    unlock-without-pin: false\n").run {
         addUser("mali")
         api {
-            val device = enrolled(this@run, "mali")
+            val device = loggedIn("mali")
 
             val wrongPin = unlock(device, "mali", "000000")
             val noPin = credentialOnly(device, "mali")
@@ -749,8 +452,8 @@ class AuthApiTest {
         addUser("mali")
         addUser("kham")
         api {
-            val shared = enrolled(this@run, "mali", DeviceMode.SHARED)
-            enroll(redeemed(this@run, "kham").enrollmentToken, enrollRequest(newPin = "246801", deviceId = shared.deviceId, deviceCredential = shared.credential))
+            val shared = loggedIn("mali", DeviceMode.SHARED)
+            login(loginRequest("kham", newPin = "246801", deviceId = shared.deviceId, deviceCredential = shared.credential))
 
             val noPin = credentialOnly(shared, "mali")
 
@@ -765,7 +468,7 @@ class AuthApiTest {
     fun aUserWhoNeedsThePasswordIsAskedForItAsBefore() = env().run {
         addUser("noy", op = true)
         api {
-            val device = enrolled(this@run, "noy")
+            val device = loggedIn("noy")
 
             val noSecret = credentialOnly(device, "noy")
 
@@ -779,7 +482,7 @@ class AuthApiTest {
     fun anIdleExpiredDeviceStaysExpiredWithoutThePin() = env("$NO_BACKOFF  device:\n    idle-expiry-days: 30\n").run {
         addUser("mali")
         api {
-            val device = enrolled(this@run, "mali")
+            val device = loggedIn("mali")
             clock.advance(Duration.ofDays(31))
 
             assertEquals(HttpStatusCode.Unauthorized, credentialOnly(device, "mali").status)
@@ -792,7 +495,7 @@ class AuthApiTest {
     fun aLockedAccountStillUnlocksItsOwnOneUserDeviceWithoutThePin() = env("config-version: 1\nauth:\n  backoff:\n    start-seconds: 60\n").run {
         addUser("mali")
         api {
-            val device = enrolled(this@run, "mali")
+            val device = loggedIn("mali")
             assertEquals(HttpStatusCode.Unauthorized, unlock(device, "mali", "000000").status)
             assertEquals(HttpStatusCode.TooManyRequests, unlock(device, "mali", PIN).status)
             clock.advance(Duration.ofSeconds(10))
@@ -811,19 +514,15 @@ class AuthApiTest {
     fun theAuditLogRecordsTheEventsAndNoSecret() = env().run {
         addUser("noy", op = true)
         api {
-            val pairing = pair("noy")
-            val redeemed = redeem(RedeemRequest(secret = pairing.secret)).parsed(RedeemResponse.serializer())
-            redeem(RedeemRequest(secret = pairing.secret)) // fails
-            val device = enroll(redeemed.enrollmentToken, enrollRequest(newPassword = OP_PASSWORD, newPin = PIN)).parsed(EnrollResponse.serializer())
+            val device = login(loginRequest("noy", newPassword = OP_PASSWORD, newPin = PIN)).parsed(LoginResponse.serializer())
+            login(loginRequest("noy", password = "wrong-password-1234", pin = PIN)) // fails
             val token = accessToken(device, "noy", OP_PASSWORD, password = true)
             unlock(device, "noy", "wrong-password-1234", password = true)
-            val secrets = listOf(
-                pairing.secret, pairing.manualCode!!, pairing.manualCode.replace("-", ""), redeemed.enrollmentToken, device.credential, token,
-                OP_PASSWORD, PIN, "wrong-password-1234",
-            ) + root.resolve("user/noy.yml").toFile().readLines().filter { "argon2id" in it }.map { it.substringAfter("\"").substringBeforeLast("\"") }
+            val secrets = listOf(device.credential, token, OP_PASSWORD, PIN, "wrong-password-1234") +
+                root.resolve("user/noy.yml").toFile().readLines().filter { "argon2id" in it }.map { it.substringAfter("\"").substringBeforeLast("\"") }
 
             val audit = audit()
-            for (event in listOf("pair.created", "redeem.ok", "redeem.fail", "enroll.ok", "unlock.ok", "unlock.fail")) assertContains(audit, " $event ")
+            for (event in listOf("login.ok", "login.fail", "unlock.ok", "unlock.fail")) assertContains(audit, " $event ")
             assertContains(audit, "user=noy device=${device.deviceId} ip=")
             assertTrue(Regex("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+07:00 ", RegexOption.MULTILINE).containsMatchIn(audit), audit)
             assertTrue(audit.lines().all { it.isEmpty() || it.split(" ").size == 6 }, audit)
@@ -834,4 +533,5 @@ class AuthApiTest {
             for (secret in secrets) assertFalse(log.infos.plus(log.warnings).plus(log.errors).any { secret in it })
         }
     }
+
 }

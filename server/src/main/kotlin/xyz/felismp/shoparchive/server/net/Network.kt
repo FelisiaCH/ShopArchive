@@ -105,10 +105,10 @@ internal class Network(
     }
 
     /**
-     * The up to two `host:port` a pairing tells a device to try: the first configured domain, then the first LAN
+     * The up to two `host:port` the server tells a device to try (`GET /config`): the first configured domain, then the first LAN
      * address. With neither, the address the server is bound to (or localhost).
      */
-    fun pairingEndpoints(): List<String> {
+    fun deviceEndpoints(): List<String> {
         val port = settings?.port ?: config.port
         val bind = settings?.bindAddress ?: config.bindAddress
         val hosts = config.networkDomains.take(1) + listenHosts(bind, lanAddresses).filter { it != "localhost" }.take(1)

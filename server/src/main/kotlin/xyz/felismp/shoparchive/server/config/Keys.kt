@@ -96,12 +96,12 @@ internal class HostListKey(path: String, comment: String) : Key<List<String>>(pa
 }
 
 /**
- * A YAML list of lower-case words such as permission nodes. With [choices] only those words are allowed; an entry
- * outside them (or not shaped like a word) makes the whole value invalid, so a typo falls back to the default with a warning.
+ * A YAML list of lower-case words such as permission nodes. An entry not shaped like a word makes the whole value invalid,
+ * so a typo falls back to the default with a warning.
  */
-internal class WordListKey(path: String, default: List<String>, comment: String, val choices: List<String>? = null) :
+internal class WordListKey(path: String, default: List<String>, comment: String) :
     Key<List<String>>(path, default, comment) {
-    override val allowed get() = if (choices == null) "a list of words such as shoparchive.users.manage" else "a list of: ${choices.joinToString(", ")}"
+    override val allowed get() = "a list of words such as shoparchive.users.manage"
 
     override fun parse(raw: String) = toWords(raw.split(','))
 
@@ -115,7 +115,7 @@ internal class WordListKey(path: String, default: List<String>, comment: String,
 
     private fun toWords(entries: List<String?>): List<String>? {
         val words = entries.map { it?.trim()?.lowercase(Locale.ROOT) }.filter { it != "" }
-        val valid = words.all { it != null && WORD.matches(it) && (choices == null || it in choices) }
+        val valid = words.all { it != null && WORD.matches(it) }
         return if (valid) words.filterNotNull().distinct() else null
     }
 

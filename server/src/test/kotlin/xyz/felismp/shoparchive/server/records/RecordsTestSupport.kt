@@ -16,8 +16,8 @@ import kotlinx.serialization.builtins.ListSerializer
 import xyz.felismp.shoparchive.server.auth.AuthEnv
 import xyz.felismp.shoparchive.server.auth.DEVICES_REVOKE_NODE
 import xyz.felismp.shoparchive.server.auth.USERS_MANAGE_NODE
-import xyz.felismp.shoparchive.server.auth.enroll
 import xyz.felismp.shoparchive.server.auth.getPath
+import xyz.felismp.shoparchive.server.auth.onNewDevice
 import xyz.felismp.shoparchive.server.auth.parsed
 import xyz.felismp.shoparchive.server.auth.postJson
 import xyz.felismp.shoparchive.server.auth.putJson
@@ -65,7 +65,7 @@ internal fun AuthEnv.login(name: String, branches: List<String> = listOf("main")
         if (op) users.setOp(name, true)
         grant.forEach { users.setUserPermission(name, it, true) }
     }
-    val device = loginDevices.getOrPut(name) { enroll(name) }
+    val device = loginDevices.getOrPut(name) { onNewDevice(name) }
     val needsPassword = op || grant.any { it == USERS_MANAGE_NODE || it == BRANCHES_MANAGE_NODE || it == DEVICES_REVOKE_NODE }
     return token(device, name, secretIsPassword = needsPassword)
 }

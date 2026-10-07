@@ -35,10 +35,10 @@ import xyz.felismp.shoparchive.app.client.fingerprintToPin
 import xyz.felismp.shoparchive.shared.AuthPolicy
 import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.DeviceMode
-import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.LoginRequest
+import xyz.felismp.shoparchive.shared.LoginResponse
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.AppVersion
 import xyz.felismp.shoparchive.shared.ReauthRequest
@@ -710,7 +710,7 @@ class AppFlow(
     private suspend fun loginTrying(
         opened: Session, creds: StoredServer, request: LoginRequest,
         rejected: MutableList<String>, accepted: MutableList<String>,
-    ): EnrollResponse {
+    ): LoginResponse {
         val deviceId = creds.deviceId
         if (deviceId == null || creds.users.isEmpty()) return opened.api.login(request)
         var last: ClientError.Api? = null

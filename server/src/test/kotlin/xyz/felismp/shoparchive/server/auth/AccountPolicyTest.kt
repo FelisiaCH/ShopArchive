@@ -3,12 +3,10 @@ package xyz.felismp.shoparchive.server.auth
 import org.junit.jupiter.api.io.TempDir
 import xyz.felismp.shoparchive.api.ApiError
 import xyz.felismp.shoparchive.shared.DeviceMode
-import xyz.felismp.shoparchive.shared.EnrollRequest
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.ErrorResponse
 import xyz.felismp.shoparchive.shared.LoginRequest
-import xyz.felismp.shoparchive.shared.RedeemRequest
 import xyz.felismp.shoparchive.shared.UnlockRequest
 import java.nio.file.Files
 import java.nio.file.Path
@@ -36,7 +34,7 @@ class AccountPolicyTest {
     @TempDir
     lateinit var root: Path
 
-    private fun AuthEnv.wrongTry(device: xyz.felismp.shoparchive.shared.EnrollResponse, name: String = "mali") =
+    private fun AuthEnv.wrongTry(device: xyz.felismp.shoparchive.shared.LoginResponse, name: String = "mali") =
         assertFailsWith<ApiError> { unlock(device, name, pin = WRONG) }
 
     private fun AuthEnv.userFile(name: String) = Files.readString(root.resolve("user/$name.yml"))
@@ -49,7 +47,7 @@ class AccountPolicyTest {
     fun eachWrongTryDoublesTheDelayUpToTheMaximumAndALockedAccountCostsNoHash() {
         val hasher = CountingHasher()
         val env = AuthEnv(root, backoff(), hasher = hasher)
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
 
         for (try_ in 1..8) {
             assertEquals(401, env.wrongTry(device).status, "try $try_")
@@ -78,7 +76,7 @@ class AccountPolicyTest {
     @Test
     fun theCountAndTheLockAreInTheUserFileSoARestartKeepsThem() {
         val env = AuthEnv(root, backoff(startSeconds = 60))
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
         env.wrongTry(device)
         assertContains(env.userFile("mali"), "failed-logins: 1")
         assertContains(env.userFile("mali"), "locked-until: 2026-10-03T08:01:00Z")
@@ -93,20 +91,20 @@ class AccountPolicyTest {
     @Test
     fun theLockIsPerAccountSoAnotherDeviceOfTheSameUserIsLockedToo() {
         val env = AuthEnv(root, backoff(startSeconds = 30))
-        val phone = env.enroll("mali")
-        val tablet = env.enroll("mali")
+        val phone = env.signIn("mali")
+        val tablet = env.signIn("mali")
 
         env.wrongTry(phone)
 
         assertEquals(429, assertFailsWith<ApiError> { env.unlock(tablet, "mali") }.status)
         env.addUser("kham")
-        env.unlock(env.enroll("kham"), "kham") // another account is not slowed down
+        env.unlock(env.signIn("kham"), "kham") // another account is not slowed down
     }
 
     @Test
     fun aDelayOfZeroTurnsTheDelayOffButStillCounts() {
         val env = AuthEnv(root, backoff(startSeconds = 0))
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
 
         repeat(3) { assertEquals(401, env.wrongTry(device).status) }
 
@@ -117,7 +115,7 @@ class AccountPolicyTest {
     @Test
     fun reachingDisableAtDisablesTheAccountEndsItsTokensAndUserUnlockBringsItBack() {
         val env = AuthEnv(root, backoff(disableAt = 5, startSeconds = 0))
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
         val token = env.token(device, "mali")
 
         repeat(5) { env.wrongTry(device) }
@@ -142,7 +140,7 @@ class AccountPolicyTest {
     @Test
     fun aDisableAtOfZeroNeverDisablesTheAccount() {
         val env = AuthEnv(root, backoff(disableAt = 0, startSeconds = 0))
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
 
         repeat(200) { assertEquals(401, env.wrongTry(device).status) }
 
@@ -159,7 +157,7 @@ class AccountPolicyTest {
     @Test
     fun userUnlockClearsTheLockOfAnEnabledAccountAndLeavesAnAdminsDisableAlone() {
         val env = AuthEnv(root, backoff(startSeconds = 60))
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
         env.wrongTry(device)
 
         assertEquals(listOf("User 'mali': wrong tries and lock cleared"), env.console("user unlock mali"))
@@ -175,29 +173,28 @@ class AccountPolicyTest {
     }
 
     @Test
-    fun aWrongProofAtEnrollmentCountsAndALockedAccountCannotEnroll() {
+    fun aWrongProofAtLoginCountsAndALockedAccountCannotLogIn() {
         val hasher = CountingHasher()
         val env = AuthEnv(root, backoff(startSeconds = 60), hasher = hasher)
-        env.enroll("mali")
-        val token = env.pairingService().redeem(RedeemRequest(secret = env.pair("mali").secret), "127.0.0.1").enrollmentToken
-        fun enroll(pin: String) = env.authService().enroll(token, EnrollRequest("Tablet", "android", DeviceMode.PERSONAL, pin = pin), "127.0.0.1")
+        env.signIn("mali")
+        fun login(pin: String) = env.authService().login(LoginRequest("mali", "Tablet", "android", DeviceMode.PERSONAL, pin = pin), "127.0.0.1")
 
-        assertEquals(401, assertFailsWith<ApiError> { enroll(WRONG) }.status)
+        assertEquals(401, assertFailsWith<ApiError> { login(WRONG) }.status)
         val verifies = hasher.verifies
-        val locked = assertFailsWith<ApiError> { enroll(TEST_PIN) }
+        val locked = assertFailsWith<ApiError> { login(TEST_PIN) }
 
         assertEquals(429, locked.status)
         assertEquals(60, locked.retryAfterSeconds)
         assertEquals(verifies, hasher.verifies)
         env.clock.advance(Duration.ofSeconds(60))
-        enroll(TEST_PIN)
+        login(TEST_PIN)
         assertContains(env.userFile("mali"), "failed-logins: 0")
     }
 
     @Test
     fun aWrongReauthCountsToo() {
         val env = AuthEnv(root, backoff(startSeconds = 60))
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
         val token = env.token(device, "mali")
         val principal = env.authService().authenticate(token)!!
 
@@ -211,7 +208,7 @@ class AccountPolicyTest {
     @Test
     fun aUserWithAPasswordEntersItAgainAfterReauthEveryDaysOrIdleDaysAndAPinIsNotCountedWrongThen() {
         val env = AuthEnv(root, reauth())
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
         val user = env.users.find("mali")!!
         assertTrue(env.users.setCredentials(user.id, Hasher(1, TEST_COST).hash(TEST_PASSWORD), null))
         env.unlock(device, "mali") // the PIN is enough while the password is fresh
@@ -246,7 +243,7 @@ class AccountPolicyTest {
     @Test
     fun reauthDaysOfZeroAreOffAndEachTurnsOnByItself() {
         val env = AuthEnv(root, reauth(everyDays = 0, idleDays = 0))
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
         assertTrue(env.users.setCredentials(env.users.find("mali")!!.id, Hasher(1, TEST_COST).hash(TEST_PASSWORD), null))
         env.unlock(device, "mali")
 
@@ -268,7 +265,7 @@ class AccountPolicyTest {
     @Test
     fun aPinFromAUserWhoAlwaysNeedsThePasswordIsAnsweredWithAPasswordRequestNotCountedWrong() {
         val env = AuthEnv(root)
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
         val user = env.users.find("mali")!!
         assertTrue(env.users.setCredentials(user.id, Hasher(1, TEST_COST).hash(TEST_PASSWORD), null))
         env.users.setOp("mali", true) // ops always need the password (auth.password-required-for)
@@ -286,7 +283,7 @@ class AccountPolicyTest {
 
     @Test
     fun theUnlockAnswerOverHttpTellsTheAppThatAPasswordIsNeeded() = AuthEnv(root, reauth()).run {
-        val device = enroll("mali")
+        val device = signIn("mali")
         assertTrue(users.setCredentials(users.find("mali")!!.id, Hasher(1, TEST_COST).hash(TEST_PASSWORD), null))
         clock.advance(Duration.ofDays(15))
         api {
@@ -306,9 +303,9 @@ class AccountPolicyTest {
     @Test
     fun aUserWithoutAPasswordKeepsUnlockingWithThePinAndAUserWhoNeedsOneAlwaysUsesIt() {
         val env = AuthEnv(root)
-        val kham = env.enroll("kham")
+        val kham = env.signIn("kham")
         env.addUser("boss", op = true)
-        val boss = env.enroll("boss")
+        val boss = env.signIn("boss")
 
         env.clock.advance(Duration.ofDays(60))
 
@@ -322,8 +319,8 @@ class AccountPolicyTest {
     @Test
     fun aUserNotUsedOnADeviceForIdleExpiryDaysIsRefusedAndTheirBlockIsRemovedWhileTheOthersStay() {
         val env = AuthEnv(root, "$NO_BACKOFF  device:\n    idle-expiry-days: 90\n")
-        val shared = env.enroll("mali", DeviceMode.SHARED)
-        val kham = env.enroll("kham", DeviceMode.SHARED, onto = shared)
+        val shared = env.signIn("mali", DeviceMode.SHARED)
+        val kham = env.signIn("kham", DeviceMode.SHARED, onto = shared)
         env.clock.advance(Duration.ofDays(80))
         env.unlock(kham, "kham") // kham is used on day 80
         env.clock.advance(Duration.ofDays(11)) // day 91: mali has not been used for 91 days, kham for 11
@@ -341,7 +338,7 @@ class AccountPolicyTest {
     @Test
     fun theIdleLimitIsConfig() {
         val env = AuthEnv(root, "config-version: 1\nauth:\n  device:\n    idle-expiry-days: 2\n  backoff:\n    start-seconds: 0\n")
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
 
         env.clock.advance(Duration.ofDays(1))
         env.unlock(device, "mali")
@@ -353,7 +350,7 @@ class AccountPolicyTest {
     @Test
     fun anIdleLimitOfZeroNeverExpiresAUser() {
         val env = AuthEnv(root, "$NO_BACKOFF  device:\n    idle-expiry-days: 0\n")
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
 
         env.clock.advance(Duration.ofDays(1000))
         env.unlock(device, "mali")
@@ -369,7 +366,7 @@ class AccountPolicyTest {
     fun disablingChangingTheRoleAndResettingEndTheTokensAtOnce() {
         val env = AuthEnv(root)
         env.console("role create cashier")
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
 
         val disabled = env.token(device, "mali")
         env.console("user disable mali")
@@ -389,21 +386,17 @@ class AccountPolicyTest {
     // --- user reset, devices ---
 
     @Test
-    fun userResetTakesTheUserOffEveryDeviceClearsPasswordAndPinAndShowsNoPairing() {
+    fun userResetTakesTheUserOffEveryDeviceAndClearsPasswordAndPin() {
         val env = AuthEnv(root, backoff(startSeconds = 60))
-        val phone = env.enroll("mali")
-        val shared = env.enroll("mali", DeviceMode.SHARED)
-        val kham = env.enroll("kham", DeviceMode.SHARED, onto = shared)
+        val phone = env.signIn("mali")
+        val shared = env.signIn("mali", DeviceMode.SHARED)
+        val kham = env.signIn("kham", DeviceMode.SHARED, onto = shared)
         val token = env.token(phone, "mali")
         env.wrongTry(phone) // a lock and a count that the reset also forgets
-        env.terminal.clear()
 
         val replies = env.console("user reset mali")
 
         assertEquals(listOf("User 'mali' reset: off 2 devices, password and PIN cleared. They set a new PIN at their next login."), replies)
-        assertTrue(replies.none { "shoparchive://" in it || "Manual code" in it || '█' in it }, replies.toString())
-        assertTrue(env.terminal.isEmpty(), env.terminal.toString())
-        assertEquals(0, env.auth.pairing.pendingCount())
         assertFalse("  mali:" in deviceFile(phone.deviceId))
         assertFalse("  mali:" in deviceFile(shared.deviceId))
         assertTrue("  kham:" in deviceFile(shared.deviceId))
@@ -428,22 +421,21 @@ class AccountPolicyTest {
     @Test
     fun userResetAlsoBringsBackAnAccountTheServerDisabled() {
         val env = AuthEnv(root, backoff(disableAt = 5, startSeconds = 0))
-        val device = env.enroll("mali")
+        val device = env.signIn("mali")
         repeat(5) { env.wrongTry(device) }
         assertFalse(env.users.find("mali")!!.enabled)
 
         env.console("user reset mali")
 
         assertTrue(env.users.find("mali")!!.enabled)
-        assertTrue(env.terminal.isEmpty())
         env.authService().login(LoginRequest("mali", "Phone", "android", DeviceMode.PERSONAL, newPin = TEST_PIN), "127.0.0.1")
     }
 
     @Test
     fun devicesListsTheDevicesOfAUserWithModeAndLastUse() {
         val env = AuthEnv(root)
-        val phone = env.enroll("mali")
-        val shared = env.enroll("mali", DeviceMode.SHARED)
+        val phone = env.signIn("mali")
+        val shared = env.signIn("mali", DeviceMode.SHARED)
         env.clock.advance(Duration.ofHours(1))
         env.unlock(shared, "mali")
 

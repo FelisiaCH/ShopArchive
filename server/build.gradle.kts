@@ -21,7 +21,6 @@ dependencies {
     implementation(libs.ktor.server.rate.limit)
     implementation(libs.bouncycastle.bcprov)
     implementation(libs.bouncycastle.bcpkix)
-    implementation(libs.zxing.core)
     implementation(libs.fastexcel)
     implementation(libs.jmdns)
     implementation(libs.log4j.api)

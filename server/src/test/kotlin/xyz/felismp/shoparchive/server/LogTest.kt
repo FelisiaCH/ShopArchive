@@ -96,7 +96,7 @@ class LogTest {
     fun terminalOnlyTextIsInNoFileUnderLogsNotEvenARolledOne() {
         leaveAnOldRun() // makes a .gz exist, so the search below covers rolled files too
         Log.start(root)
-        Log.terminalOnly("secret-pairing-code-4711")
+        Log.terminalOnly("secret-code-4711")
         Log.info("ordinary-line")
         Log.close()
 

@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /** Version of the HTTP/WebSocket protocol; bumped when a client and server of different versions can no longer talk. */
-const val PROTOCOL_VERSION = 2
+const val PROTOCOL_VERSION = 3
 
 /** Request header every client sends with [PROTOCOL_VERSION]; the server answers a missing or different one with [ErrorCode.PROTOCOL_MISMATCH]. */
 const val PROTOCOL_HEADER = "X-ShopArchive-Protocol"
@@ -27,19 +27,15 @@ enum class ErrorCode {
     NOT_FOUND,
     /** The body or a value in it is not acceptable (the message says why). */
     INVALID_REQUEST,
-    /** A pairing secret or manual code that is wrong, used, expired or unknown; deliberately says nothing more. */
-    PAIRING_INVALID,
     /** An important action needs the PIN or password to be entered again (`POST /api/v1/reauth`). */
     REAUTH_REQUIRED,
-    /** A PIN or password this request meant to set was set by another request first. Ask the person for the existing one and send it with the same enrollment token. */
+    /** A PIN or password this request meant to set was set by another request first. Ask the person for the existing one and send the request again with it. */
     CREDENTIALS_CHANGED,
     PAYLOAD_TOO_LARGE,
     BANNED,
     /** Too many requests from this address, or too many wrong tries on this account: wait the seconds in the `Retry-After` header. */
     RATE_LIMITED,
-    /** The enrollment token was real but its time ran out: redeem a new pairing (ask for a new link or code). A wrong or used token is [UNAUTHORIZED]. */
-    ENROLLMENT_EXPIRED,
-    /** Adding a user to a shared device: the device id or device credential sent is not one the server accepts (the device was removed, or its user was). Not a wrong PIN; try another stored credential or pair again. */
+    /** Adding a user to a shared device: the device id or device credential sent is not one the server accepts (the device was removed, or its user was). Not a wrong PIN; try another stored credential, or remove the server from the device and add it again. */
     DEVICE_NOT_RECOGNIZED,
     /** The branch has no open day (never opened, or closed): open one before recording entries. */
     NO_OPEN_SESSION,
@@ -149,42 +145,6 @@ data class ErrorResponse(
     val reason: String? = null,
 )
 
-/** What a QR code or `shoparchive://pair?d=<base64url of this JSON>` link carries. [fp] is the SHA-256 of the server certificate's public key as hex, no spaces: the pin every later connection is checked against. */
-@Serializable
-data class PairPayload(
-    val v: Int,
-    /** Server id (`data/server-id`). */
-    val sid: String,
-    val fp: String,
-    /** One-time secret, base64url of 16 random bytes. */
-    val sec: String,
-    val u: String,
-    /** Up to two `host:port` the server can be reached at. */
-    val ep: List<String>,
-)
-
-/** Body of `POST /api/v1/pair/redeem`: either [secret] (from the QR or link) or [username] with [code] (typed in). */
-@Serializable
-data class RedeemRequest(val secret: String? = null, val username: String? = null, val code: String? = null)
-
-/**
- * [enrollmentToken] works only on `POST /api/v1/enroll`. The flags tell the app which fields the enrollment needs.
- * [suggestedPasswordMin] (in characters; 0 means no suggestion) and [serverName] are for the app's hints about a weak new password: the server accepts any.
- */
-@Serializable
-data class RedeemResponse(
-    val enrollmentToken: String,
-    val username: String,
-    val passwordRequired: Boolean,
-    val hasPassword: Boolean,
-    val hasPin: Boolean,
-    val pinLength: Int,
-    val suggestedPasswordMin: Int = 0,
-    val serverName: String = "",
-    /** Seconds [enrollmentToken] stays valid, counted by the server when it answered, so a wrong clock on the device does not matter. 0 means unknown. */
-    val expiresInSeconds: Long = 0,
-)
-
 @Serializable
 enum class DeviceMode {
     @SerialName("shared") SHARED,
@@ -192,25 +152,7 @@ enum class DeviceMode {
 }
 
 /**
- * Body of `POST /api/v1/enroll`. [password] and [pin] are the ones the user already has; [newPassword] and [newPin]
- * set them when the user has none. A shared device adds a second user by sending its [deviceId] and one of its
- * [deviceCredential]s; the label, platform and mode of the device are then the ones it already has.
- */
-@Serializable
-data class EnrollRequest(
-    val deviceLabel: String,
-    val platform: String,
-    val mode: DeviceMode,
-    val password: String? = null,
-    val newPassword: String? = null,
-    val pin: String? = null,
-    val newPin: String? = null,
-    val deviceId: String? = null,
-    val deviceCredential: String? = null,
-)
-
-/**
- * Body of `POST /api/v1/login`: no pairing, the [username] and the PIN (or the password if the user needs one) are enough.
+ * Body of `POST /api/v1/login`: the [username] and the PIN (or the password if the user needs one) are enough.
  * [password] and [pin] are the ones the user already has; [newPassword] and [newPin] set them when the user has none (a user
  * without a PIN is told so with [ErrorReasons.PIN_NOT_SET]). A shared device adds a second user by sending its [deviceId] and one
  * of its [deviceCredential]s; the label, platform and mode of the device are then the ones it already has.
@@ -231,7 +173,7 @@ data class LoginRequest(
 
 /** The device credential is shown once: the device must keep it. */
 @Serializable
-data class EnrollResponse(val deviceId: String, val credential: String)
+data class LoginResponse(val deviceId: String, val credential: String)
 
 /** Body of `POST /api/v1/unlock`: the user's password if the user needs one, else the PIN; neither where [AuthPolicy.unlockWithoutPin] lets the credential alone do. */
 @Serializable
@@ -306,14 +248,6 @@ data class ConfigResponse(
     val userId: String = "",
 )
 
-/** Body of `POST /api/v1/pairings`. */
-@Serializable
-data class CreatePairingRequest(val username: String)
-
-/** [manualCode] is `XXXXX-XXXXX`, or null when the server has turned manual codes off. [fingerprint] is for the person to compare on screen. */
-@Serializable
-data class PairingResponse(val link: String, val manualCode: String?, val fingerprint: String, val expiresAt: String)
-
 /** A message the server pushes on `/api/v1/ws`: JSON with a `type` field. */
 @Serializable
 sealed interface WsMessage
@@ -322,7 +256,7 @@ sealed interface WsMessage
 @SerialName("say")
 data class SayMessage(val message: String, val from: String) : WsMessage
 
-/** Another device of the same user was just paired. */
+/** The same user just logged in on another device. */
 @Serializable
 @SerialName("device.paired")
 data class DevicePairedMessage(val deviceId: String, val label: String) : WsMessage
@@ -357,7 +291,7 @@ data class SessionClosedMessage(val id: String, val branch: String, val business
 @Serializable
 data class CommandRequest(val line: String)
 
-/** What the command said, one entry per line. A line may hold a pairing link, which the app shows as a QR. */
+/** What the command said, one entry per line. */
 @Serializable
 data class CommandResponse(val lines: List<String>)
 

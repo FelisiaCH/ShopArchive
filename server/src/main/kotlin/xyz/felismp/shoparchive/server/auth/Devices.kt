@@ -68,7 +68,7 @@ internal class DeviceFile(id: String, private val clock: Clock) : YamlConfigFile
             // Without the id nobody can say whose block it is, and guessing from the name is what the id is there to stop.
             val userId = (fields["user-id"] as? String)?.trim()?.lowercase()?.takeIf(::isUuid)
             if (userId == null) {
-                warn("users.$name: no valid user-id; the entry is ignored, so that user is not on this device any more and has to pair it again")
+                warn("users.$name: no valid user-id; the entry is ignored, so that user is not on this device any more and has to log in on it again")
                 continue
             }
             val created = instant(fields["created"], "users.$name.created", warn)
@@ -243,7 +243,7 @@ internal class DeviceStore(
             val device = fresh(id) ?: continue
             if (device.users[old]?.userId != userId) continue
             if (new in device.users) {
-                log.warn("data/devices/$id.yml: cannot rename '$old' to '$new', the name is already in the file; '$old' has to pair this device again")
+                log.warn("data/devices/$id.yml: cannot rename '$old' to '$new', the name is already in the file; '$old' has to log in on this device again")
                 continue
             }
             write(id, device.copy(users = device.users.entries.associate { (if (it.key == old) new else it.key) to it.value }))

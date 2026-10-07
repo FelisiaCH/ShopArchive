@@ -17,7 +17,7 @@ internal class AccountConsole(
 ) {
     /**
      * Takes the user off every device, clears the password and PIN, and ends the access tokens; the user sets a new PIN at their next login.
-     * The grants made before go first, under the enroll lock: with credentials gone, whoever still held one could enroll with a PIN of their own choosing.
+     * It runs under the account lock, so a login in flight finishes first and is then undone.
      */
     fun reset(sender: CommandSender, name: String) {
         val user = users.user(name)
@@ -29,7 +29,6 @@ internal class AccountConsole(
         // The device files and the user file are one change for a backup: it must not hold the devices off and the user still with a PIN.
         val removed = barrier.mutate {
             sessions.withAccount(user.id) {
-                sessions.revokeEnrollments(user.id)
                 val removed = devices.removeAccount(user.id)
                 users.resetCredentials(name)
                 sessions.revokeAccess(user.id, null)
@@ -40,11 +39,10 @@ internal class AccountConsole(
         sender.sendMessage("User '$name' reset: off $removed ${if (removed == 1) "device" else "devices"}, password and PIN cleared. They set a new PIN at their next login.")
     }
 
-    /** `user disable`: a disabled account must not be enrollable, and enabling it again must not bring back a grant made before. */
+    /** `user disable`, under the account lock: a login in flight finishes first, and none starts until the account is disabled. */
     fun disable(sender: CommandSender, name: String) {
         val user = users.user(name)
         sessions.withAccount(user.id) {
-            sessions.revokeEnrollments(user.id)
             users.setEnabled(name, false)
         }
         sender.sendMessage("User '$name' disabled")

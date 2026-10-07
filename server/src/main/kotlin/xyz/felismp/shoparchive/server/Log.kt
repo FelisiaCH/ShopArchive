@@ -67,7 +67,7 @@ internal object Log {
 
     /**
      * Prints [msg] on the console only - never to a file under `logs/`, whatever the log level. For secrets
-     * such as pairing codes. (A service wrapper that captures stdout still sees it; that is outside the jar's reach.)
+     * such as the first-run PIN. (A service wrapper that captures stdout still sees it; that is outside the jar's reach.)
      */
     fun terminalOnly(msg: String) {
         val current = running

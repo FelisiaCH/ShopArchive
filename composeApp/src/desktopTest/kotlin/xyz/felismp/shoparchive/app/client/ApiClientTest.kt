@@ -3,10 +3,10 @@ package xyz.felismp.shoparchive.app.client
 import kotlinx.coroutines.runBlocking
 import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.DeviceMode
-import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.LoginRequest
+import xyz.felismp.shoparchive.shared.LoginResponse
 import xyz.felismp.shoparchive.shared.PROTOCOL_HEADER
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.ReauthRequest
@@ -73,7 +73,7 @@ class ApiClientTest {
             else json("""{"deviceId":"dev-9","credential":"cred-9"}""")
         }.use { s ->
             val api = ApiClient("sid", s.pin, listOf(s.endpoint))
-            assertEquals(EnrollResponse("dev-9", "cred-9"), api.login(alice))
+            assertEquals(LoginResponse("dev-9", "cred-9"), api.login(alice))
             assertEquals("POST", s.requests[0].method)
             assertEquals("/api/v1/login", s.requests[0].target)
             assertEquals(null, s.requests[0].headers["Authorization"])

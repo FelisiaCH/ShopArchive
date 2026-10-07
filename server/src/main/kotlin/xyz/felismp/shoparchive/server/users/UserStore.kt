@@ -200,7 +200,7 @@ internal class UserStore(
         return enable
     }
 
-    /** `user reset`: no password and no PIN, so the next pairing sets new ones; the wrong tries are forgotten too. Access tokens end. */
+    /** `user reset`: no password and no PIN, so the next login sets new ones; the wrong tries are forgotten too. Access tokens end. */
     fun resetCredentials(name: String) = barrier.mutate { resetCredentialsInLock(name) }
 
     @Synchronized

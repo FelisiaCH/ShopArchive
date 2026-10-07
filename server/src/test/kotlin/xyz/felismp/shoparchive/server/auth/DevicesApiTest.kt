@@ -12,8 +12,8 @@ import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.CurrencyInfo
 import xyz.felismp.shoparchive.shared.DeviceInfo
 import xyz.felismp.shoparchive.shared.DeviceMode
-import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
+import xyz.felismp.shoparchive.shared.LoginResponse
 import xyz.felismp.shoparchive.shared.ReauthRequest
 import xyz.felismp.shoparchive.shared.SetModeRequest
 import java.nio.file.Files
@@ -31,26 +31,26 @@ class DevicesApiTest {
     @TempDir
     lateinit var root: Path
 
-    private fun deviceFile(device: EnrollResponse) = Files.readString(root.resolve("data/devices/${device.deviceId}.yml"))
+    private fun deviceFile(device: LoginResponse) = Files.readString(root.resolve("data/devices/${device.deviceId}.yml"))
 
     /** A user who may take others off devices (and so has a password) and a shared device with mali and kham on it. */
     private class Scene(val env: AuthEnv) {
-        val maliPhone: EnrollResponse
-        val maliShared: EnrollResponse
-        val khamShared: EnrollResponse
-        val khamTablet: EnrollResponse
-        val boss: EnrollResponse
+        val maliPhone: LoginResponse
+        val maliShared: LoginResponse
+        val khamShared: LoginResponse
+        val khamTablet: LoginResponse
+        val boss: LoginResponse
         val maliId: String
         val khamId: String
 
         init {
             env.addUser("boss")
             env.users.setUserPermission("boss", DEVICES_REVOKE_NODE, true)
-            boss = env.enroll("boss")
-            maliPhone = env.enroll("mali")
-            maliShared = env.enroll("mali", DeviceMode.SHARED)
-            khamShared = env.enroll("kham", DeviceMode.SHARED, onto = maliShared)
-            khamTablet = env.enroll("kham")
+            boss = env.signIn("boss")
+            maliPhone = env.signIn("mali")
+            maliShared = env.signIn("mali", DeviceMode.SHARED)
+            khamShared = env.signIn("kham", DeviceMode.SHARED, onto = maliShared)
+            khamTablet = env.signIn("kham")
             maliId = env.users.find("mali")!!.id
             khamId = env.users.find("kham")!!.id
         }
@@ -162,7 +162,7 @@ class DevicesApiTest {
         api {
             val phoneToken = token(scene.maliPhone, "mali")
             val sharedToken = token(scene.maliShared, "mali")
-            suspend fun mode(device: EnrollResponse, token: String, mode: DeviceMode) =
+            suspend fun mode(device: LoginResponse, token: String, mode: DeviceMode) =
                 putJson("/api/v1/devices/${device.deviceId}/mode", SetModeRequest.serializer(), SetModeRequest(mode), token)
 
             assertEquals(HttpStatusCode.NoContent, mode(scene.maliPhone, phoneToken, DeviceMode.SHARED).status)
@@ -221,7 +221,7 @@ class DevicesApiTest {
     @Test
     fun configFollowsTheServerConfigAfterAReload() {
         val env = AuthEnv(root)
-        val mali = env.enroll("mali")
+        val mali = env.signIn("mali")
         env.api {
             val token = env.token(mali, "mali")
             Files.writeString(
@@ -243,9 +243,9 @@ class DevicesApiTest {
 
     @Test
     fun requirePermissionRefusesWhoLacksTheNodeAndAnOpHasEvery() = AuthEnv(root).run {
-        val mali = enroll("mali")
+        val mali = signIn("mali")
         addUser("boss", op = true)
-        val boss = enroll("boss")
+        val boss = signIn("boss")
         val maliPrincipal = authService().authenticate(token(mali, "mali"))!!
         val bossPrincipal = authService().authenticate(token(boss, "boss", secretIsPassword = true))!!
 
@@ -263,12 +263,12 @@ class DevicesApiTest {
         nodes.register(PermissionNode(BRANCH_ALL_NODE, "Every branch", default = false)) // P06 registers it; here it stands in
         addUser("mali")
         users.addBranch("mali", "market")
-        val mali = authService().authenticate(token(enroll("mali"), "mali"))!!
+        val mali = authService().authenticate(token(signIn("mali"), "mali"))!!
         addUser("kham")
         users.setUserPermission("kham", BRANCH_ALL_NODE, true)
-        val kham = authService().authenticate(token(enroll("kham"), "kham"))!!
+        val kham = authService().authenticate(token(signIn("kham"), "kham"))!!
         addUser("boss", op = true)
-        val boss = authService().authenticate(token(enroll("boss"), "boss", secretIsPassword = true))!!
+        val boss = authService().authenticate(token(signIn("boss"), "boss", secretIsPassword = true))!!
 
         services.requireBranch(mali, "market")
         assertEquals(HttpStatusCode.Forbidden, assertFailsWith<ApiException> { services.requireBranch(mali, "airport") }.status)

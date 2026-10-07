@@ -24,11 +24,11 @@ import xyz.felismp.shoparchive.shared.AuthPolicy
 import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.DeviceInfo
 import xyz.felismp.shoparchive.shared.DeviceMode
-import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.InfoResponse
 import xyz.felismp.shoparchive.shared.LoginRequest
+import xyz.felismp.shoparchive.shared.LoginResponse
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.ReauthRequest
 import xyz.felismp.shoparchive.shared.UnlockRequest
@@ -136,12 +136,12 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
     override var endpoints: List<String> = emptyList()
     override fun useEndpoint(endpoint: String) { endpoints = listOf(endpoint) + (endpoints - endpoint) }
     override suspend fun info(): InfoResponse { reach(); failInfo?.let { throw it }; return InfoResponse(infoServerId, "Shop", "", "1", protocol) }
-    override suspend fun login(request: LoginRequest): EnrollResponse {
+    override suspend fun login(request: LoginRequest): LoginResponse {
         reach(); logins += request; failLogin?.let { throw it }
         if (request.deviceCredential in badDeviceCredentials) throw ClientError.Api(401, ErrorCode.DEVICE_NOT_RECOGNIZED, "This device is not recognized for that user.")
         if (request.username in noPinYet && request.newPin == null) throw ClientError.Api(401, ErrorCode.UNAUTHORIZED, "Set a PIN.", reason = ErrorReasons.PIN_NOT_SET)
         if (WRONG_PIN in listOf(request.pin, request.newPin)) throw ClientError.Api(401, ErrorCode.UNAUTHORIZED, "Login failed.")
-        return EnrollResponse(request.deviceId ?: "dev-new", "cred-${request.username}")
+        return LoginResponse(request.deviceId ?: "dev-new", "cred-${request.username}")
     }
     override suspend fun unlock(request: UnlockRequest): UnlockResponse {
         reach(); unlocks += request; failUnlock?.let { throw it }; token = true; return UnlockResponse("access", 900)
@@ -672,7 +672,7 @@ class AppFlowTest {
     @Test fun deferredCallShowsBusyAndIgnoresSecondTap() {
         val gate = CompletableDeferred<Unit>()
         val slow = object : ServerApi by api {
-            override suspend fun login(request: LoginRequest): EnrollResponse { gate.await(); return api.login(request) }
+            override suspend fun login(request: LoginRequest): LoginResponse { gate.await(); return api.login(request) }
         }
         store.stored = StoredServer("sid-1", "Shop", PIN_HEX, listOf("192.168.1.2:8443"))
         val f = AppFlow(scope, store, ThisDevice("x", "windows"), { _, _, _ -> slow }, { "" }, prefs, { 0L }, Dispatchers.Unconfined)
@@ -1618,7 +1618,7 @@ class AppFlowTest {
         api.badDeviceCredentials += users.map { it.credential }
         // The fifth try is refused for too many tries: the server stops with a different answer than "not recognized".
         val counting = object : ServerApi by api {
-            override suspend fun login(request: LoginRequest): EnrollResponse {
+            override suspend fun login(request: LoginRequest): LoginResponse {
                 if (api.logins.size >= 4) { api.logins += request; throw ClientError.Api(401, ErrorCode.UNAUTHORIZED, "Too many wrong tries.") }
                 return api.login(request)
             }

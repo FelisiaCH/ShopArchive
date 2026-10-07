@@ -118,7 +118,7 @@ object ShutdownChild {
             // must still reach latest.log (the log is closed last), the secret must reach stdout only.
             "logging-stop" -> {
                 Log.start(dir.resolve("log-root"))
-                Log.terminalOnly("pairing-code-4711")
+                Log.terminalOnly("secret-code-4711")
                 Log.info("line-from-main")
                 Shutdown.register("late") { Log.info("line-from-hook") }
                 Shutdown.stop(0)

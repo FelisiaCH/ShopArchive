@@ -12,7 +12,7 @@ class AuthNodesTest {
         val nodes = Permissions().also(::registerAuthNodes).all()
 
         assertEquals(
-            listOf("shoparchive.devices.pair", "shoparchive.devices.revoke", "shoparchive.server.status", "shoparchive.users.manage"),
+            listOf("shoparchive.devices.revoke", "shoparchive.server.status", "shoparchive.users.manage"),
             nodes.map { it.node },
         )
         for (node in nodes) {

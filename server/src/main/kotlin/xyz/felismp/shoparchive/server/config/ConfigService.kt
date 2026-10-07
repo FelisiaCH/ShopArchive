@@ -85,10 +85,6 @@ internal class ConfigService(
 
 /** The `auth:` section of `config/shoparchive.yml`, read from one snapshot so a reload never shows a mix. */
 internal class AuthSettings(core: Values) {
-    val pairingTtlMinutes = core[CoreConfig.pairingTtlMinutes]
-    val manualCodeAttempts = core[CoreConfig.manualCodeAttempts]
-    val manualCode = core[CoreConfig.manualCode]
-    val pairingSources = core[CoreConfig.pairingSources]
     val pinLength = core[CoreConfig.pinLength]
     val pinMaxFailures = core[CoreConfig.pinMaxFailures]
     val passwordRequiredFor = core[CoreConfig.passwordRequiredFor]

@@ -603,8 +603,6 @@ class UsersTest {
         assertEquals(listOf("search"), commands.complete(listOf("perm", "s")))
         assertEquals(listOf("cashier"), commands.complete(listOf("role", "perm", "c")))
         assertEquals(listOf("noy"), commands.complete(listOf("op", "noy")))
-        assertEquals(emptyList(), commands.complete(listOf("user", "pa")), "there is no user pair")
-        assertEquals(emptyList(), commands.complete(listOf("user", "pair", "no")))
         assertEquals(listOf("users"), commands.complete(listOf("reload", "u")))
     }
 

@@ -3,11 +3,10 @@ package xyz.felismp.shoparchive.server.auth
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import org.junit.jupiter.api.io.TempDir
-import xyz.felismp.shoparchive.shared.EnrollRequest
 import xyz.felismp.shoparchive.shared.DeviceMode
 import xyz.felismp.shoparchive.shared.ErrorCode
+import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.ReauthRequest
-import xyz.felismp.shoparchive.shared.RedeemRequest
 import xyz.felismp.shoparchive.shared.UnlockRequest
 import java.nio.file.Path
 import kotlin.test.Test
@@ -20,14 +19,14 @@ class RateLimitTest {
     @TempDir
     lateinit var root: Path
 
-    private val redeemWrong = RedeemRequest(secret = "nonsense")
+    private val loginWrong = LoginRequest("ghost", "Phone", "android", DeviceMode.PERSONAL, pin = TEST_PIN)
 
     @Test
-    fun theEleventhRedeemInAMinuteFromOneAddressIs429WithRetryAfterAndTheSharedCode() = AuthEnv(root).run {
+    fun theEleventhLoginInAMinuteFromOneAddressIs429WithRetryAfterAndTheSharedCode() = AuthEnv(root).run {
         api(rateLimitPerMinute = 10) {
-            repeat(10) { assertEquals(HttpStatusCode.Unauthorized, postJson("/api/v1/pair/redeem", RedeemRequest.serializer(), redeemWrong).status, "request ${it + 1}") }
+            repeat(10) { assertEquals(HttpStatusCode.Unauthorized, postJson("/api/v1/login", LoginRequest.serializer(), loginWrong).status, "request ${it + 1}") }
 
-            val limited = postJson("/api/v1/pair/redeem", RedeemRequest.serializer(), redeemWrong)
+            val limited = postJson("/api/v1/login", LoginRequest.serializer(), loginWrong)
 
             assertEquals(HttpStatusCode.TooManyRequests, limited.status)
             assertEquals(ErrorCode.RATE_LIMITED, limited.errorCode())
@@ -37,22 +36,21 @@ class RateLimitTest {
     }
 
     @Test
-    fun redeemEnrollAndUnlockShareOneCountPerAddress() = AuthEnv(root).run {
+    fun loginAndUnlockShareOneCountPerAddress() = AuthEnv(root).run {
         api(rateLimitPerMinute = 3) {
-            assertEquals(HttpStatusCode.Unauthorized, postJson("/api/v1/pair/redeem", RedeemRequest.serializer(), redeemWrong).status)
-            val enroll = EnrollRequest("Phone", "android", DeviceMode.PERSONAL, newPin = TEST_PIN)
-            assertEquals(HttpStatusCode.Unauthorized, postJson("/api/v1/enroll", EnrollRequest.serializer(), enroll, "not-a-token").status)
+            assertEquals(HttpStatusCode.Unauthorized, postJson("/api/v1/login", LoginRequest.serializer(), loginWrong).status)
+            assertEquals(HttpStatusCode.Unauthorized, postJson("/api/v1/login", LoginRequest.serializer(), loginWrong.copy(username = "mali")).status)
             val unlock = UnlockRequest("11111111-2222-3333-4444-555555555555", "mali", "x", pin = TEST_PIN)
             assertEquals(HttpStatusCode.Unauthorized, postJson("/api/v1/unlock", UnlockRequest.serializer(), unlock).status)
 
             assertEquals(HttpStatusCode.TooManyRequests, postJson("/api/v1/unlock", UnlockRequest.serializer(), unlock).status)
-            assertEquals(HttpStatusCode.TooManyRequests, postJson("/api/v1/enroll", EnrollRequest.serializer(), enroll, "not-a-token").status)
+            assertEquals(HttpStatusCode.TooManyRequests, postJson("/api/v1/login", LoginRequest.serializer(), loginWrong).status)
         }
     }
 
     @Test
     fun authenticatedRoutesAndInfoAreNotLimited() = AuthEnv(root).run {
-        val device = enroll("mali")
+        val device = signIn("mali")
         val token = token(device, "mali")
         api(rateLimitPerMinute = 1) {
             repeat(30) {
@@ -64,7 +62,7 @@ class RateLimitTest {
 
     @Test
     fun aLockedAccountIs429WithRetryAfterOverHttpToo() = AuthEnv(root, "config-version: 1\nauth:\n  backoff:\n    start-seconds: 30\n").run {
-        val device = enroll("mali")
+        val device = signIn("mali")
         api {
             val request = UnlockRequest(device.deviceId, "mali", device.credential, pin = "000000")
             assertEquals(HttpStatusCode.Unauthorized, postJson("/api/v1/unlock", UnlockRequest.serializer(), request).status)

@@ -31,7 +31,6 @@
     <string name="proto_versions">App protocol: %1$s. Server protocol: %2$s.</string>
     <string name="proto_unknown">unknown</string>
     <string name="err_unreachable">Cannot reach the server. Check that the server is running, that you are on the same network and that the address is right, then try again.</string>
-    <string name="err_pairing_invalid">This pairing is not valid or has expired. Ask the administrator for a new link or code.</string>
     <string name="err_too_many">Too many attempts. Wait %1$s seconds, then try again.</string>
     <string name="err_too_many_later">Too many attempts. Wait a while, then try again.</string>
     <string name="err_banned">The server has blocked this address. Contact the administrator.</string>
@@ -292,7 +291,6 @@
     <string name="code_entry_broken">The files of this entry are damaged. Ask the administrator to check the server.</string>
     <string name="code_storage_busy">The disk of the server was busy and nothing was changed. Try again.</string>
     <string name="code_internal">The server failed to handle this. Try again, and tell the administrator if it keeps happening.</string>
-    <string name="err_enroll_expired">The time to finish setting up ran out. Ask the administrator for a new link or code.</string>
     <string name="reports_notifications">Messages</string>
     <string name="notif_hint">What the server sent to Telegram or another channel, newest first.</string>
     <string name="notif_empty">No messages yet.</string>

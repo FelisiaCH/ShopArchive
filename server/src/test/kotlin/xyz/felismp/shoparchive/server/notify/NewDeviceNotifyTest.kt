@@ -13,13 +13,12 @@ import xyz.felismp.shoparchive.server.auth.AuthEnv
 import xyz.felismp.shoparchive.server.auth.NO_BACKOFF
 import xyz.felismp.shoparchive.server.auth.TEST_PIN
 import xyz.felismp.shoparchive.server.auth.api
-import xyz.felismp.shoparchive.server.auth.enroll
 import xyz.felismp.shoparchive.server.auth.parsed
 import xyz.felismp.shoparchive.server.auth.postJson
 import xyz.felismp.shoparchive.server.auth.unlock
 import xyz.felismp.shoparchive.shared.DeviceMode
-import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.LoginRequest
+import xyz.felismp.shoparchive.shared.LoginResponse
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,13 +37,13 @@ class NewDeviceNotifyTest {
         e.users.addUser("dana", "none", emptyList())
     }
 
-    private fun loginRequest(name: String, pin: String? = null, newPin: String? = null, mode: DeviceMode = DeviceMode.PERSONAL, onto: EnrollResponse? = null) =
+    private fun loginRequest(name: String, pin: String? = null, newPin: String? = null, mode: DeviceMode = DeviceMode.PERSONAL, onto: LoginResponse? = null) =
         LoginRequest(name, "Phone of $name", "android", mode, pin = pin, newPin = newPin, deviceId = onto?.deviceId, deviceCredential = onto?.credential)
 
-    private suspend fun ApplicationTestBuilder.loggedIn(request: LoginRequest): EnrollResponse {
+    private suspend fun ApplicationTestBuilder.loggedIn(request: LoginRequest): LoginResponse {
         val response = postJson("/api/v1/login", LoginRequest.serializer(), request)
         assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
-        return response.parsed(EnrollResponse.serializer())
+        return response.parsed(LoginResponse.serializer())
     }
 
     private fun AuthEnv.newDevices() = notify!!.outbox.items().filter { it.notification.event == ShopEventTypes.DEVICE_NEW }
@@ -113,17 +112,6 @@ class NewDeviceNotifyTest {
 
             assertEquals(1, newDevices().size)
         }
-    }
-
-    @Test
-    fun anEnrollmentPublishesNothing() = env().run {
-        val seen = mutableListOf<ShopEvent>()
-        events.subscribe(ShopEventTypes.DEVICE_NEW, ShopEventListener { seen += it })
-
-        enroll("mali")
-
-        assertEquals(emptyList(), seen)
-        assertEquals(emptyList(), notify!!.outbox.items())
     }
 
     @Test
