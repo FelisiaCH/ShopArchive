@@ -83,7 +83,7 @@ interface EntryService {
     /** Marks the entry deleted; nothing is removed from disk. Needs the PIN or password entered recently. */
     fun delete(principal: Principal, date: String, id: String): EntryDto
 
-    /** Puts the entry on another business date. Needs the PIN or password entered recently. */
+    /** Puts the entry on another business date. */
     fun move(principal: Principal, date: String, id: String, request: MoveEntryRequest): EntryDto
 
     /** Slip number [n] (the `N` of `slip-N.jpg`). */
@@ -126,7 +126,7 @@ class ExportFile(val bytes: ByteArray, val contentType: String, val fileName: St
 interface ExportService {
     /**
      * The entries [principal] could list with [query] (`from` and `to` are required), as `csv` or `xlsx`.
-     * @throws ApiError 400 for a bad range or format; 401 [xyz.felismp.shoparchive.shared.ErrorCode.REAUTH_REQUIRED]; 403
+     * @throws ApiError 400 for a bad range or format; 403
      */
     fun export(principal: Principal, query: EntryQuery, format: String): ExportFile
 }

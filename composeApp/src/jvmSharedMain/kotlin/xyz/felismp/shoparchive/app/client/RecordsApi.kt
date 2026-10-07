@@ -67,7 +67,7 @@ interface RecordsApi {
     /** Soft delete; needs a recent PIN or password. */
     suspend fun deleteEntry(date: String, id: String): EntryDto
 
-    /** Moves an entry to business date [to]; needs a recent PIN or password. */
+    /** Moves an entry to business date [to]. */
     suspend fun moveEntry(date: String, id: String, to: String): EntryDto
 
     /** Slip number [n] of the entry (an image). */
@@ -90,7 +90,7 @@ interface RecordsApi {
     /** Puts the summary of a closed day into the outbox again. */
     suspend fun notifyDay(branch: String, sessionId: String): NotificationDto
 
-    /** The entries of the range as a CSV or XLSX file; needs a recent PIN or password. [format] is `csv` or `xlsx`. */
+    /** The entries of the range as a CSV or XLSX file. [format] is `csv` or `xlsx`. */
     suspend fun export(from: String, to: String, branch: String, format: String): ExportFile
 
     /** Runs [line] like the server console does and answers what it said, one entry per line. Needs the node of the command and a recent PIN or password. */

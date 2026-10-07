@@ -79,6 +79,10 @@ class AuthApiTest {
         return response.parsed(UnlockResponse.serializer()).accessToken
     }
 
+    /** An unlock with the device credential and neither PIN nor password. */
+    private suspend fun ApplicationTestBuilder.credentialOnly(device: EnrollResponse, name: String) =
+        postJson("/api/v1/unlock", UnlockRequest.serializer(), UnlockRequest(device.deviceId, name, device.credential))
+
     private suspend fun ApplicationTestBuilder.reauth(token: String?, request: ReauthRequest) =
         postJson("/api/v1/reauth", ReauthRequest.serializer(), request, token)
 
@@ -703,6 +707,101 @@ class AuthApiTest {
             assertEquals(HttpStatusCode.Forbidden, createPairing(token, "mali").status) // admin
             assertEquals(1, console("user pair mali").size) // the console is still allowed: one line, the rest is terminal-only
             assertTrue(terminal.isNotEmpty())
+        }
+    }
+
+    // --- unlock without the PIN ---
+
+    @Test
+    fun aOneUserDeviceUnlocksWithItsCredentialAloneButTheSessionIsNotRecentlyVerified() = env().run {
+        addUser("mali")
+        api {
+            val device = enrolled(this@run, "mali")
+
+            val unlocked = credentialOnly(device, "mali")
+            assertEquals(HttpStatusCode.OK, unlocked.status, unlocked.bodyAsText())
+            val token = unlocked.parsed(UnlockResponse.serializer()).accessToken
+            assertContains(audit(), "unlock.ok user=mali device=${device.deviceId} ip=localhost result=ok,credential-only")
+            // Pairing someone needs a recent PIN: the credential alone is not one.
+            assertEquals(ErrorCode.REAUTH_REQUIRED, createPairing(token, "mali").errorCode())
+            assertEquals(HttpStatusCode.NoContent, reauth(token, ReauthRequest(pin = PIN)).status)
+            assertEquals(HttpStatusCode.Created, createPairing(token, "mali").status)
+        }
+    }
+
+    @Test
+    fun turnedOffAnUnlockWithoutThePinIsAWrongPin() = env("$NO_BACKOFF  device:\n    unlock-without-pin: false\n").run {
+        addUser("mali")
+        api {
+            val device = enrolled(this@run, "mali")
+
+            val wrongPin = unlock(device, "mali", "000000")
+            val noPin = credentialOnly(device, "mali")
+
+            assertEquals(HttpStatusCode.Unauthorized, noPin.status)
+            assertEquals(wrongPin.bodyAsText(), noPin.bodyAsText())
+            assertContains(root.resolve("data/devices/${device.deviceId}.yml").toFile().readText(), "pin-failures: 2")
+        }
+    }
+
+    @Test
+    fun aDeviceWithTwoUsersAlwaysAsksForThePinAndNoPinCountsAsAWrongTry() = env().run {
+        addUser("mali")
+        addUser("kham")
+        api {
+            val shared = enrolled(this@run, "mali", DeviceMode.SHARED)
+            enroll(redeemed(this@run, "kham").enrollmentToken, enrollRequest(newPin = "246801", deviceId = shared.deviceId, deviceCredential = shared.credential))
+
+            val noPin = credentialOnly(shared, "mali")
+
+            assertEquals(HttpStatusCode.Unauthorized, noPin.status)
+            assertEquals(ErrorCode.UNAUTHORIZED, noPin.errorCode())
+            assertContains(audit(), "unlock.fail user=mali device=${shared.deviceId} ip=localhost result=wrong-secret")
+            assertContains(root.resolve("data/devices/${shared.deviceId}.yml").toFile().readText(), "pin-failures: 1")
+        }
+    }
+
+    @Test
+    fun aUserWhoNeedsThePasswordIsAskedForItAsBefore() = env().run {
+        addUser("noy", op = true)
+        api {
+            val device = enrolled(this@run, "noy")
+
+            val noSecret = credentialOnly(device, "noy")
+
+            assertEquals(HttpStatusCode.Unauthorized, noSecret.status)
+            assertEquals(ErrorCode.REAUTH_REQUIRED, noSecret.errorCode())
+            assertFalse("credential-only" in audit(), audit())
+        }
+    }
+
+    @Test
+    fun anIdleExpiredDeviceStaysExpiredWithoutThePin() = env("$NO_BACKOFF  device:\n    idle-expiry-days: 30\n").run {
+        addUser("mali")
+        api {
+            val device = enrolled(this@run, "mali")
+            clock.advance(Duration.ofDays(31))
+
+            assertEquals(HttpStatusCode.Unauthorized, credentialOnly(device, "mali").status)
+            assertContains(audit(), "device.expired user=mali device=${device.deviceId}")
+            assertFalse(root.resolve("data/devices/${device.deviceId}.yml").toFile().readText().contains("  mali:"))
+        }
+    }
+
+    @Test
+    fun aLockedAccountStillUnlocksItsOwnOneUserDeviceWithoutThePin() = env("config-version: 1\nauth:\n  backoff:\n    start-seconds: 60\n").run {
+        addUser("mali")
+        api {
+            val device = enrolled(this@run, "mali")
+            assertEquals(HttpStatusCode.Unauthorized, unlock(device, "mali", "000000").status)
+            assertEquals(HttpStatusCode.TooManyRequests, unlock(device, "mali", PIN).status)
+            clock.advance(Duration.ofSeconds(10))
+
+            assertEquals(HttpStatusCode.OK, credentialOnly(device, "mali").status)
+            // The device was used now, but the wrong PIN still counts: no PIN was entered.
+            val file = root.resolve("data/devices/${device.deviceId}.yml").toFile().readText()
+            assertContains(file, "last-used: ${clock.now}")
+            assertContains(file, "pin-failures: 1")
         }
     }
 

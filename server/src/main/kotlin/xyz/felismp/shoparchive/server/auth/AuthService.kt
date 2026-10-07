@@ -147,12 +147,24 @@ internal class DefaultAuthService(
             audit.record("device.expired", username, deviceId, ip, "idle")
             throw unauthorized("Unlock failed.")
         }
-        checkSecret(deviceId, username, user, request.pin, request.password, ip, "unlock")
         val ttl = Duration.ofMinutes(config.auth.accessTokenMinutes.toLong())
+        if (request.pin == null && request.password == null && unlocksWithoutPin(deviceId, username)) {
+            // No secret was tried, so no wrong count and no lock: a lockout does not shut the owner out of their own phone.
+            // The session is not recently verified: what asks for the PIN again still does.
+            devices.recordUse(deviceId, username, user.id)
+            val (token, _) = sessions.issueAccess(user.id, username, deviceId, ttl, verified = false)
+            audit.record("unlock.ok", username, deviceId, ip, "ok,credential-only")
+            return UnlockResponse(token, ttl.seconds.toInt())
+        }
+        checkSecret(deviceId, username, user, request.pin, request.password, ip, "unlock")
         val (token, _) = sessions.issueAccess(user.id, username, deviceId, ttl)
         audit.record("unlock.ok", username, deviceId, ip, "ok")
         return UnlockResponse(token, ttl.seconds.toInt())
     }
+
+    /** Whether the device credential alone unlocks: it is on (`auth.device.unlock-without-pin`), the device holds one user, and that user needs no password. */
+    private fun unlocksWithoutPin(deviceId: String, username: String): Boolean =
+        config.auth.unlockWithoutPin && devices.get(deviceId)?.users?.size == 1 && !policy.passwordRequired(username)
 
     override fun authenticate(accessToken: String): Principal? {
         val (session, found) = sessions.access(accessToken) ?: return null

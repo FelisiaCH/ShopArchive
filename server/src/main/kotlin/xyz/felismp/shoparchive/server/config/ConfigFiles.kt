@@ -105,6 +105,10 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
         "auth.device.biometrics-personal", true,
         "Let the app on a personal device unlock with fingerprint or face. Policy for the app: the server only tells it (GET /api/v1/config).",
     )
+    val unlockWithoutPin = BoolKey(
+        "auth.device.unlock-without-pin", true,
+        "A device that holds one user unlocks with its device credential alone; the PIN is asked only for deleting entries and managing users, devices and the console. A device with more users always asks for the PIN.",
+    )
     val passwordRequiredFor = WordListKey(
         "auth.password.required-for",
         emptyList(),
@@ -253,7 +257,7 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
     val keys: List<Key<*>> = listOf(
         timezone, locale, shutdownHookTimeoutMs, networkDomains, certValidityDays, maxBodyKb, requestTimeoutSeconds,
         pairingTtlMinutes, manualCodeAttempts, manualCode, pairingSources, pinLength, pinMaxFailures,
-        deviceIdleExpiryDays, autoLockSharedMinutes, autoLockPersonalMinutes, biometricsPersonal,
+        deviceIdleExpiryDays, autoLockSharedMinutes, autoLockPersonalMinutes, biometricsPersonal, unlockWithoutPin,
         passwordRequiredFor, passwordMin, passwordMax, accessTokenMinutes, reauthWindowMinutes, reauthEveryDays, reauthIdleDays,
         backoffStartSeconds, backoffMaxMinutes, backoffDisableAt, rateLimitPerMinute, hashConcurrency,
         requireOpenDay, requireCategory, editWindowDays, slipsMaxCount, slipsMaxSizeKb,

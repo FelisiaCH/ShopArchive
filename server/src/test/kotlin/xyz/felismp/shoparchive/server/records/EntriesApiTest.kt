@@ -552,16 +552,31 @@ class EntriesApiTest {
     }
 
     @Test
-    fun movingAnEntryRenamesItsFolderAsksForThePinAndIsInTheHistory() = env().run {
+    fun aDeviceUnlockedWithoutThePinDeletesOnlyAfterThePinButMovesAtOnce() = env(NO_BACKOFF + "records:\n  edit-window-days: 1\n").run {
+        login("noy")
+        api {
+            val noy = unlockWithoutPin("noy")
+            openDay(noy)
+            val e = createEntry(noy, newEntry(item = "misfiled")).parsed(EntryDto.serializer())
+
+            val moved = postJson("/api/v1/entries/${e.date}/${e.id}/move", MoveEntryRequest.serializer(), MoveEntryRequest("2026-10-02"), noy)
+            assertEquals(HttpStatusCode.OK, moved.status, moved.bodyAsText())
+
+            val asked = deletePath("/api/v1/entries/2026-10-02/${e.id}", noy)
+            assertEquals(HttpStatusCode.Unauthorized, asked.status)
+            assertEquals(ErrorCode.REAUTH_REQUIRED, asked.errorCode())
+            assertEquals(HttpStatusCode.NoContent, postJson("/api/v1/reauth", ReauthRequest.serializer(), ReauthRequest(pin = TEST_PIN), noy).status)
+            assertEquals(HttpStatusCode.OK, deletePath("/api/v1/entries/2026-10-02/${e.id}", noy).status)
+        }
+    }
+
+    @Test
+    fun movingAnEntryRenamesItsFolderNeedsNoFreshPinAndIsInTheHistory() = env().run {
         val boss = login("boss", op = true)
         api {
             openDay(boss)
             val e = createEntry(boss, newEntry(item = "misfiled")).parsed(EntryDto.serializer())
-            clock.advance(Duration.ofMinutes(6))
-
-            val asked = postJson("/api/v1/entries/${e.date}/${e.id}/move", MoveEntryRequest.serializer(), MoveEntryRequest("2026-10-01"), boss)
-            assertEquals(ErrorCode.REAUTH_REQUIRED, asked.errorCode())
-            postJson("/api/v1/reauth", ReauthRequest.serializer(), ReauthRequest(password = xyz.felismp.shoparchive.server.auth.TEST_PASSWORD), boss)
+            clock.advance(Duration.ofMinutes(6)) // past the 5 minute window: a move does not ask for the PIN again
 
             val moved = postJson("/api/v1/entries/${e.date}/${e.id}/move", MoveEntryRequest.serializer(), MoveEntryRequest("2026-10-01"), boss)
             assertEquals(HttpStatusCode.OK, moved.status)

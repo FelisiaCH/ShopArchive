@@ -95,6 +95,7 @@ internal class DefaultClientConfigService(
                 autoLockPersonalMinutes = auth.autoLockPersonalMinutes,
                 biometricsPersonal = auth.biometricsPersonal,
                 reauthWindowMinutes = auth.reauthWindowMinutes,
+                unlockWithoutPin = auth.unlockWithoutPin,
             ),
             endpoints = endpoints().take(2),
             currencies = config.currencies.map { CurrencyInfo(it.code, it.exponent) },

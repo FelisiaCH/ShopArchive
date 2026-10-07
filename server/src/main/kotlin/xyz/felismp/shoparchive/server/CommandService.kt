@@ -71,7 +71,7 @@ private class AppSender(override val principal: Principal, override val ip: Stri
 
 /**
  * `POST /api/v1/command`: a user in the app runs the commands the console runs. Each command is checked against its own node
- * ([Command.permission]); `op` and `deop` are never run here, and [OP_ONLY_COMMANDS] only by an op. Like an export it needs the PIN or password entered recently, and
+ * ([Command.permission]); `op` and `deop` are never run here, and [OP_ONLY_COMMANDS] only by an op. Like deleting an entry it needs the PIN or password entered recently, and
  * every run is written to the audit log with the line as typed.
  */
 internal class DefaultCommandService(

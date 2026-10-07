@@ -143,6 +143,7 @@ class AuthConfigTest {
         assertEquals(3, auth.autoLockSharedMinutes)
         assertEquals(15, auth.autoLockPersonalMinutes)
         assertTrue(auth.biometricsPersonal)
+        assertTrue(auth.unlockWithoutPin)
         assertEquals(0, auth.reauthEveryDays)
         assertEquals(0, auth.reauthIdleDays)
         assertEquals(1, auth.backoffStartSeconds)
@@ -151,7 +152,7 @@ class AuthConfigTest {
         assertEquals(10, auth.rateLimitPerMinute)
         val text = root.text("config/shoparchive.yml")
         for (line in listOf(
-            "\n  device:\n", "    idle-expiry-days: 0\n", "    auto-lock-shared-minutes: 3\n", "    auto-lock-personal-minutes: 15\n", "    biometrics-personal: true\n",
+            "\n  device:\n", "    idle-expiry-days: 0\n", "    auto-lock-shared-minutes: 3\n", "    auto-lock-personal-minutes: 15\n", "    biometrics-personal: true\n", "    unlock-without-pin: true\n",
             "    reauth-every-days: 0\n", "    reauth-idle-days: 0\n",
             "\n  backoff:\n", "    start-seconds: 1\n", "    max-minutes: 15\n", "    disable-at: 0\n", "  rate-limit-per-minute: 10\n",
         )) assertTrue(line in text, "missing ${line.trim()} in:\n$text")

@@ -23,7 +23,7 @@ internal fun sha256Hex(text: String): String = sha256(text).joinToString("") { "
 /**
  * What an access token stands for: the account [userId], never just a name (a name can be given to another account
  * after a rename). [username] is what the account was called when the token was issued, for display. [verifiedAt] is
- * when the PIN or password was last entered on its behalf.
+ * when the PIN or password was last entered on its behalf ([Instant.EPOCH] if never).
  */
 internal class AccessSession(val userId: String, val username: String, val deviceId: String, val expiresAt: Instant, @Volatile var verifiedAt: Instant)
 
@@ -56,13 +56,16 @@ internal class Sessions(private val clock: Clock = Clock.systemUTC()) {
     private val access = ConcurrentHashMap<String, AccessSession>()
     private val enrollments = ConcurrentHashMap<String, Enrollment>()
 
-    /** Returns the new token and the handle ([Principal.session][xyz.felismp.shoparchive.api.Principal.session]) that names it. */
-    fun issueAccess(userId: String, username: String, deviceId: String, ttl: Duration): Pair<String, String> {
+    /**
+     * Returns the new token and the handle ([Principal.session][xyz.felismp.shoparchive.api.Principal.session]) that names it.
+     * [verified]: the PIN or password was entered for it now; if not, it is not recently verified until a re-auth.
+     */
+    fun issueAccess(userId: String, username: String, deviceId: String, ttl: Duration, verified: Boolean = true): Pair<String, String> {
         val now = clock.instant()
         access.values.removeIf { it.expiresAt <= now }
         val token = randomToken(32)
         val session = sha256Hex(token)
-        access[session] = AccessSession(userId, username, deviceId, now.plus(ttl), verifiedAt = now)
+        access[session] = AccessSession(userId, username, deviceId, now.plus(ttl), verifiedAt = if (verified) now else Instant.EPOCH)
         return token to session
     }
 

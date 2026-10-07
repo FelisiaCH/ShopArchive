@@ -102,6 +102,7 @@ internal class AuthSettings(core: Values) {
     val autoLockSharedMinutes = core[CoreConfig.autoLockSharedMinutes]
     val autoLockPersonalMinutes = core[CoreConfig.autoLockPersonalMinutes]
     val biometricsPersonal = core[CoreConfig.biometricsPersonal]
+    val unlockWithoutPin = core[CoreConfig.unlockWithoutPin]
     val backoffStartSeconds = core[CoreConfig.backoffStartSeconds]
     val backoffMaxMinutes = core[CoreConfig.backoffMaxMinutes]
     val backoffDisableAt = core[CoreConfig.backoffDisableAt]

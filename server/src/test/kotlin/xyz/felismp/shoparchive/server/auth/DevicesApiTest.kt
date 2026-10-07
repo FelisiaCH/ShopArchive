@@ -207,6 +207,7 @@ class DevicesApiTest {
             assertEquals(3, config.auth.autoLockSharedMinutes)
             assertEquals(15, config.auth.autoLockPersonalMinutes)
             assertTrue(config.auth.biometricsPersonal)
+            assertTrue(config.auth.unlockWithoutPin)
             assertEquals(5, config.auth.reauthWindowMinutes)
             assertEquals(listOf("shop.example.com:25655", "192.168.1.20:25655"), config.endpoints)
             assertEquals(listOf(CurrencyInfo("LAK", 0), CurrencyInfo("THB", 2), CurrencyInfo("USD", 2)), config.currencies)
@@ -225,7 +226,7 @@ class DevicesApiTest {
             val token = env.token(mali, "mali")
             Files.writeString(
                 root.resolve("config/shoparchive.yml"),
-                "config-version: 1\nauth:\n  device:\n    auto-lock-shared-minutes: 7\n    biometrics-personal: false\n  session:\n    reauth-window-minutes: 9\n  backoff:\n    start-seconds: 0\n",
+                "config-version: 1\nauth:\n  device:\n    auto-lock-shared-minutes: 7\n    biometrics-personal: false\n    unlock-without-pin: false\n  session:\n    reauth-window-minutes: 9\n  backoff:\n    start-seconds: 0\n",
             )
             env.console("reload")
 
@@ -233,6 +234,7 @@ class DevicesApiTest {
 
             assertEquals(7, config.auth.autoLockSharedMinutes)
             assertFalse(config.auth.biometricsPersonal)
+            assertFalse(config.auth.unlockWithoutPin)
             assertEquals(9, config.auth.reauthWindowMinutes)
         }
     }

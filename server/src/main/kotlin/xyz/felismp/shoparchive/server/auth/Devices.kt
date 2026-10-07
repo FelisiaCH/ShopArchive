@@ -261,6 +261,16 @@ internal class DeviceStore(
         write(id, device.copy(users = device.users + (username to user.copy(lastUsed = now, pinFailures = 0, lastVerified = if (fullVerification) now else user.lastVerified))))
     }
 
+    /** The device was used with its credential alone: no PIN or password was entered, so the count of wrong ones stays. */
+    fun recordUse(id: String, username: String, userId: String) = barrier.mutate { recordUseInLock(id, username, userId) }
+
+    @Synchronized
+    private fun recordUseInLock(id: String, username: String, userId: String) {
+        val device = fresh(id) ?: return
+        val user = device.users[username]?.takeIf { it.userId == userId } ?: return
+        write(id, device.copy(users = device.users + (username to user.copy(lastUsed = now()))))
+    }
+
     /** Takes the account [userId] off device [id] (the file is read again first). False if it was not on it. */
     fun removeUser(id: String, userId: String): Boolean = barrier.mutate { removeUserInLock(id, userId) }
 

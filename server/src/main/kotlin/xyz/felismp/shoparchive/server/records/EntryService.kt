@@ -242,7 +242,6 @@ internal class DefaultEntryService(
         val result = store.writer.run {
             val entry = lookup(principal, date, id)
             requireChange(principal, entry, ENTRY_EDIT_OWN_NODE, ENTRY_EDIT_ALL_NODE)
-            access.requireRecentAuth(principal)
             val target = date(request.date)
             if (target == entry.date) return@run entry to null
             if (target.isAfter(today())) throw badRequest("An entry cannot be moved to a day that has not come yet.", ErrorReasons.ENTRY_MOVE_FUTURE)

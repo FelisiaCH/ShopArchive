@@ -168,7 +168,7 @@ data class ExportUi(
     val canExport: Boolean get() = branch != null && rangeProblem == null && !blocked && phase !is ExportPhase.Working
 }
 
-/** Reports › Export: a CSV or XLSX of a range and branch (needs the PIN or password again), then saved where the person chooses. */
+/** Reports › Export: a CSV or XLSX of a range and branch, then saved where the person chooses. */
 class ExportState(private val env: Env) {
     private class Form(val from: String, val to: String, val branch: String?, val format: String, val phase: ExportPhase = ExportPhase.Idle, val saved: SaveResult? = null)
 

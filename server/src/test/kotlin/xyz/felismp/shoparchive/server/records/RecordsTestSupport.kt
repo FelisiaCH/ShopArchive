@@ -23,6 +23,7 @@ import xyz.felismp.shoparchive.server.auth.postJson
 import xyz.felismp.shoparchive.server.auth.putJson
 import xyz.felismp.shoparchive.server.auth.testJson
 import xyz.felismp.shoparchive.server.auth.token
+import xyz.felismp.shoparchive.server.auth.unlock
 import xyz.felismp.shoparchive.shared.CloseSessionRequest
 import xyz.felismp.shoparchive.shared.CreateEntryRequest
 import xyz.felismp.shoparchive.shared.EntryDto
@@ -68,6 +69,9 @@ internal fun AuthEnv.login(name: String, branches: List<String> = listOf("main")
     val needsPassword = op || grant.any { it == USERS_MANAGE_NODE || it == BRANCHES_MANAGE_NODE || it == DEVICES_REVOKE_NODE }
     return token(device, name, secretIsPassword = needsPassword)
 }
+
+/** A token of [name] (signed in by [login] before) from an unlock with the device credential alone: no PIN was entered for it. */
+internal fun AuthEnv.unlockWithoutPin(name: String): String = unlock(loginDevices.getValue(name), name, pin = null).accessToken
 
 /** An open day on branch main with the given float, opened by [token]'s user; the session. */
 internal suspend fun ApplicationTestBuilder.openDay(token: String, branch: String = "main", float: Map<String, String> = mapOf("LAK" to "50000")): SessionDto {

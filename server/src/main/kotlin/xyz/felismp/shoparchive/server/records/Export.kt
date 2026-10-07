@@ -98,7 +98,6 @@ internal class DefaultExportService(
 ) : ExportService {
     override fun export(principal: Principal, query: EntryQuery, format: String): ExportFile {
         access.require(principal, EXPORT_NODE)
-        access.requireRecentAuth(principal)
         if (format != "csv" && format != "xlsx") throw badRequest("format is csv or xlsx.")
         if (query.from == null || query.to == null) throw badRequest("from and to are needed, like 2026-09-27.")
         val entries = services.require<EntryService>().list(principal, query)

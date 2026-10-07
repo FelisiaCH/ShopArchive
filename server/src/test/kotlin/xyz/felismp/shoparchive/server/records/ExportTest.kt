@@ -9,19 +9,16 @@ import org.dhatim.fastexcel.reader.ReadableWorkbook
 import org.junit.jupiter.api.io.TempDir
 import xyz.felismp.shoparchive.server.auth.AuthEnv
 import xyz.felismp.shoparchive.server.auth.NO_BACKOFF
-import xyz.felismp.shoparchive.server.auth.TEST_PIN
 import xyz.felismp.shoparchive.server.auth.api
 import xyz.felismp.shoparchive.server.auth.deletePath
 import xyz.felismp.shoparchive.server.auth.errorCode
 import xyz.felismp.shoparchive.server.auth.getPath
 import xyz.felismp.shoparchive.server.auth.parsed
-import xyz.felismp.shoparchive.server.auth.postJson
 import xyz.felismp.shoparchive.shared.AppliesTo
 import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.LocalizedName
-import xyz.felismp.shoparchive.shared.ReauthRequest
 import xyz.felismp.shoparchive.shared.SlipDto
 import xyz.felismp.shoparchive.shared.UserRef
 import java.io.ByteArrayInputStream
@@ -137,7 +134,7 @@ d",LAK""" in text, text)
         createEntry(token, newEntry(item = item, branch = branch, tenders = listOf(cash("LAK", "1000"), cash("THB", "5.00")))).also { check(it.status.value == 201) { it.bodyAsText() } }.parsed(EntryDto.serializer())
 
     @Test
-    fun theRouteNeedsTheNodeAndAFreshPinAndSaysWhatIsWrongWithTheDates() = env().run {
+    fun theRouteNeedsTheNodeButNoFreshPinAndSaysWhatIsWrongWithTheDates() = env().run {
         val plain = login("plain")
         val noy = login("noy", grant = listOf(EXPORT_NODE))
         api {
@@ -149,12 +146,10 @@ d",LAK""" in text, text)
             for (bad in listOf("", "?from=${e.date}", "?to=${e.date}", "?from=${e.date}&to=2026-01-01", "?from=x&to=${e.date}", "$q&format=pdf")) {
                 assertEquals(HttpStatusCode.BadRequest, getPath("/api/v1/export$bad", noy).status, bad)
             }
-            clock.advance(Duration.ofMinutes(6))
-            val asked = getPath("/api/v1/export$q", noy)
-            assertEquals(HttpStatusCode.Unauthorized, asked.status)
-            assertEquals(ErrorCode.REAUTH_REQUIRED, asked.errorCode())
-            postJson("/api/v1/reauth", ReauthRequest.serializer(), ReauthRequest(pin = TEST_PIN), noy)
+            clock.advance(Duration.ofMinutes(6)) // past the 5 minute window: an export does not ask for the PIN again
             assertEquals(HttpStatusCode.OK, getPath("/api/v1/export$q", noy).status)
+            // Nor right after an unlock with the device credential alone.
+            assertEquals(HttpStatusCode.OK, getPath("/api/v1/export$q", unlockWithoutPin("noy")).status)
         }
     }
 

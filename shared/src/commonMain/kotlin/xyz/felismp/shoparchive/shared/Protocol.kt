@@ -233,7 +233,7 @@ data class LoginRequest(
 @Serializable
 data class EnrollResponse(val deviceId: String, val credential: String)
 
-/** Body of `POST /api/v1/unlock`: the user's password if the user needs one, else the PIN. */
+/** Body of `POST /api/v1/unlock`: the user's password if the user needs one, else the PIN; neither where [AuthPolicy.unlockWithoutPin] lets the credential alone do. */
 @Serializable
 data class UnlockRequest(
     val deviceId: String,
@@ -269,7 +269,10 @@ data class DeviceInfo(
 @Serializable
 data class SetModeRequest(val mode: DeviceMode)
 
-/** What the app does about login, from the server's config. [passwordRequired] is for the caller: false means the PIN alone unlocks. */
+/**
+ * What the app does about login, from the server's config. [passwordRequired] is for the caller: false means the PIN alone unlocks.
+ * [unlockWithoutPin]: a device that holds one user unlocks with its credential alone (false from a server that does not know it).
+ */
 @Serializable
 data class AuthPolicy(
     val pinLength: Int,
@@ -278,6 +281,7 @@ data class AuthPolicy(
     val autoLockPersonalMinutes: Int,
     val biometricsPersonal: Boolean,
     val reauthWindowMinutes: Int,
+    val unlockWithoutPin: Boolean = false,
 )
 
 /** A currency a record can be in; [exponent] is the number of decimal places of its smallest unit. */
