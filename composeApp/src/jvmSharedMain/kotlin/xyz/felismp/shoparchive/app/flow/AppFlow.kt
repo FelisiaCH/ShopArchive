@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import xyz.felismp.shoparchive.app.client.ClientError
 import xyz.felismp.shoparchive.app.client.ConnectionStatus
 import xyz.felismp.shoparchive.app.client.CredentialStore
+import xyz.felismp.shoparchive.app.client.FoundServer
 import xyz.felismp.shoparchive.app.client.LiveConnection
 import xyz.felismp.shoparchive.app.client.Preferences
 import xyz.felismp.shoparchive.app.client.PreferencesStore
@@ -27,7 +28,8 @@ import xyz.felismp.shoparchive.app.client.ServerApi
 import xyz.felismp.shoparchive.app.client.ServerDiscovery
 import xyz.felismp.shoparchive.app.client.mergeEndpoints
 import xyz.felismp.shoparchive.app.client.rememberEndpoints
-import xyz.felismp.shoparchive.app.client.StoredCredentials
+import xyz.felismp.shoparchive.app.client.StoredServer
+import xyz.felismp.shoparchive.app.client.StoredServers
 import xyz.felismp.shoparchive.app.client.StoredUser
 import xyz.felismp.shoparchive.app.client.fingerprintToPin
 import xyz.felismp.shoparchive.app.client.parsePairLink
@@ -61,8 +63,12 @@ private const val LIVE_SEARCH_COOLDOWN_MS = 60_000L
 /** How long to listen for the server's mDNS announcement once none of its saved addresses answers; a LAN answers in well under a second, so this only bounds the wait when it is not there. */
 private val DISCOVERY_TIMEOUT: Duration = 4.seconds
 
+/** How long the server list listens for servers announcing themselves on the local network. */
+private val BROWSE_TIMEOUT: Duration = 3.seconds
+
 /**
- * The app's flow: Starting, then Pair and Enroll (no stored credentials) or Locked (stored ones), then Unlocked and Settings.
+ * The app's flow: Starting, then the server list (Servers), or straight to Locked when this device holds one server. Opening a
+ * server shows Locked (it has users here) or Pair and Enroll (it has none yet), then Unlocked and Settings.
  * A changed server key or protocol from any call lands on a blocking state. Screens read [state] and call the actions;
  * typed text stays in the screens and comes in as arguments. PINs, passwords and tokens are never stored here.
  * While unlocked the app reports interaction with [userActive]; no interaction for the server's auto-lock time locks it.
@@ -100,8 +106,10 @@ class AppFlow(
     private var enrolledUser: String? = null
     private var manual: Pair<String, String>? = null // username, code of the manual pairing in progress
     private var live: LiveConnection? = null
-    private var stored: StoredCredentials? = null // what this device holds, once loaded
-    private var addingTo: StoredCredentials? = null // set while another user is being paired onto this shared device
+    private var stored: StoredServer? = null // the server open now, as this device holds it
+    private var all = StoredServers(emptyList()) // every server this device holds, as last read or written
+    private var pairAddress: String? = null // the address the pairing form starts with, when the server is already known
+    private var addingTo: StoredServer? = null // set while another user is being paired onto this shared device
     private var unlocked: AppState.Unlocked? = null // set from unlock to lock, also while Settings is shown
     private var lastActivity = 0L
     private var idleLimitMs = 0L
@@ -110,7 +118,7 @@ class AppFlow(
     private var sessionScope: CoroutineScope = newSessionScope()
     private var removing = false
     private val saveLock = Mutex() // the stored credentials are written, and removed, one at a time
-    private var persisted: StoredCredentials? = null // what is on disk for sure; [stored] differing from it means a save is still owed
+    private var persisted: StoredServer? = null // what is on disk for sure; [stored] differing from it means a save is still owed
     private var enrollGen = 0 // changes when an enrollment is abandoned, so a late answer of the abandoned one is dropped
     private var lastLiveSearchMs: Long? = null // when the live socket last searched, to space the searches
 
@@ -157,14 +165,17 @@ class AppFlow(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                null // unreadable store: pair again
+                null // unreadable store: start from an empty list
             }
-            if (found == null) _state.value = pair() else resume(found)
+            all = found ?: StoredServers(emptyList())
+            // One server opens straight away, as before there was a list; none or several show the list.
+            val only = all.servers.singleOrNull()
+            if (only != null) open(only) else showList()
         }
     }
 
     /** Builds the client for what the device holds and shows the lock screen. */
-    private fun resume(creds: StoredCredentials, readFromDisk: Boolean = true) {
+    private fun resume(creds: StoredServer, readFromDisk: Boolean = true) {
         stored = creds
         // Only what was just read from disk is known to be there; a snapshot from memory must not hide a save that is still owed.
         if (readFromDisk) persisted = creds
@@ -172,7 +183,7 @@ class AppFlow(
         _state.value = lockedFor(creds)
     }
 
-    private fun lockedFor(creds: StoredCredentials, username: String? = null, needsPassword: Boolean = false, problem: Problem? = null): AppState.Locked {
+    private fun lockedFor(creds: StoredServer, username: String? = null, needsPassword: Boolean = false, problem: Problem? = null): AppState.Locked {
         val names = creds.users.map { it.username }
         val shared = creds.mode == DeviceMode.SHARED
         // A personal device holds one user; a shared one waits for a pick.
@@ -185,7 +196,124 @@ class AppFlow(
         check: FingerprintCheck? = null,
         busy: Boolean = false,
         problem: Problem? = null,
-    ) = AppState.Pair(preview, check, busy, problem, adding = addingTo != null)
+    ) = AppState.Pair(preview, check, busy, problem, adding = addingTo != null, address = pairAddress.orEmpty())
+
+    /**
+     * Writes [server] into the list on disk in place of the one with its id (or after the others when it is new), as the last one opened.
+     * Callers hold the save lock and run on [io].
+     */
+    private fun persist(server: StoredServer) {
+        val others = all.servers
+        val list = if (others.any { it.serverId == server.serverId }) others.map { if (it.serverId == server.serverId) server else it } else others + server
+        val next = StoredServers(list, lastServerId = server.serverId)
+        store.save(next)
+        all = next
+    }
+
+    // ---- the server list ----
+
+    private fun rows() = all.servers.map { s ->
+        val endpoint = s.endpoints.firstOrNull().orEmpty()
+        ServerRow(s.serverId, s.name.ifBlank { endpoint }, endpoint, s.users.size)
+    }
+
+    private fun showList(problem: Problem? = null) {
+        _state.value = AppState.Servers(rows(), emptyList(), searching = false, problem = problem)
+        refreshFound()
+    }
+
+    private fun servers(change: (AppState.Servers) -> AppState.Servers) {
+        (_state.value as? AppState.Servers)?.let { _state.value = change(it) }
+    }
+
+    /** Looks on the local network again; servers already saved here are left out, since they are in the list above. */
+    fun refreshFound() {
+        val s = _state.value as? AppState.Servers ?: return
+        if (s.searching) return
+        _state.value = s.copy(searching = true)
+        scope.launch {
+            val found = try {
+                discovery.browse(BROWSE_TIMEOUT)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                emptyList()
+            }
+            val saved = all.servers.map { it.serverId }.toSet()
+            servers { it.copy(found = found.filter { f -> f.serverId !in saved }.distinctBy { f -> f.serverId }, searching = false) }
+        }
+    }
+
+    /** Opens a saved server: its lock screen, or the pairing when nobody is paired with it here yet. It is remembered as the last one opened. */
+    fun openServer(serverId: String) {
+        val s = _state.value as? AppState.Servers ?: return
+        if (s.busy) return
+        val server = all.servers.firstOrNull { it.serverId == serverId } ?: return
+        open(server)
+        if (all.lastServerId == serverId) return
+        scope.launch {
+            try {
+                withContext(io) {
+                    saveLock.withLock {
+                        val next = all.copy(lastServerId = serverId)
+                        store.save(next)
+                        all = next
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Only which server was opened last is not kept.
+            }
+        }
+    }
+
+    private fun open(server: StoredServer) {
+        if (server.deviceId != null && server.users.isNotEmpty()) return resume(server)
+        pairAddress = server.endpoints.firstOrNull()
+        _state.value = pair()
+    }
+
+    /** A server not saved here yet, by `host:port`: checked that it answers, then paired with by the manual code, which first shows its fingerprint. */
+    fun addServer(address: String) {
+        val s = _state.value as? AppState.Servers ?: return
+        if (s.busy) return
+        val target = address.trim()
+        if (!validAddress(target)) {
+            _state.value = s.copy(problem = Problem.BadAddress)
+            return
+        }
+        _state.value = s.copy(busy = true, problem = null)
+        scope.launch {
+            guarded({ withContext(io) { probe(target) } }) { p -> servers { it.copy(busy = false, problem = p) } } ?: return@launch
+            if (_state.value !is AppState.Servers) return@launch
+            pairAddress = target
+            _state.value = pair()
+        }
+    }
+
+    fun openFound(found: FoundServer) = addServer(found.endpoint)
+
+    /** Back to the server list from the lock screen or the pairing: ends the session as a lock does and closes this server's client. */
+    fun showServers() {
+        when (val s = _state.value) {
+            is AppState.Locked -> if (s.busy) return
+            is AppState.Pair -> if (s.busy) return
+            else -> return
+        }
+        endSession()
+        failReauth(ClientError.Locked())
+        enrollGen++
+        session?.api?.close()
+        session = null
+        stored = null
+        persisted = null
+        addingTo = null
+        manual = null
+        enrollmentToken = null
+        pairAddress = null
+        showList()
+    }
 
     // ---- pairing: link ----
 
@@ -364,8 +492,8 @@ class AppFlow(
                         val made = if (base != null) base.copy(
                             users = base.users.filter { it.username != username } + user,
                             endpoints = mergeEndpoints(opened.api.endpoints, base.endpoints),
-                        ) else StoredCredentials(done.deviceId, opened.serverId, opened.pin, opened.api.endpoints, listOf(user), form.mode)
-                        store.save(made)
+                        ) else StoredServer(opened.serverId, s.redeem.serverName, opened.pin, opened.api.endpoints, done.deviceId, listOf(user), form.mode)
+                        persist(made)
                         stored = made
                         persisted = made
                         made
@@ -390,7 +518,7 @@ class AppFlow(
      * each wrong try counts against the enrollment, which ends after 5.
      */
     private suspend fun enrollTrying(
-        opened: Session, token: String, r: RedeemResponse, form: EnrollInput, adding: StoredCredentials?,
+        opened: Session, token: String, r: RedeemResponse, form: EnrollInput, adding: StoredServer?,
         /** Filled with the users whose device credential the server did not recognize. */
         rejected: MutableList<String>,
         /** Filled with the user whose credential the server accepted. */
@@ -432,7 +560,7 @@ class AppFlow(
                     val next = base.copy(users = marked(base.users))
                     addingTo = addingTo?.let { a -> a.copy(users = marked(a.users)) }
                     if (next == base) return@withLock
-                    store.save(next)
+                    persist(next)
                     stored = next
                     persisted = next
                 }
@@ -465,25 +593,34 @@ class AppFlow(
         }
         _state.value = s.copy(busy = true, problem = null)
         scope.launch {
-            val creds = try {
+            val loaded = try {
                 withContext(io) { store.load() }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
                 null
             }
-            if (creds == null) {
-                _state.value = pair()
+            val creds = loaded?.servers?.firstOrNull { it.serverId == opened.serverId }
+            if (loaded == null || creds == null) {
+                // This server is gone from the store: back to what it still holds.
+                all = loaded ?: StoredServers(emptyList())
+                stored = null
+                persisted = null
+                session = null
+                opened.api.close()
+                showList()
                 return@launch
             }
+            all = loaded
             stored = creds
             persisted = creds
             val credential = creds.users.firstOrNull { it.username == username }?.credential
-            if (credential == null) {
+            val deviceId = creds.deviceId
+            if (credential == null || deviceId == null) {
                 _state.value = s.copy(busy = false, problem = Problem.WrongCredentials)
                 return@launch
             }
-            val request = UnlockRequest(creds.deviceId, username, credential,
+            val request = UnlockRequest(deviceId, username, credential,
                 pin = secret.takeIf { !s.needsPassword }, password = secret.takeIf { s.needsPassword })
             val passwordAsked = { e: Exception -> e is ClientError.Api && e.code == ErrorCode.REAUTH_REQUIRED && e.passwordRequired }
             try {
@@ -561,7 +698,7 @@ class AppFlow(
                         // The newest credentials at the moment of writing, not the ones this call saw.
                         val latest = stored ?: return@withLock
                         if (latest == persisted) return@withLock
-                        store.save(latest)
+                        persist(latest)
                         persisted = latest
                     }
                 }
@@ -824,7 +961,7 @@ class AppFlow(
         }
     }
 
-    /** Forgets this server on this device: deletes the saved sign-ins of every user here and returns to pairing. */
+    /** Forgets this server on this device: deletes the saved sign-ins of every user here and returns to the server list. Other servers stay. */
     fun removeServer() {
         val s = _state.value as? AppState.Settings ?: return
         if (s.busy || removing) return // one removal at a time, even after Back and Settings again
@@ -832,8 +969,20 @@ class AppFlow(
         // Not cancellable and no lock meanwhile: the saved sign-ins are either all gone, or the user is still in Settings.
         removing = true
         scope.launch {
+            val gone = stored?.serverId
             val cleared = try {
-                guarded({ withContext(io) { saveLock.withLock { store.clear(); stored = null; persisted = null } } }) { p -> settings { it.copy(busy = false, problem = p) } }
+                guarded({
+                    withContext(io) {
+                        saveLock.withLock {
+                            val next = StoredServers(all.servers.filter { it.serverId != gone }, all.lastServerId.takeIf { it != gone })
+                            // The last server takes the file with it.
+                            if (next.servers.isEmpty()) store.clear() else store.save(next)
+                            all = next
+                            stored = null
+                            persisted = null
+                        }
+                    }
+                }) { p -> settings { it.copy(busy = false, problem = p) } }
             } finally {
                 removing = false
             }
@@ -844,7 +993,8 @@ class AppFlow(
             session = null
             stored = null
             addingTo = null
-            _state.value = pair()
+            pairAddress = null
+            showList()
         }
     }
 

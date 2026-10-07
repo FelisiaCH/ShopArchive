@@ -17,7 +17,9 @@ import xyz.felismp.shoparchive.app.client.CredentialStore
 import xyz.felismp.shoparchive.app.client.ServerApi
 import xyz.felismp.shoparchive.app.client.Preferences
 import xyz.felismp.shoparchive.app.client.PreferencesStore
-import xyz.felismp.shoparchive.app.client.StoredCredentials
+import xyz.felismp.shoparchive.app.client.FoundServer
+import xyz.felismp.shoparchive.app.client.StoredServer
+import xyz.felismp.shoparchive.app.client.StoredServers
 import xyz.felismp.shoparchive.app.client.StoredUser
 import xyz.felismp.shoparchive.shared.AuthPolicy
 import xyz.felismp.shoparchive.shared.ConfigResponse
@@ -49,14 +51,22 @@ private val PIN_HEX = "AB".repeat(32)
 private const val WRONG_PIN = "000000"
 private val PIN_FP = PIN_HEX.chunked(4).joinToString(" ")
 
-private class FakeStore(var stored: StoredCredentials? = null) : CredentialStore {
-    override fun load() = stored
-    override fun save(credentials: StoredCredentials) { stored = credentials }
-    override fun clear() { stored = null }
+private class FakeStore(var all: StoredServers? = null) : CredentialStore {
+    /** The first saved server, which is the only one in most tests; setting it makes it the only one. */
+    var stored: StoredServer?
+        get() = all?.servers?.firstOrNull()
+        set(value) { all = value?.let { StoredServers(listOf(it)) } }
+    override fun load() = all
+    override fun save(servers: StoredServers) { all = servers }
+    override fun clear() { all = null }
 }
 
 private fun storedAlice(mode: DeviceMode = DeviceMode.PERSONAL) =
-    StoredCredentials("dev-1", "sid-1", PIN_HEX, listOf("10.0.0.5:8443"), listOf(StoredUser("alice", "cred")), mode)
+    StoredServer("sid-1", "Shop", PIN_HEX, listOf("10.0.0.5:8443"), "dev-1", listOf(StoredUser("alice", "cred")), mode)
+
+/** Another server, named after its [id], with each of [users] holding the credential `cred-<name>`. */
+private fun server(id: String, endpoint: String, vararg users: String) =
+    StoredServer(id, "Shop $id", PIN_HEX, listOf(endpoint), "dev-$id", users.map { StoredUser(it, "cred-$it") })
 
 private fun storedShared() = storedAlice(DeviceMode.SHARED).let { it.copy(users = it.users + StoredUser("bob", "cred-bob")) }
 
@@ -67,7 +77,11 @@ private class FakePrefs(var saved: Preferences = Preferences()) : PreferencesSto
 
 private class FakeDiscovery(var found: List<String> = emptyList()) : ServerDiscovery {
     var searches = 0
+    /** What a browse of the whole network finds. */
+    var announced: List<FoundServer> = emptyList()
+    var browses = 0
     override suspend fun find(serverId: String, timeout: kotlin.time.Duration): List<String> { searches++; return found }
+    override suspend fun browse(timeout: kotlin.time.Duration): List<FoundServer> { browses++; return announced }
 }
 
 private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerApi, xyz.felismp.shoparchive.app.client.RecordsApi by records {
@@ -201,8 +215,27 @@ class AppFlowTest {
 
     // ---- start ----
 
-    @Test fun noStoredCredentialsStartsAtPair() {
-        assertIs<AppState.Pair>(flow().state.value)
+    /** From the server list to the pairing screen, by adding a server's address (the probe it takes is forgotten). */
+    private fun pairingFlow(): AppFlow = flow().apply {
+        addServer("192.168.1.2:8443")
+        assertIs<AppState.Pair>(state.value)
+        probed = null
+    }
+
+    @Test fun noStoredServerStartsAtTheEmptyServerListAndLooksOnTheNetwork() {
+        discovery.announced = listOf(FoundServer("sid-9", "Market", "192.168.1.9:8443"))
+        val s = assertIs<AppState.Servers>(flow().state.value)
+        assertTrue(s.saved.isEmpty())
+        assertEquals(listOf(FoundServer("sid-9", "Market", "192.168.1.9:8443")), s.found)
+        assertFalse(s.searching)
+        assertEquals(1, discovery.browses)
+    }
+
+    @Test fun twoStoredServersStartAtTheServerList() {
+        store.all = StoredServers(listOf(server("sid-1", "10.0.0.5:8443", "alice"), server("sid-2", "10.0.0.6:8443", "bob", "carol")))
+        val s = assertIs<AppState.Servers>(flow().state.value)
+        assertEquals(listOf(ServerRow("sid-1", "Shop sid-1", "10.0.0.5:8443", 1), ServerRow("sid-2", "Shop sid-2", "10.0.0.6:8443", 2)), s.saved)
+        assertTrue(connected.isEmpty(), "no server is opened before one is picked")
     }
 
     @Test fun storedCredentialsStartAtLocked() {
@@ -213,14 +246,14 @@ class AppFlowTest {
         assertEquals(PIN_HEX, connected.single().first)
     }
 
-    @Test fun unreadableStoreStartsAtPair() {
+    @Test fun unreadableStoreStartsAtTheServerList() {
         val broken = object : CredentialStore {
-            override fun load(): StoredCredentials? = error("damaged")
-            override fun save(credentials: StoredCredentials) = Unit
+            override fun load(): StoredServers? = error("damaged")
+            override fun save(servers: StoredServers) = Unit
             override fun clear() = Unit
         }
         val f = AppFlow(scope, broken, ThisDevice("x", "windows"), { _, _, _ -> api }, { "" }, prefs, { 0L }, Dispatchers.Unconfined)
-        assertIs<AppState.Pair>(f.state.value)
+        assertTrue(assertIs<AppState.Servers>(f.state.value).saved.isEmpty())
     }
 
     @Test fun unlockingLooksForAnUpdateOnlyWhereThePlatformCanInstallOne() {
@@ -284,6 +317,125 @@ class AppFlowTest {
         assertEquals(Problem.WrongCredentials, assertIs<AppState.Locked>(f.state.value).problem)
     }
 
+    // ---- the server list ----
+
+    private fun twoServers() = StoredServers(listOf(server("sid-1", "10.0.0.5:8443", "alice"), server("sid-2", "10.0.0.6:8443", "bob", "carol")))
+
+    @Test fun openingAServerShowsItsLockScreenAndRemembersItAsTheLastOne() {
+        store.all = twoServers()
+        val f = flow()
+        f.openServer("sid-2")
+        val locked = assertIs<AppState.Locked>(f.state.value)
+        assertEquals("10.0.0.6:8443", locked.server)
+        assertEquals(listOf("bob", "carol"), locked.users)
+        assertEquals(Triple(PIN_HEX, "sid-2", listOf("10.0.0.6:8443")), connected.single())
+        assertEquals("sid-2", store.all?.lastServerId)
+        assertEquals(twoServers().servers, store.all?.servers, "opening changes no server")
+        f.unlock("483926")
+        assertEquals(UnlockRequest("dev-sid-2", "bob", "cred-bob", pin = "483926"), api.unlocks.single())
+    }
+
+    @Test fun openingAServerWithoutUsersGoesToPairingWithItsAddress() {
+        store.all = StoredServers(listOf(server("sid-1", "10.0.0.5:8443", "alice"), server("sid-2", "10.0.0.6:8443").copy(deviceId = null)))
+        val f = flow()
+        f.openServer("sid-2")
+        assertEquals("10.0.0.6:8443", assertIs<AppState.Pair>(f.state.value).address)
+    }
+
+    @Test fun pairingASecondServerKeepsTheFirst() {
+        val first = server("sid-0", "10.0.0.4:8443", "zoe")
+        store.stored = first
+        api.redeemResponse = api.redeemResponse.copy(serverName = "Market")
+        val f = flow()
+        assertIs<AppState.Locked>(f.state.value)
+        f.showServers()
+        f.addServer("192.168.1.2:8443")
+        f.enrolling(); f.enroll(good)
+        assertIs<AppState.Unlocked>(f.state.value)
+        val all = assertNotNull(store.all)
+        assertEquals(first, all.servers.first(), "the first server is untouched")
+        assertEquals(StoredServer("sid-1", "Market", PIN_HEX, listOf("192.168.1.2:8443"), "dev-1", listOf(StoredUser("alice", "cred-1"))), all.servers[1])
+        assertEquals("sid-1", all.lastServerId)
+    }
+
+    @Test fun removingAServerRemovesOnlyThatOne() {
+        store.all = twoServers()
+        val f = flow()
+        f.openServer("sid-1"); f.unlock("483926"); f.openSettings()
+        f.removeServer()
+        val s = assertIs<AppState.Servers>(f.state.value)
+        assertEquals(listOf("sid-2"), s.saved.map { it.serverId })
+        assertEquals(listOf(server("sid-2", "10.0.0.6:8443", "bob", "carol")), store.all?.servers)
+        assertNull(f.workspace)
+    }
+
+    @Test fun theServerListFromTheLockScreenEndsTheSession() {
+        store.stored = storedAlice()
+        val f = flow()
+        f.unlock("483926")
+        f.lockNow()
+        f.showServers()
+        val s = assertIs<AppState.Servers>(f.state.value)
+        assertEquals(listOf(ServerRow("sid-1", "Shop", "10.0.0.5:8443", 1)), s.saved)
+        assertTrue(api.closed)
+        assertFalse(api.token)
+        assertNull(f.workspace)
+        assertFalse(f.canWrite.value)
+        f.unlock("483926") // not on the lock screen any more
+        assertEquals(1, api.unlocks.size)
+    }
+
+    @Test fun theServerListFromPairingDropsThePairingInProgress() {
+        val f = pairingFlow()
+        f.submitManual("192.168.1.2:8443", "alice", "BCDFG-HJKLM")
+        f.showServers()
+        assertIs<AppState.Servers>(f.state.value)
+        f.confirmFingerprint() // nothing to confirm any more
+        assertTrue(api.redeemed.isEmpty())
+    }
+
+    @Test fun theFoundListLeavesOutSavedServers() {
+        store.all = twoServers()
+        discovery.announced = listOf(
+            FoundServer("sid-2", "Shop sid-2", "10.0.0.6:8443"),
+            FoundServer("sid-9", "Market", "192.168.1.9:8443"),
+            FoundServer("sid-9", "Market", "10.8.0.9:8443"), // the same server on another network
+        )
+        val f = flow()
+        assertEquals(listOf(FoundServer("sid-9", "Market", "192.168.1.9:8443")), assertIs<AppState.Servers>(f.state.value).found)
+        discovery.announced = emptyList()
+        f.refreshFound()
+        assertEquals(emptyList(), assertIs<AppState.Servers>(f.state.value).found)
+        assertEquals(2, discovery.browses)
+    }
+
+    @Test fun addingAServerChecksTheAddressProbesItThenPairsWithItFilledIn() {
+        val f = flow()
+        f.addServer("no-port")
+        assertEquals(Problem.BadAddress, assertIs<AppState.Servers>(f.state.value).problem)
+        assertNull(probed)
+        probeResult = { throw ClientError.Unreachable() }
+        f.addServer("192.168.1.2:8443")
+        val s = assertIs<AppState.Servers>(f.state.value)
+        assertEquals(Problem.Unreachable, s.problem)
+        assertFalse(s.busy)
+        probeResult = { PIN_FP }
+        f.addServer(" shop.example.com:25655 ")
+        assertEquals("shop.example.com:25655", probed)
+        assertEquals("shop.example.com:25655", assertIs<AppState.Pair>(f.state.value).address)
+        f.submitManual("shop.example.com:25655", "alice", "BCDFG-HJKLM")
+        assertEquals(PIN_FP, assertNotNull(assertIs<AppState.Pair>(f.state.value).check).fingerprint)
+    }
+
+    @Test fun openingAFoundServerAddsItsAddress() {
+        val found = FoundServer("sid-9", "Market", "192.168.1.9:8443")
+        discovery.announced = listOf(found)
+        val f = flow()
+        f.openFound(found)
+        assertEquals("192.168.1.9:8443", probed)
+        assertEquals("192.168.1.9:8443", assertIs<AppState.Pair>(f.state.value).address)
+    }
+
     // ---- pair by link ----
 
     @Test fun pairByLinkShowsPreviewThenRedeemsWithSecret() {
@@ -332,7 +484,7 @@ class AppFlowTest {
     // ---- pair by manual code ----
 
     @Test fun manualCodeProbesThenConfirmRedeemsWithThatPin() {
-        val f = flow()
+        val f = pairingFlow()
         f.submitManual(" 192.168.1.2:8443 ", "alice", "bcdfg-hjklm")
         assertEquals("192.168.1.2:8443", probed)
         val check = assertNotNull(assertIs<AppState.Pair>(f.state.value).check)
@@ -345,7 +497,7 @@ class AppFlowTest {
     }
 
     @Test fun cancelAtFingerprintRedeemsNothing() {
-        val f = flow()
+        val f = pairingFlow()
         f.submitManual("192.168.1.2:8443", "alice", "BCDFG-HJKLM")
         f.cancelFingerprint()
         assertNull(assertIs<AppState.Pair>(f.state.value).check)
@@ -355,7 +507,7 @@ class AppFlowTest {
     }
 
     @Test fun manualFieldsAreChecked() {
-        val f = flow()
+        val f = pairingFlow()
         f.submitManual("no-port", "alice", "BCDFG-HJKLM")
         assertEquals(Problem.BadAddress, assertIs<AppState.Pair>(f.state.value).problem)
         f.submitManual("host:99999", "alice", "BCDFG-HJKLM")
@@ -368,7 +520,7 @@ class AppFlowTest {
     }
 
     @Test fun unreachableProbeStaysOnPairWithError() {
-        val f = flow()
+        val f = pairingFlow()
         probeResult = { throw ClientError.Unreachable() }
         f.submitManual("192.168.1.2:8443", "alice", "BCDFG-HJKLM")
         val s = assertIs<AppState.Pair>(f.state.value)
@@ -377,7 +529,7 @@ class AppFlowTest {
     }
 
     @Test fun manualRedeemWithWrongCodeStaysOnFingerprint() {
-        val f = flow()
+        val f = pairingFlow()
         f.submitManual("192.168.1.2:8443", "alice", "BCDFG-HJKLM")
         api.failRedeem = ClientError.Api(400, ErrorCode.PAIRING_INVALID, "no")
         f.confirmFingerprint()
@@ -387,7 +539,7 @@ class AppFlowTest {
     }
 
     @Test fun manualPairingWithOtherProtocolIsBlocked() {
-        val f = flow()
+        val f = pairingFlow()
         api.protocol = PROTOCOL_VERSION + 1
         f.submitManual("192.168.1.2:8443", "alice", "BCDFG-HJKLM")
         f.confirmFingerprint()
@@ -403,20 +555,20 @@ class AppFlowTest {
         flow().apply { api.failRedeem = mismatch; previewLink(link()); redeemLink(); assertEquals(AppState.PinMismatch, state.value) }
         api.failRedeem = null
         // manual probe never talks to a pinned server, but a mismatch on confirm blocks
-        flow().apply { api.failInfo = mismatch; submitManual("h:1", "a", "BCDFG-HJKLM"); confirmFingerprint(); assertEquals(AppState.PinMismatch, state.value) }
+        pairingFlow().apply { api.failInfo = mismatch; submitManual("h:1", "a", "BCDFG-HJKLM"); confirmFingerprint(); assertEquals(AppState.PinMismatch, state.value) }
         api.failInfo = null
         // enroll
         flow().apply { enrolling(); api.failEnroll = mismatch; enroll(good); assertEquals(AppState.PinMismatch, state.value) }
         api.failEnroll = null
         // unlock from the lock screen
-        store.stored = StoredCredentials("d", "s", PIN_HEX, listOf("h:1"), listOf(StoredUser("alice", "c")))
+        store.stored = StoredServer("s", "", PIN_HEX, listOf("h:1"), "d", listOf(StoredUser("alice", "c")))
         flow().apply { api.failUnlock = mismatch; unlock("483926"); assertEquals(AppState.PinMismatch, state.value) }
     }
 
     @Test fun protocolMismatchBlocksWithServerVersion() {
         flow().apply { api.failRedeem = ClientError.ProtocolMismatch(7, "old"); previewLink(link()); redeemLink(); assertEquals(AppState.ProtocolMismatch(7), state.value) }
         api.failRedeem = null
-        store.stored = StoredCredentials("d", "s", PIN_HEX, listOf("h:1"), listOf(StoredUser("alice", "c")))
+        store.stored = StoredServer("s", "", PIN_HEX, listOf("h:1"), "d", listOf(StoredUser("alice", "c")))
         flow().apply { api.failUnlock = ClientError.ProtocolMismatch(2, "old"); unlock("483926"); assertEquals(AppState.ProtocolMismatch(2), state.value) }
     }
 
@@ -443,8 +595,8 @@ class AppFlowTest {
         val f = flow()
         f.enrolling(); f.enroll(good)
         val saved = assertNotNull(store.stored)
-        assertEquals(StoredCredentials("dev-1", "sid-1", PIN_HEX, listOf("192.168.1.2:8443"), listOf(StoredUser("alice", "cred-1"))), saved)
-        val text = Json.encodeToString(StoredCredentials.serializer(), saved)
+        assertEquals(StoredServer("sid-1", "", PIN_HEX, listOf("192.168.1.2:8443"), "dev-1", listOf(StoredUser("alice", "cred-1"))), saved)
+        val text = Json.encodeToString(StoredServers.serializer(), assertNotNull(store.all))
         assertFalse("483926" in text || "access" in text)
     }
 
@@ -568,7 +720,7 @@ class AppFlowTest {
 
     // ---- lock screen ----
 
-    private fun lockedFlow(creds: StoredCredentials = storedAlice()): AppFlow { store.stored = creds; return flow() }
+    private fun lockedFlow(creds: StoredServer = storedAlice()): AppFlow { store.stored = creds; return flow() }
 
     @Test fun sharedDeviceListsItsUsersAndWaitsForAPick() {
         val f = lockedFlow(storedShared())
@@ -741,7 +893,7 @@ class AppFlowTest {
         api.announced = listOf("shop.example.com:25655", oldAddress)
         var saves = 0
         val counting = object : CredentialStore by store {
-            override fun save(credentials: StoredCredentials) { saves++; store.save(credentials) }
+            override fun save(servers: StoredServers) { saves++; store.save(servers) }
         }
         val f = AppFlow(scope, counting, ThisDevice("Test PC", "windows"), { _, _, eps -> api.also { it.endpoints = eps } }, { PIN_FP }, prefs, { clock }, Dispatchers.Unconfined)
         f.unlock("483926")
@@ -752,7 +904,7 @@ class AppFlowTest {
         store.stored = storedAlice()
         api.announced = listOf("shop.example.com:25655")
         val broken = object : CredentialStore by store {
-            override fun save(credentials: StoredCredentials) = throw java.io.IOException("disk full")
+            override fun save(servers: StoredServers) = throw java.io.IOException("disk full")
         }
         val f = AppFlow(scope, broken, ThisDevice("Test PC", "windows"), { _, _, eps -> api.also { it.endpoints = eps } }, { PIN_FP }, prefs, { clock }, Dispatchers.Unconfined)
         f.unlock("483926")
@@ -765,10 +917,10 @@ class AppFlowTest {
         var failing = true
         var saves = 0
         val flaky = object : CredentialStore by store {
-            override fun save(credentials: StoredCredentials) {
+            override fun save(servers: StoredServers) {
                 saves++
                 if (failing) throw java.io.IOException("disk full")
-                store.save(credentials)
+                store.save(servers)
             }
         }
         val f = AppFlow(scope, flaky, ThisDevice("Test PC", "windows"), { _, _, eps -> api.also { it.endpoints = eps } }, { PIN_FP }, prefs, { clock }, Dispatchers.Unconfined)
@@ -796,16 +948,16 @@ class AppFlowTest {
         @Volatile var gateNext = false
         val entered = java.util.concurrent.CountDownLatch(1)
         val release = java.util.concurrent.CountDownLatch(1)
-        private val log = java.util.Collections.synchronizedList(mutableListOf<StoredCredentials>())
-        /** A snapshot of every write so far, in order. */
-        fun written(): List<StoredCredentials> = synchronized(log) { log.toList() }
-        override fun save(credentials: StoredCredentials) {
+        private val log = java.util.Collections.synchronizedList(mutableListOf<StoredServer>())
+        /** A snapshot of every write so far, in order (the one server each holds). */
+        fun written(): List<StoredServer> = synchronized(log) { log.toList() }
+        override fun save(servers: StoredServers) {
             if (gateNext) {
                 gateNext = false
                 entered.countDown()
                 check(release.await(30, java.util.concurrent.TimeUnit.SECONDS)) { "the gate was never opened" }
             }
-            synchronized(log) { log += credentials; inner.save(credentials) }
+            synchronized(log) { log += servers.servers.single(); inner.save(servers) }
         }
     }
 
@@ -858,7 +1010,7 @@ class AppFlowTest {
         api.announced = listOf("shop.example.com:25655")
         var failing = true
         val flaky = object : CredentialStore by store {
-            override fun save(credentials: StoredCredentials) { if (failing) throw java.io.IOException("disk full"); store.save(credentials) }
+            override fun save(servers: StoredServers) { if (failing) throw java.io.IOException("disk full"); store.save(servers) }
         }
         val f = AppFlow(scope, flaky, ThisDevice("Test PC", "windows"), { _, _, eps -> api.also { it.endpoints = eps } }, { PIN_FP }, prefs, { clock }, Dispatchers.Unconfined)
         f.selectUser("alice"); f.unlock("111111")
@@ -1289,11 +1441,11 @@ class AppFlowTest {
         assertEquals("lo", flow().language.value)
     }
 
-    @Test fun removingTheServerDeletesTheCredentialsAndReturnsToPair() {
+    @Test fun removingTheOnlyServerDeletesTheCredentialsAndReturnsToTheServerList() {
         val f = lockedFlow(storedShared()); f.selectUser("alice"); f.unlock("111111"); f.openSettings()
         f.removeServer()
-        assertNull(store.stored)
-        assertFalse(assertIs<AppState.Pair>(f.state.value).adding)
+        assertNull(store.all)
+        assertTrue(assertIs<AppState.Servers>(f.state.value).saved.isEmpty())
         assertTrue(api.closed)
         assertFalse(api.token)
     }
@@ -1333,7 +1485,7 @@ class AppFlowTest {
         f.previewLink(link()); f.redeemLink()
     }
 
-    private fun names(c: StoredCredentials?) = c?.users?.map { it.username }
+    private fun names(c: StoredServer?) = c?.users?.map { it.username }
 
     @Test fun addUserFallsBackToTheNextUsersCredentialAndPrefersTheLastToUnlock() {
         val f = lockedFlow(storedShared())
@@ -1415,8 +1567,8 @@ class AppFlowTest {
 
     @Test fun anOldCredentialFileWithoutTheMarkStillReads() {
         val old = """{"deviceId":"d","serverId":"s","certPin":"p","endpoints":["h:1"],"users":[{"username":"a","credential":"c"}]}"""
-        val read = kotlinx.serialization.json.Json.decodeFromString(StoredCredentials.serializer(), old)
-        assertFalse(read.users.single().rejected)
+        val read = xyz.felismp.shoparchive.app.client.decodeServers(old.toByteArray())
+        assertFalse(read.servers.single().users.single().rejected)
     }
 
     @Test fun addUserWithEveryCredentialRejectedSaysWhatToDo() {
@@ -1603,9 +1755,9 @@ class AppFlowTest {
     @Test fun aLockWhileTheServerIsBeingRemovedWaitsForTheRemoval() {
         lateinit var f: AppFlow
         val removing = object : CredentialStore {
-            var stored: StoredCredentials? = storedAlice()
+            var stored: StoredServers? = StoredServers(listOf(storedAlice()))
             override fun load() = stored
-            override fun save(credentials: StoredCredentials) { stored = credentials }
+            override fun save(servers: StoredServers) { stored = servers }
             override fun clear() { f.lockNow(); stored = null } // the auto-lock fires while the sign-ins are being deleted
         }
         f = AppFlow(
@@ -1614,7 +1766,7 @@ class AppFlowTest {
         )
         f.unlock("111111"); f.openSettings()
         f.removeServer()
-        assertIs<AppState.Pair>(f.state.value)
+        assertIs<AppState.Servers>(f.state.value)
         assertNull(removing.stored)
     }
 
@@ -1622,9 +1774,9 @@ class AppFlowTest {
         lateinit var f: AppFlow
         var clears = 0
         val removing = object : CredentialStore {
-            var stored: StoredCredentials? = storedAlice()
+            var stored: StoredServers? = StoredServers(listOf(storedAlice()))
             override fun load() = stored
-            override fun save(credentials: StoredCredentials) { stored = credentials }
+            override fun save(servers: StoredServers) { stored = servers }
             override fun clear() {
                 clears++
                 f.closeSettings(); f.openSettings(); f.removeServer() // Back, Settings, Remove again while the first one runs

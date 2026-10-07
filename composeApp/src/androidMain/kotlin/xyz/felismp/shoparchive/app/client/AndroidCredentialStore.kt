@@ -36,22 +36,22 @@ class AndroidCredentialStore(private val file: File) : CredentialStore {
         }
     }
 
-    override fun load(): StoredCredentials? {
+    override fun load(): StoredServers? {
         if (!file.exists()) return null
         return try {
             val bytes = file.readBytes()
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
-            decodeCredentials(cipher.doFinal(bytes, 12, bytes.size - 12))
+            decodeServers(cipher.doFinal(bytes, 12, bytes.size - 12))
         } catch (_: Exception) {
             null // key lost (e.g. restored backup) or file damaged: pair again
         }
     }
 
-    override fun save(credentials: StoredCredentials) {
+    override fun save(servers: StoredServers) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, key()) }
         val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeBytes(cipher.iv + cipher.doFinal(credentials.encode()))
+        tmp.writeBytes(cipher.iv + cipher.doFinal(servers.encode()))
         check(tmp.renameTo(file)) { "could not replace ${file.name}" }
     }
 

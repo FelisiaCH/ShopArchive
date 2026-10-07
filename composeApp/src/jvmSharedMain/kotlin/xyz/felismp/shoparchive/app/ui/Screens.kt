@@ -3,6 +3,7 @@ package xyz.felismp.shoparchive.app.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,6 +17,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import xyz.felismp.shoparchive.app.client.formatFingerprint
 import xyz.felismp.shoparchive.app.AppBuild
@@ -44,6 +46,7 @@ fun AppHost(flow: AppFlow) {
     }
     when (val s = flow.state.collectAsState().value) {
         AppState.Starting -> ScreenFrame(stringResource(Res.string.app_name)) { ShopText(stringResource(Res.string.starting), muted = true) }
+        is AppState.Servers -> ServersScreen(s, flow)
         is AppState.Pair -> PairScreen(s, flow)
         is AppState.Enroll -> EnrollScreen(s, flow)
         is AppState.Locked -> LockedScreen(s, flow)
@@ -65,12 +68,45 @@ private fun Status(busy: Boolean, problem: Problem?) {
     problem?.let { ShopBanner(it.text(), Tone.Error) }
 }
 
+/** The home screen: the servers saved here, the others found on the local network, and adding one by its address. */
+@Composable
+private fun ServersScreen(s: AppState.Servers, flow: AppFlow) {
+    var address by rememberSaveable { mutableStateOf("") }
+    ScreenFrame(stringResource(Res.string.servers_title)) {
+        if (s.saved.isEmpty()) ShopText(stringResource(Res.string.servers_none), muted = true)
+        s.saved.forEach { row ->
+            ShopCard(Modifier.fillMaxWidth()) {
+                ShopText(row.name, TextRole.Title)
+                ShopText(row.endpoint + " · " + pluralStringResource(Res.plurals.server_users, row.userCount, row.userCount), TextRole.Caption, muted = true)
+                ShopButton(stringResource(Res.string.servers_open), { flow.openServer(row.serverId) }, primary = false, enabled = !s.busy)
+            }
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ShopText(stringResource(Res.string.servers_found), TextRole.Title, modifier = Modifier.weight(1f))
+            ShopButton(stringResource(Res.string.servers_refresh), flow::refreshFound, primary = false, enabled = !s.searching && !s.busy)
+        }
+        when {
+            s.searching -> ShopText(stringResource(Res.string.servers_searching), muted = true)
+            s.found.isEmpty() -> ShopText(stringResource(Res.string.servers_found_none), muted = true)
+        }
+        s.found.forEach { found ->
+            ShopButton("${found.name} · ${found.endpoint}", { flow.openFound(found) }, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
+        }
+
+        ShopTextField(address, { address = it }, stringResource(Res.string.servers_add_label), enabled = !s.busy)
+        Status(s.busy, s.problem)
+        ShopButton(stringResource(Res.string.servers_add), { flow.addServer(address) }, Modifier.fillMaxWidth(), enabled = !s.busy && address.isNotBlank())
+    }
+}
+
 @Composable
 private fun PairScreen(s: AppState.Pair, flow: AppFlow) {
-    var tab by rememberSaveable { mutableStateOf(PairTab.LINK) }
+    // A server picked from the list brings its address: the manual-code form starts with it.
+    var tab by rememberSaveable(s.address) { mutableStateOf(if (s.address.isEmpty()) PairTab.LINK else PairTab.CODE) }
     // Secrets (link, code, password, PIN) use remember, never rememberSaveable: saved state can outlive the process outside the credential store.
     var link by remember { mutableStateOf("") }
-    var address by rememberSaveable { mutableStateOf("") }
+    var address by rememberSaveable(s.address) { mutableStateOf(s.address) }
     var username by rememberSaveable { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     val clipboard = LocalClipboardManager.current
@@ -120,6 +156,7 @@ private fun PairScreen(s: AppState.Pair, flow: AppFlow) {
                 }
                 Status(s.busy, s.problem)
                 if (s.adding) ShopButton(stringResource(Res.string.add_user_back), flow::cancelAddUser, primary = false, enabled = !s.busy)
+                else ShopButton(stringResource(Res.string.servers_back), flow::showServers, primary = false, enabled = !s.busy)
             }
         }
     }
@@ -234,6 +271,7 @@ private fun LockedScreen(s: AppState.Locked, flow: AppFlow) {
             )
             if (s.shared) ShopButton(stringResource(Res.string.lock_other_user), { flow.selectUser(null) }, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
         }
+        ShopButton(stringResource(Res.string.servers_back), flow::showServers, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
     }
 }
 

@@ -1,6 +1,9 @@
 package xyz.felismp.shoparchive.app.client
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import xyz.felismp.shoparchive.shared.DeviceMode
 
 /**
@@ -12,23 +15,29 @@ import xyz.felismp.shoparchive.shared.DeviceMode
 data class StoredUser(val username: String, val credential: String, val rejected: Boolean = false)
 
 /**
- * What this device keeps between runs. [certPin] is the server certificate pin (not the user's PIN).
+ * One server this device knows. [certPin] is the server certificate pin (not the user's PIN). [deviceId] is null until a user has paired here.
  * There is deliberately no field for the access token, PIN or password: those are never stored.
  */
 @Serializable
-data class StoredCredentials(
-    val deviceId: String,
+data class StoredServer(
     val serverId: String,
+    /** The name the server gave when it was paired; blank for a server paired before names were kept. */
+    val name: String,
     val certPin: String,
     val endpoints: List<String>,
+    val deviceId: String? = null,
     /** One on a personal device; every user paired on a shared one. */
-    val users: List<StoredUser>,
+    val users: List<StoredUser> = emptyList(),
     val mode: DeviceMode = DeviceMode.PERSONAL,
 )
 
+/** What this device keeps between runs: every server it knows, and the one opened last. */
+@Serializable
+data class StoredServers(val servers: List<StoredServer>, val lastServerId: String? = null)
+
 interface CredentialStore {
-    fun load(): StoredCredentials?
-    fun save(credentials: StoredCredentials)
+    fun load(): StoredServers?
+    fun save(servers: StoredServers)
     fun clear()
 }
 
@@ -38,7 +47,12 @@ expect abstract class PlatformContext
 /** The platform's store: Keystore-wrapped file on Android, DPAPI-protected file on Windows. */
 expect fun createCredentialStore(context: PlatformContext): CredentialStore
 
-internal fun StoredCredentials.encode(): ByteArray = clientJson.encodeToString(StoredCredentials.serializer(), this).toByteArray(Charsets.UTF_8)
+internal fun StoredServers.encode(): ByteArray = clientJson.encodeToString(StoredServers.serializer(), this).toByteArray(Charsets.UTF_8)
 
-internal fun decodeCredentials(bytes: ByteArray): StoredCredentials =
-    clientJson.decodeFromString(StoredCredentials.serializer(), bytes.toString(Charsets.UTF_8))
+/** Also reads the file from before the list: one server's credentials at the top (with a `deviceId`), which becomes a list of one. The next save writes the list. */
+internal fun decodeServers(bytes: ByteArray): StoredServers {
+    val tree = clientJson.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject
+    if ("deviceId" !in tree) return clientJson.decodeFromJsonElement(StoredServers.serializer(), tree)
+    val old = clientJson.decodeFromJsonElement(StoredServer.serializer(), JsonObject(tree + ("name" to JsonPrimitive(""))))
+    return StoredServers(listOf(old), lastServerId = old.serverId)
+}

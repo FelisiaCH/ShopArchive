@@ -370,4 +370,18 @@
     <string name="console_copy_link">Copy link</string>
     <string name="console_pair_scan">Scan this with the app on the new device, or send the link.</string>
     <string name="reason_command_console_only">This command can only be run on the server console.</string>
+    <string name="servers_title">Servers</string>
+    <string name="servers_none">No servers on this device yet.</string>
+    <string name="servers_open">Open</string>
+    <string name="servers_found">Found on this network</string>
+    <string name="servers_refresh">Refresh</string>
+    <string name="servers_searching">Looking…</string>
+    <string name="servers_found_none">No other servers found.</string>
+    <string name="servers_add_label">Server address (IP:port or domain:port)</string>
+    <string name="servers_add">Add server</string>
+    <string name="servers_back">Server list</string>
+    <plurals name="server_users">
+        <item quantity="one">%1$d user</item>
+        <item quantity="other">%1$d users</item>
+    </plurals>
 </resources>

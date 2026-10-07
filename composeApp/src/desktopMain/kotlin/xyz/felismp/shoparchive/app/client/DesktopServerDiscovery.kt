@@ -30,25 +30,26 @@ internal fun multicastAddresses(): List<InetAddress> {
 
 /**
  * Browses `_shoparchive._tcp` with JmDNS, the same library the server announces with, on every usable interface at once (one JmDNS
- * per address, all within the same [find] timeout). Any failure on an interface just means nothing was found there.
+ * per address, all within the same [browse] timeout). Any failure on an interface just means nothing was found there.
  */
 class JmdnsDiscovery : ServerDiscovery {
-    override suspend fun find(serverId: String, timeout: Duration): List<String> = withContext(Dispatchers.IO) {
+    override suspend fun browse(timeout: Duration): List<FoundServer> = withContext(Dispatchers.IO) {
         // Without any usable address, the library's own pick is still better than not looking.
         val targets: List<InetAddress?> = multicastAddresses().ifEmpty { listOf(null) }
         coroutineScope {
-            targets.map { address -> async { browse(address, serverId, timeout) } }.awaitAll().flatten().distinct()
+            targets.map { address -> async { browse(address, timeout) } }.awaitAll().flatten().distinct()
         }
     }
 
-    private fun browse(address: InetAddress?, serverId: String, timeout: Duration): List<String> {
+    private fun browse(address: InetAddress?, timeout: Duration): List<FoundServer> {
         var jmdns: JmDNS? = null
         return try {
             jmdns = if (address == null) JmDNS.create() else JmDNS.create(address)
-            jmdns.list("$MDNS_SERVICE_TYPE.local.", timeout.inWholeMilliseconds.coerceAtLeast(1))
-                .filter { it.getPropertyString(MDNS_SERVER_ID_KEY) == serverId }
-                .flatMap { info -> info.inet4Addresses.map { "${it.hostAddress}:${info.port}" } }
-                .distinct()
+            jmdns.list("$MDNS_SERVICE_TYPE.local.", timeout.inWholeMilliseconds.coerceAtLeast(1)).flatMap { info ->
+                val id = info.getPropertyString(MDNS_SERVER_ID_KEY) ?: return@flatMap emptyList()
+                val name = info.getPropertyString(MDNS_NAME_KEY) ?: info.name
+                info.inet4Addresses.map { FoundServer(id, name, "${it.hostAddress}:${info.port}") }
+            }.distinct()
         } catch (_: Exception) {
             emptyList()
         } finally {

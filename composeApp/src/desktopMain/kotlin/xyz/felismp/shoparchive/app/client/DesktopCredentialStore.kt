@@ -46,16 +46,16 @@ object PlainProtector : Protector {
 class DesktopCredentialStore(private val dir: Path, private val protector: Protector) : CredentialStore {
     private val file: Path = dir.resolve("credentials.bin")
 
-    override fun load(): StoredCredentials? {
+    override fun load(): StoredServers? {
         if (!Files.exists(file)) return null
         return try {
-            decodeCredentials(protector.unprotect(Files.readAllBytes(file)))
+            decodeServers(protector.unprotect(Files.readAllBytes(file)))
         } catch (_: Exception) {
             null // unreadable (other user, damaged): the device has to be paired again
         }
     }
 
-    override fun save(credentials: StoredCredentials) {
+    override fun save(servers: StoredServers) {
         Files.createDirectories(dir)
         val tmp = dir.resolve("credentials.tmp")
         Files.deleteIfExists(tmp)
@@ -64,7 +64,7 @@ class DesktopCredentialStore(private val dir: Path, private val protector: Prote
         } catch (_: UnsupportedOperationException) {
             Files.createFile(tmp) // not POSIX (Windows): DPAPI protects the content instead
         }
-        Files.write(tmp, protector.protect(credentials.encode()))
+        Files.write(tmp, protector.protect(servers.encode()))
         Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     }
 

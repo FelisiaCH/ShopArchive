@@ -2,6 +2,7 @@ package xyz.felismp.shoparchive.app.flow
 
 import kotlinx.coroutines.flow.StateFlow
 import xyz.felismp.shoparchive.app.client.ConnectionStatus
+import xyz.felismp.shoparchive.app.client.FoundServer
 import xyz.felismp.shoparchive.shared.DeviceInfo
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.PairPayload
@@ -44,11 +45,26 @@ sealed interface Problem {
     data object Unknown : Problem
 }
 
+/** A server saved on this device, as the server list shows it: [endpoint] is the address tried first. */
+data class ServerRow(val serverId: String, val name: String, val endpoint: String, val userCount: Int)
+
 /** The fingerprint the user must compare with the server console before the manual-code pairing goes on. */
 data class FingerprintCheck(val address: String, val fingerprint: String)
 
 sealed interface AppState {
     data object Starting : AppState
+
+    /**
+     * The home screen: the servers saved here, the others [found] on the local network ([searching] while it is looked at), and a field to add one by address.
+     * [busy] while an added address is being checked.
+     */
+    data class Servers(
+        val saved: List<ServerRow>,
+        val found: List<FoundServer>,
+        val searching: Boolean,
+        val problem: Problem?,
+        val busy: Boolean = false,
+    ) : AppState
 
     /** Both pairing tabs. [preview] is a parsed link waiting for Continue, [check] a fingerprint waiting for Confirm. */
     data class Pair(
@@ -58,6 +74,8 @@ sealed interface AppState {
         val problem: Problem? = null,
         /** Pairing another user onto this shared device: the screen offers a way back to the lock screen. */
         val adding: Boolean = false,
+        /** The server's address when it is already known (picked from the server list): the manual-code form starts with it. */
+        val address: String = "",
     ) : AppState
 
     data class Enroll(

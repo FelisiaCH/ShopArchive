@@ -9,12 +9,19 @@ import kotlin.time.Duration
  */
 interface ServerDiscovery {
     /** The `host:port` of every server announcing [serverId] that answered within [timeout]; empty when none did or discovery is not possible here. */
-    suspend fun find(serverId: String, timeout: Duration): List<String>
+    suspend fun find(serverId: String, timeout: Duration): List<String> =
+        browse(timeout).filter { it.serverId == serverId }.map { it.endpoint }.distinct()
+
+    /** Every server that announced itself within [timeout], one entry per address; empty when none did or discovery is not possible here. */
+    suspend fun browse(timeout: Duration): List<FoundServer>
 }
+
+/** A server announcing itself on the local network: its id, the TXT `name` it gives, and one `host:port` it was seen at. */
+data class FoundServer(val serverId: String, val name: String, val endpoint: String)
 
 /** For tests and platforms without discovery: finds nothing. */
 object NoDiscovery : ServerDiscovery {
-    override suspend fun find(serverId: String, timeout: Duration): List<String> = emptyList()
+    override suspend fun browse(timeout: Duration): List<FoundServer> = emptyList()
 }
 
 /** The mDNS service type the server announces. */
@@ -22,6 +29,9 @@ internal const val MDNS_SERVICE_TYPE = "_shoparchive._tcp"
 
 /** The TXT key that carries the server id. */
 internal const val MDNS_SERVER_ID_KEY = "server-id"
+
+/** The TXT key that carries the server's name. */
+internal const val MDNS_NAME_KEY = "name"
 
 /** The platform's discovery: Android's network service discovery, JmDNS on desktop. */
 expect fun createServerDiscovery(context: PlatformContext): ServerDiscovery

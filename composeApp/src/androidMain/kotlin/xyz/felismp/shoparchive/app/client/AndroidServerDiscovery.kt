@@ -15,22 +15,29 @@ import kotlin.time.Duration
 actual fun createServerDiscovery(context: PlatformContext): ServerDiscovery = NsdDiscovery(context.applicationContext)
 
 /**
- * Browses `_shoparchive._tcp` with Android's own network service discovery (no Play services). It returns as soon as one
- * server with the wanted id has been resolved, or when [find]'s time is up with whatever it has. Every Android failure
- * (no Wi-Fi, no permission, the service refusing to start) just means nothing was found.
+ * Browses `_shoparchive._tcp` with Android's own network service discovery (no Play services). [find] returns as soon as one
+ * server with the wanted id has been resolved, [browse] when its time is up; both with whatever they have by then. Every Android
+ * failure (no Wi-Fi, no permission, the service refusing to start) just means nothing was found.
  */
 class NsdDiscovery(private val context: Context) : ServerDiscovery {
-    override suspend fun find(serverId: String, timeout: Duration): List<String> {
+    override suspend fun find(serverId: String, timeout: Duration): List<String> =
+        search(timeout) { it.serverId == serverId }.filter { it.serverId == serverId }.map { it.endpoint }.distinct()
+
+    override suspend fun browse(timeout: Duration): List<FoundServer> = search(timeout) { false }
+
+    /** Every server resolved until [timeout], or until one [enough] says is all that is wanted. */
+    private suspend fun search(timeout: Duration, enough: (FoundServer) -> Boolean): List<FoundServer> {
         val nsd = context.getSystemService(Context.NSD_SERVICE) as? NsdManager ?: return emptyList()
-        val found = CopyOnWriteArrayList<String>()
+        val found = CopyOnWriteArrayList<FoundServer>()
         val first = CompletableDeferred<Unit>()
         val resolver = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) CallbackResolver(nsd) else QueuedResolver(nsd)
 
         fun accept(info: NsdServiceInfo, address: String?) {
             val id = info.attributes[MDNS_SERVER_ID_KEY]?.decodeToString()
-            if (id == serverId && address != null && info.port > 0) {
-                found += "$address:${info.port}"
-                first.complete(Unit)
+            if (id != null && address != null && info.port > 0) {
+                val server = FoundServer(id, info.attributes[MDNS_NAME_KEY]?.decodeToString() ?: info.serviceName, "$address:${info.port}")
+                found += server
+                if (enough(server)) first.complete(Unit)
             }
         }
 

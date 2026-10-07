@@ -370,4 +370,17 @@
     <string name="console_copy_link">คัดลอกลิงก์</string>
     <string name="console_pair_scan">สแกนด้วยแอปบนอุปกรณ์เครื่องใหม่ หรือส่งลิงก์ให้</string>
     <string name="reason_command_console_only">คำสั่งนี้ใช้ได้เฉพาะที่คอนโซลของเซิร์ฟเวอร์</string>
+    <string name="servers_title">เซิร์ฟเวอร์</string>
+    <string name="servers_none">ยังไม่มีเซิร์ฟเวอร์ในเครื่องนี้</string>
+    <string name="servers_open">เปิด</string>
+    <string name="servers_found">พบในเครือข่ายนี้</string>
+    <string name="servers_refresh">รีเฟรช</string>
+    <string name="servers_searching">กำลังค้นหา…</string>
+    <string name="servers_found_none">ไม่พบเซิร์ฟเวอร์อื่น</string>
+    <string name="servers_add_label">ที่อยู่เซิร์ฟเวอร์ (IP:port หรือ domain:port)</string>
+    <string name="servers_add">เพิ่มเซิร์ฟเวอร์</string>
+    <string name="servers_back">รายการเซิร์ฟเวอร์</string>
+    <plurals name="server_users">
+        <item quantity="other">ผู้ใช้ %1$d คน</item>
+    </plurals>
 </resources>

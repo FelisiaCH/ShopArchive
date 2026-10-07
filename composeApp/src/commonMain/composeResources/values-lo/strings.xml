@@ -370,4 +370,17 @@
     <string name="console_copy_link">ສຳເນົາລິ້ງ</string>
     <string name="console_pair_scan">ສະແກນດ້ວຍແອັບໃນອຸປະກອນເຄື່ອງໃໝ່ ຫຼື ສົ່ງລິ້ງໃຫ້</string>
     <string name="reason_command_console_only">ຄຳສັ່ງນີ້ໃຊ້ໄດ້ສະເພາະທີ່ຄອນໂຊນຂອງເຊີບເວີ</string>
+    <string name="servers_title">ເຊີບເວີ</string>
+    <string name="servers_none">ຍັງບໍ່ມີເຊີບເວີໃນເຄື່ອງນີ້</string>
+    <string name="servers_open">ເປີດ</string>
+    <string name="servers_found">ພົບໃນເຄືອຂ່າຍນີ້</string>
+    <string name="servers_refresh">ໂຫຼດໃໝ່</string>
+    <string name="servers_searching">ກຳລັງຊອກຫາ…</string>
+    <string name="servers_found_none">ບໍ່ພົບເຊີບເວີອື່ນ</string>
+    <string name="servers_add_label">ທີ່ຢູ່ເຊີບເວີ (IP:port ຫຼື domain:port)</string>
+    <string name="servers_add">ເພີ່ມເຊີບເວີ</string>
+    <string name="servers_back">ລາຍການເຊີບເວີ</string>
+    <plurals name="server_users">
+        <item quantity="other">ຜູ້ໃຊ້ %1$d ຄົນ</item>
+    </plurals>
 </resources>
