@@ -196,7 +196,7 @@ abstract class CheckServerZip : DefaultTask() {
         ZipFile(zipFile.get().asFile).use { zip ->
             val names = zip.entries().asSequence().map { it.name }.toSet()
             val required = listOf(
-                "shoparchive-server.jar", "start.sh", "start.bat", "README.md",
+                "shoparchive-server.jar", "start.sh", "start.bat", "README.md", "OPS.md",
                 "service/shoparchive.service", "service/shoparchive-winsw.xml", "plugins/shoparchive-telegram.jar",
             )
             val missing = required.filter { it !in names }
