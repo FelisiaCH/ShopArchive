@@ -66,7 +66,7 @@ internal class Auth(
     endpoints: () -> List<String>,
     clock: Clock = Clock.systemUTC(),
     cost: Argon2Cost = Argon2Cost.DEFAULT,
-    hasher: Hasher = Hasher(config.auth.hashConcurrency, cost),
+    val hasher: Hasher = Hasher(config.auth.hashConcurrency, cost),
     records: ClientRecordsConfig = NoRecords,
     barrier: DataBarrier = DataBarrier(),
 ) {

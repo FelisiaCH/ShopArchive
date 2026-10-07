@@ -162,6 +162,9 @@ fun main(args: Array<String>) {
     // that sends until then, and a message being sent is left unknown. The records close after both.
     Shutdown.register("notifications") { notify.close() }
 
+    // Before the network: the owner never has a moment without a PIN in which anyone could log in and choose one.
+    val firstRunLogin = firstRunSetup(config, users, records.branches, auth.devices, auth.hasher, auth.sessions)
+
     try {
         network.start()
     } catch (e: CertificateException) {
@@ -192,8 +195,8 @@ fun main(args: Array<String>) {
     val elapsedSeconds = (System.currentTimeMillis() - startTimeMillis) / 1000.0
     Log.info(String.format(Locale.ROOT, "Done (%.2fs)! For help, type \"help\"", elapsedSeconds))
 
-    // After "Done", so the QR is the last thing on the screen.
-    firstRun(config, users, records.branches, auth.devices, auth.console::show)
+    // After "Done", so the owner's name and PIN are the last thing on the screen.
+    printFirstRun(firstRunLogin)
 
     Console(commands).run()
 }

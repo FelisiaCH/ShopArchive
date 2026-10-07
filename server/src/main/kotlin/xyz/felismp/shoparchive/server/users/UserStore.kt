@@ -236,6 +236,19 @@ internal class UserStore(
         return true
     }
 
+    /**
+     * Gives the user with [id] the PIN hash [pinHash], replacing the one it has, and forgets the wrong tries and the lock.
+     * For the first-run owner only, while it has no device: every other PIN is chosen by its user and kept ([setCredentials]).
+     */
+    fun replacePin(id: String, pinHash: String) = barrier.mutate { replacePinInLock(id, pinHash) }
+
+    @Synchronized
+    private fun replacePinInLock(id: String, pinHash: String) {
+        val name = findById(id)?.first ?: throw UserException("No user with id '$id'")
+        // editUser reads the file again first, so a hand edit made meanwhile is kept and only these fields change.
+        editUser(name) { it.copy(pin = pinHash, failedLogins = 0, lockedUntil = null) }
+    }
+
     fun addBranch(name: String, branch: String) = barrier.mutate { addBranchInLock(name, branch) }
 
     @Synchronized

@@ -250,7 +250,7 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
     )
     val setupFirstUser = StringKey(
         "setup.first-user", "owner",
-        "The admin (an op, in that branch) made the first time the server starts with no users. Every start prints a new pairing for it while it has no paired device. Empty: none is made and nothing is printed.",
+        "The admin (an op, in that branch) made the first time the server starts with no users. Every start prints its user name and a new PIN while it has not logged in on any device. Empty: none is made and nothing is printed.",
         allowBlank = true,
     )
 
