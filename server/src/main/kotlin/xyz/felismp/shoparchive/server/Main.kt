@@ -111,11 +111,12 @@ fun main(args: Array<String>) {
     registerNotifyNodes(permissions)
     registerCommandNodes(permissions)
     val users = UserStore(root, permissions, config, barrier = barrier)
-    users.load()
+    // The hints of an empty server come after the first-run setup, which may make the first user and branch.
+    users.loadWithoutHint()
 
     val records = Records(root, config, users, services, barrier = barrier)
     try {
-        records.load()
+        records.loadWithoutHint()
     } catch (e: ConfigFileException) {
         Log.error(e.message ?: "a data file cannot be read")
         exitProcess(1)
@@ -164,6 +165,8 @@ fun main(args: Array<String>) {
 
     // Before the network: the owner never has a moment without a PIN in which anyone could log in and choose one.
     val firstRunLogin = firstRunSetup(config, users, records.branches, auth.devices, auth.hasher, auth.sessions)
+    users.hintIfEmpty()
+    records.hintIfEmpty()
 
     try {
         network.start()

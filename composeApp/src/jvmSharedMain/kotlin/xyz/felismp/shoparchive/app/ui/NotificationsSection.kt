@@ -51,7 +51,7 @@ private fun Message(ws: Workspace, n: NotificationDto, canSend: Boolean, enabled
                 "entry.created" -> stringResource(Res.string.notif_event_entry)
                 "device.new" -> stringResource(Res.string.notif_event_device)
                 else -> n.event
-            } + " · " + branch,
+            } + if (branch.isEmpty()) "" else " · $branch", // device.new of a user with no branch has none
             TextRole.Title,
         )
         ShopText(n.code + " · " + n.user + " · " + n.createdAt.take(16).replace('T', ' '), TextRole.Caption, muted = true)

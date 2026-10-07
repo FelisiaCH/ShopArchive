@@ -170,6 +170,36 @@ class FirstRunTest {
         assertEquals(emptyList(), users.user("owner").branches)
     }
 
+    /** A start in Main's order: the loads without the empty-server hints, the setup, then the hints for what is still missing; returns those hints. */
+    private fun AuthEnv.hintsOfAStart(): List<String> {
+        log.infos.clear()
+        users.loadWithoutHint()
+        records!!.loadWithoutHint()
+        start()
+        users.hintIfEmpty()
+        records.hintIfEmpty()
+        return log.infos.filter { it.startsWith("No users yet") || it.startsWith("No branches yet") }
+    }
+
+    @Test
+    fun aFirstStartThatMakesTheOwnerAndTheBranchDoesNotSayHowToMakeThem() = env().run {
+        assertEquals(emptyList(), hintsOfAStart())
+    }
+
+    @Test
+    fun aFirstStartWithTheSetupOffStillSaysHowToMakeTheFirstUserAndBranch() = env("setup:\n  first-user: \"\"\n  first-branch: \"\"\n").run {
+        val hints = hintsOfAStart()
+
+        assertEquals(2, hints.size, hints.toString())
+        assertTrue(hints[0].startsWith("No users yet. Create the first one with: user add <name>"), hints.toString())
+        assertEquals("No branches yet. Add the first one with: branch add main Main", hints[1])
+    }
+
+    @Test
+    fun aFirstStartWithoutAFirstBranchStillSaysHowToAddOne() = env("setup:\n  first-branch: \"\"\n").run {
+        assertEquals(listOf("No branches yet. Add the first one with: branch add main Main"), hintsOfAStart())
+    }
+
     @Test
     fun aNameThatCannotBeMadeIsLoggedAndTheServerGoesOn() = env("setup:\n  first-user: \"Ab\"\n").run {
         assertEquals(emptyList(), start())

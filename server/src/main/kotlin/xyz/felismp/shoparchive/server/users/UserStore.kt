@@ -52,8 +52,19 @@ internal class UserStore(
     private val renameListeners = CopyOnWriteArrayList<(id: String, old: String, new: String) -> Unit>()
     private val accessListeners = CopyOnWriteArrayList<(id: String) -> Unit>()
 
-    /** Reads every file again, rewriting each from the template (old copy saved under `data/migration/`), and regenerates `permissions.txt`. */
-    fun load() = barrier.mutate { loadInLock() }
+    /** Reads every file again, rewriting each from the template (old copy saved under `data/migration/`), and regenerates `permissions.txt`; then [hintIfEmpty]. */
+    fun load() {
+        loadWithoutHint()
+        hintIfEmpty()
+    }
+
+    /** [load] without the hint: a start gives it after the first-run setup, which may make the first user. */
+    fun loadWithoutHint() = barrier.mutate { loadInLock() }
+
+    /** With no users: how to make the first one. */
+    fun hintIfEmpty() {
+        if (userNames().isEmpty()) log.info("No users yet. Create the first one with: user add <name>   then make it an admin with: op <name>   then they open the app, type that name and set their own PIN")
+    }
 
     @Synchronized
     private fun loadInLock() {
@@ -67,7 +78,6 @@ internal class UserStore(
         for (name in names("user", ::isValidUserName)) readUser(name)
         writePermissionsTxt()
         log.info("user/: ${users.size} users and ${roles.size} roles loaded")
-        if (users.isEmpty()) log.info("No users yet. Create the first one with: user add <name>   then make it an admin with: op <name>   then they open the app, type that name and set their own PIN")
     }
 
     @Synchronized fun userNames(): List<String> = users.keys.toList()

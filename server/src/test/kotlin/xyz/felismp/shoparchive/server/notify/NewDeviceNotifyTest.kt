@@ -19,6 +19,7 @@ import xyz.felismp.shoparchive.server.auth.unlock
 import xyz.felismp.shoparchive.shared.DeviceMode
 import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.LoginResponse
+import xyz.felismp.shoparchive.shared.NotificationState
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -78,6 +79,24 @@ class NewDeviceNotifyTest {
 
             assertEquals("", newDevices().single().notification.branch)
         }
+    }
+
+    @Test
+    fun aMessageForAUserWithoutABranchIsStillQueuedAfterARestart() = env().run {
+        api {
+            loggedIn(loginRequest("dana", newPin = TEST_PIN))
+        }
+        val queued = newDevices().single()
+
+        // a new process: only the files
+        val reloaded = OutboxStore(root, settings, clock).also { it.load() }.all()
+
+        val item = reloaded.single()
+        assertEquals(queued.id, item.id)
+        assertEquals("", item.notification.branch)
+        assertEquals("dana", item.notification.user)
+        assertEquals(NotificationState.QUEUED, item.state)
+        assertEquals(describe(queued.notification), describe(item.notification))
     }
 
     @Test

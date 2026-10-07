@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -372,6 +373,32 @@ class OutboxTest {
         assertEquals(fields, read.notification.fields)
         assertEquals(written.state, read.state)
         assertEquals(written.id, read.id)
+    }
+
+    @Test
+    fun aMessageWithAnEmptyBranchComesBackFromItsFileStillQueued() {
+        // device.new for a user with no branch: the branch is empty, not missing.
+        val written = outbox().enqueue(Draft("20261003-BBBBB", "device.new", "2026-10-03T15:00:00+07:00", "", "dana", "lo", mapOf("user" to "dana")))
+        assertTrue("branch: \"\"\n" in Files.readString(root.resolve("data/outbox/${written.id}.yml")))
+
+        val read = outbox().items().single()
+
+        assertEquals(written.id, read.id)
+        assertEquals("", read.notification.branch)
+        assertEquals(NotificationState.QUEUED, read.state)
+        assertEquals(written.notification.fields, read.notification.fields)
+    }
+
+    @Test
+    fun aFileWithoutABranchIsStillNotUsed() {
+        val written = outbox().enqueue(draft())
+        val file = root.resolve("data/outbox/${written.id}.yml")
+        val text = Files.readString(file)
+        Files.writeString(file, text.replace("branch: \"main\"\n", ""))
+
+        assertEquals(emptyList(), outbox().items())
+        val e = assertFailsWith<OutboxFormatException> { parseOutboxItem("x.yml", text.replace("branch: \"main\"\n", "")) }
+        assertEquals("branch is missing", e.message)
     }
 
     @Test

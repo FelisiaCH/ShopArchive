@@ -75,17 +75,29 @@ internal class Records(
     }
 
     /** Reads branches, categories, sessions and every entry. @throws xyz.felismp.shoparchive.server.config.ConfigFileException a data file cannot be understood */
-    fun load() {
-        loadData()
+    fun load() = loadAll(hint = true)
+
+    /** [load] without [hintIfEmpty]: a start gives it after the first-run setup, which may make the first branch. */
+    fun loadWithoutHint() = loadAll(hint = false)
+
+    private fun loadAll(hint: Boolean) {
+        readData(hint)
         sessions.load()
         store.load()
     }
 
     /** `reload data`: the two data files again, then the warnings about the users that depend on them. */
-    fun loadData() {
+    fun loadData() = readData(hint = true)
+
+    /** With no branches: how to add the first one. */
+    fun hintIfEmpty() {
+        if (branches.all().isEmpty()) log.info("No branches yet. Add the first one with: branch add main Main")
+    }
+
+    private fun readData(hint: Boolean) {
         branches.load()
         categories.load()
-        if (branches.all().isEmpty()) log.info("No branches yet. Add the first one with: branch add main Main")
+        if (hint) hintIfEmpty()
         for (name in users.userNames()) {
             for (key in users.user(name).branches) {
                 if (branches.find(key) == null) log.warn("user '$name': the branch '$key' is not in data/branches.yml")

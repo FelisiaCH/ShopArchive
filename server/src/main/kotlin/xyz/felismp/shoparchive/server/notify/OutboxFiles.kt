@@ -78,6 +78,8 @@ internal fun parseOutboxItem(name: String, content: String): OutboxItem {
     }
     fun need(key: String): String = (map[key] as? String)?.takeIf { it.isNotBlank() } ?: throw OutboxFormatException("$key is missing")
     fun optional(key: String): String? = map[key] as? String
+    // Written always, but may be empty: a device.new for a user with no branch has none.
+    fun present(key: String): String = optional(key) ?: throw OutboxFormatException("$key is missing")
     fun count(key: String): Int = need(key).toIntOrNull()?.takeIf { it >= 0 } ?: throw OutboxFormatException("$key is not a whole number")
     val version = need("file-version").toIntOrNull() ?: throw OutboxFormatException("file-version is not a number")
     if (version > OUTBOX_FILE_VERSION) throw OutboxFormatException("file-version $version is newer than this server understands ($OUTBOX_FILE_VERSION)")
@@ -91,7 +93,7 @@ internal fun parseOutboxItem(name: String, content: String): OutboxItem {
         else -> throw OutboxFormatException("fields is not a list of words")
     }
     val notification = Notification(
-        id = need("id"), code = need("code"), event = need("event"), createdAt = need("created"), branch = need("branch"),
+        id = need("id"), code = need("code"), event = need("event"), createdAt = need("created"), branch = present("branch"),
         user = optional("user").orEmpty(), locale = need("locale"), fields = fields, attempt = 1, resendOf = optional("resend-of"),
     )
     return OutboxItem(notification, state, count("attempts"), count("failures"), optional("last-attempt"), next, optional("sent-at"), optional("last-error"), optional("subject"))
