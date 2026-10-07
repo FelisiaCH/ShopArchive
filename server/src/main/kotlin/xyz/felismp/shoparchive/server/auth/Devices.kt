@@ -288,7 +288,7 @@ internal class DeviceStore(
         return true
     }
 
-    /** A wrong PIN or password. At [maxFailures] the user is taken off the device; returns true then. */
+    /** A wrong PIN or password. At [maxFailures] (unless 0) the user is taken off the device; returns true then. */
     fun recordFailure(id: String, username: String, userId: String, maxFailures: Int): Boolean = barrier.mutate { recordFailureInLock(id, username, userId, maxFailures) }
 
     @Synchronized
@@ -296,7 +296,7 @@ internal class DeviceStore(
         val device = fresh(id) ?: return false
         val user = device.users[username]?.takeIf { it.userId == userId } ?: return false
         val failures = user.pinFailures + 1
-        if (failures >= maxFailures) {
+        if (maxFailures > 0 && failures >= maxFailures) {
             write(id, device.copy(users = device.users - username))
             return true
         }

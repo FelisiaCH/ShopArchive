@@ -31,13 +31,13 @@ internal class Backoff(
         throw ApiError(429, ErrorCode.RATE_LIMITED, "Too many wrong tries. Try again in $seconds seconds.", retryAfterSeconds = seconds)
     }
 
-    /** A wrong PIN or password. The next try is delayed twice as long as the last; at `auth.backoff.disable-at` the account is disabled and its tokens end. */
+    /** A wrong PIN or password. The next try is delayed twice as long as the last; at `auth.backoff.disable-at` (unless 0) the account is disabled and its tokens end. */
     fun failed(userId: String, username: String, deviceId: String?, ip: String) {
         val settings = config.auth
         val now = clock.instant()
         val after = users.updateLogin(userId) { user ->
             val count = user.failedLogins + 1
-            if (count >= settings.backoffDisableAt) {
+            if (settings.backoffDisableAt > 0 && count >= settings.backoffDisableAt) {
                 user.copy(failedLogins = count, lockedUntil = null, enabled = false, disabledReason = DISABLED_BY_BACKOFF)
             } else {
                 user.copy(failedLogins = count, lockedUntil = delay(count, settings.backoffStartSeconds, settings.backoffMaxMinutes)?.let(now::plus))

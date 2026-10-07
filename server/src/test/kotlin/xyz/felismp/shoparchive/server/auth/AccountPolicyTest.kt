@@ -25,6 +25,10 @@ private const val WRONG = "000000"
 private fun backoff(disableAt: Int = 100, startSeconds: Int = 1, maxMinutes: Int = 1) =
     "config-version: 1\nauth:\n  backoff:\n    start-seconds: $startSeconds\n    max-minutes: $maxMinutes\n    disable-at: $disableAt\n"
 
+/** [NO_BACKOFF] with the given periodic re-auth limits (the defaults are 0: off). */
+private fun reauth(everyDays: Int = 30, idleDays: Int = 14) =
+    "$NO_BACKOFF  session:\n    reauth-every-days: $everyDays\n    reauth-idle-days: $idleDays\n"
+
 /** The account side of login policy: delays between wrong tries, re-entering the password now and then, idle devices, and ending access at once. */
 class AccountPolicyTest {
     @TempDir
@@ -134,6 +138,23 @@ class AccountPolicyTest {
     }
 
     @Test
+    fun aDisableAtOfZeroNeverDisablesTheAccount() {
+        val env = AuthEnv(root, backoff(disableAt = 0, startSeconds = 0))
+        val device = env.enroll("mali")
+
+        repeat(200) { assertEquals(401, env.wrongTry(device).status) }
+
+        assertTrue(env.users.find("mali")!!.enabled)
+        assertContains(env.userFile("mali"), "failed-logins: 200")
+
+        // Turned on, the count so far is already past it: the next wrong try disables the account.
+        env.reconfigure(backoff(disableAt = 5, startSeconds = 0))
+        env.wrongTry(device)
+        assertFalse(env.users.find("mali")!!.enabled)
+        assertEquals("backoff", env.users.find("mali")!!.disabledReason)
+    }
+
+    @Test
     fun userUnlockClearsTheLockOfAnEnabledAccountAndLeavesAnAdminsDisableAlone() {
         val env = AuthEnv(root, backoff(startSeconds = 60))
         val device = env.enroll("mali")
@@ -187,7 +208,7 @@ class AccountPolicyTest {
 
     @Test
     fun aUserWithAPasswordEntersItAgainAfterReauthEveryDaysOrIdleDaysAndAPinIsNotCountedWrongThen() {
-        val env = AuthEnv(root)
+        val env = AuthEnv(root, reauth())
         val device = env.enroll("mali")
         val user = env.users.find("mali")!!
         assertTrue(env.users.setCredentials(user.id, Hasher(1, TEST_COST).hash(TEST_PASSWORD), null))
@@ -221,6 +242,28 @@ class AccountPolicyTest {
     }
 
     @Test
+    fun reauthDaysOfZeroAreOffAndEachTurnsOnByItself() {
+        val env = AuthEnv(root, reauth(everyDays = 0, idleDays = 0))
+        val device = env.enroll("mali")
+        assertTrue(env.users.setCredentials(env.users.find("mali")!!.id, Hasher(1, TEST_COST).hash(TEST_PASSWORD), null))
+        env.unlock(device, "mali")
+
+        env.clock.advance(Duration.ofDays(1000))
+        env.unlock(device, "mali") // both off: the PIN is enough, however long ago the password was entered
+
+        // Only every-days: the password was last entered 1000 days ago.
+        env.reconfigure(reauth(everyDays = 30, idleDays = 0))
+        assertEquals(ErrorCode.REAUTH_REQUIRED, assertFailsWith<ApiError> { env.unlock(device, "mali") }.code)
+        env.unlock(device, "mali", pin = null, password = TEST_PASSWORD)
+
+        // Only idle-days: 15 days without use, the password entered as long ago.
+        env.reconfigure(reauth(everyDays = 0, idleDays = 14))
+        env.clock.advance(Duration.ofDays(15))
+        assertEquals(ErrorCode.REAUTH_REQUIRED, assertFailsWith<ApiError> { env.unlock(device, "mali") }.code)
+        env.unlock(device, "mali", pin = null, password = TEST_PASSWORD)
+    }
+
+    @Test
     fun aPinFromAUserWhoAlwaysNeedsThePasswordIsAnsweredWithAPasswordRequestNotCountedWrong() {
         val env = AuthEnv(root)
         val device = env.enroll("mali")
@@ -240,7 +283,7 @@ class AccountPolicyTest {
     }
 
     @Test
-    fun theUnlockAnswerOverHttpTellsTheAppThatAPasswordIsNeeded() = AuthEnv(root).run {
+    fun theUnlockAnswerOverHttpTellsTheAppThatAPasswordIsNeeded() = AuthEnv(root, reauth()).run {
         val device = enroll("mali")
         assertTrue(users.setCredentials(users.find("mali")!!.id, Hasher(1, TEST_COST).hash(TEST_PASSWORD), null))
         clock.advance(Duration.ofDays(15))
@@ -276,7 +319,7 @@ class AccountPolicyTest {
 
     @Test
     fun aUserNotUsedOnADeviceForIdleExpiryDaysIsRefusedAndTheirBlockIsRemovedWhileTheOthersStay() {
-        val env = AuthEnv(root)
+        val env = AuthEnv(root, "$NO_BACKOFF  device:\n    idle-expiry-days: 90\n")
         val shared = env.enroll("mali", DeviceMode.SHARED)
         val kham = env.enroll("kham", DeviceMode.SHARED, onto = shared)
         env.clock.advance(Duration.ofDays(80))
@@ -302,6 +345,19 @@ class AccountPolicyTest {
         env.unlock(device, "mali")
         env.clock.advance(Duration.ofDays(3))
 
+        assertEquals(401, assertFailsWith<ApiError> { env.unlock(device, "mali") }.status)
+    }
+
+    @Test
+    fun anIdleLimitOfZeroNeverExpiresAUser() {
+        val env = AuthEnv(root, "$NO_BACKOFF  device:\n    idle-expiry-days: 0\n")
+        val device = env.enroll("mali")
+
+        env.clock.advance(Duration.ofDays(1000))
+        env.unlock(device, "mali")
+
+        env.reconfigure("$NO_BACKOFF  device:\n    idle-expiry-days: 2\n")
+        env.clock.advance(Duration.ofDays(3))
         assertEquals(401, assertFailsWith<ApiError> { env.unlock(device, "mali") }.status)
     }
 

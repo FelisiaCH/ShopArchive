@@ -221,7 +221,7 @@ internal class DefaultAuthService(
 
     /**
      * The user's password if they need one, else their PIN, against the hash on file. Wrong ones are counted per user and
-     * device (at `auth.pin.max-failures` the user is taken off the device and its tokens end) and per account (the delay
+     * device (at `auth.pin.max-failures`, unless 0, the user is taken off the device and its tokens end) and per account (the delay
      * between tries, [Backoff]). A locked account is refused before any hash is computed.
      */
     private fun checkSecret(deviceId: String, username: String, user: UserData, pin: String?, password: String?, ip: String, event: String) {
@@ -265,17 +265,18 @@ internal class DefaultAuthService(
         }
     }
 
-    /** Whether the user has a password that must be entered at this unlock: it was last entered too long ago, or the user has not unlocked this device for long. */
+    /** Whether the user has a password that must be entered at this unlock: it was last entered too long ago, or the user has not unlocked this device for long. A limit of 0 is off. */
     private fun passwordDue(deviceId: String, username: String, user: UserData): Boolean {
         if (!isUsableCredential(user.password)) return false
         val entry = devices.entry(deviceId, username, user.id) ?: return false
         val now = clock.instant()
         val settings = config.auth
-        return !entry.lastVerified.plus(Duration.ofDays(settings.reauthEveryDays.toLong())).isAfter(now) ||
-            !entry.lastUsed.plus(Duration.ofDays(settings.reauthIdleDays.toLong())).isAfter(now)
+        return (settings.reauthEveryDays > 0 && !entry.lastVerified.plus(Duration.ofDays(settings.reauthEveryDays.toLong())).isAfter(now)) ||
+            (settings.reauthIdleDays > 0 && !entry.lastUsed.plus(Duration.ofDays(settings.reauthIdleDays.toLong())).isAfter(now))
     }
 
     private fun idleExpired(deviceId: String, username: String, user: UserData): Boolean {
+        if (config.auth.deviceIdleExpiryDays == 0) return false
         val entry = devices.entry(deviceId, username, user.id) ?: return false
         return !entry.lastUsed.plus(Duration.ofDays(config.auth.deviceIdleExpiryDays.toLong())).isAfter(clock.instant())
     }

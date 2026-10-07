@@ -31,7 +31,7 @@ class AuthConfigTest {
         assertTrue(auth.manualCode)
         assertEquals(listOf("console", "admin", "self"), auth.pairingSources)
         assertEquals(6, auth.pinLength)
-        assertEquals(10, auth.pinMaxFailures)
+        assertEquals(0, auth.pinMaxFailures)
         assertEquals(emptyList(), auth.passwordRequiredFor)
         assertEquals(8, auth.passwordMin)
         assertEquals(128, auth.passwordMax)
@@ -43,7 +43,7 @@ class AuthConfigTest {
         val tail = text.substring(text.indexOf("\nauth:\n"))
         for (line in listOf(
             "auth:\n", "\n  pairing:\n", "    ttl-minutes: 10\n", "    manual-code-attempts: 5\n", "    manual-code: true\n", "    sources: [console, admin, self]\n",
-            "\n  pin:\n", "    length: 6\n", "    max-failures: 10\n",
+            "\n  pin:\n", "    length: 6\n", "    max-failures: 0\n",
             "\n  password:\n", "    required-for: []\n",
             "    min: 8\n", "    max: 128\n",
             "\n  session:\n", "    access-token-minutes: 15\n", "    reauth-window-minutes: 5\n",
@@ -139,44 +139,65 @@ class AuthConfigTest {
     fun thePolicyKeysHaveTheirDefaultsAndAreWrittenInTheirSections() {
         val auth = loaded().auth
 
-        assertEquals(90, auth.deviceIdleExpiryDays)
+        assertEquals(0, auth.deviceIdleExpiryDays)
         assertEquals(3, auth.autoLockSharedMinutes)
         assertEquals(15, auth.autoLockPersonalMinutes)
         assertTrue(auth.biometricsPersonal)
-        assertEquals(30, auth.reauthEveryDays)
-        assertEquals(14, auth.reauthIdleDays)
+        assertEquals(0, auth.reauthEveryDays)
+        assertEquals(0, auth.reauthIdleDays)
         assertEquals(1, auth.backoffStartSeconds)
         assertEquals(15, auth.backoffMaxMinutes)
-        assertEquals(100, auth.backoffDisableAt)
+        assertEquals(0, auth.backoffDisableAt)
         assertEquals(10, auth.rateLimitPerMinute)
         val text = root.text("config/shoparchive.yml")
         for (line in listOf(
-            "\n  device:\n", "    idle-expiry-days: 90\n", "    auto-lock-shared-minutes: 3\n", "    auto-lock-personal-minutes: 15\n", "    biometrics-personal: true\n",
-            "    reauth-every-days: 30\n", "    reauth-idle-days: 14\n",
-            "\n  backoff:\n", "    start-seconds: 1\n", "    max-minutes: 15\n", "    disable-at: 100\n", "  rate-limit-per-minute: 10\n",
+            "\n  device:\n", "    idle-expiry-days: 0\n", "    auto-lock-shared-minutes: 3\n", "    auto-lock-personal-minutes: 15\n", "    biometrics-personal: true\n",
+            "    reauth-every-days: 0\n", "    reauth-idle-days: 0\n",
+            "\n  backoff:\n", "    start-seconds: 1\n", "    max-minutes: 15\n", "    disable-at: 0\n", "  rate-limit-per-minute: 10\n",
         )) assertTrue(line in text, "missing ${line.trim()} in:\n$text")
     }
 
     @Test
     fun thePolicyKeysOutsideTheirRangeAreClampedWithAWarning() {
         val auth = loaded(
-            "  device:\n    idle-expiry-days: 0\n    auto-lock-shared-minutes: 999\n    auto-lock-personal-minutes: 0\n" +
-                "  session:\n    reauth-every-days: 9999\n    reauth-idle-days: 0\n" +
-                "  backoff:\n    start-seconds: 600\n    max-minutes: 0\n    disable-at: 1\n" +
+            "  pin:\n    max-failures: -3\n" +
+                "  device:\n    idle-expiry-days: -1\n    auto-lock-shared-minutes: 999\n    auto-lock-personal-minutes: 0\n" +
+                "  session:\n    reauth-every-days: 9999\n    reauth-idle-days: -5\n" +
+                "  backoff:\n    start-seconds: 600\n    max-minutes: 0\n    disable-at: -1\n" +
                 "  rate-limit-per-minute: 100000\n",
         ).auth
 
-        assertEquals(1, auth.deviceIdleExpiryDays)
+        assertEquals(0, auth.pinMaxFailures)
+        assertEquals(0, auth.deviceIdleExpiryDays)
         assertEquals(120, auth.autoLockSharedMinutes)
         assertEquals(1, auth.autoLockPersonalMinutes)
         assertEquals(365, auth.reauthEveryDays)
-        assertEquals(1, auth.reauthIdleDays)
+        assertEquals(0, auth.reauthIdleDays)
         assertEquals(60, auth.backoffStartSeconds)
         assertEquals(1, auth.backoffMaxMinutes)
-        assertEquals(5, auth.backoffDisableAt)
+        assertEquals(0, auth.backoffDisableAt)
         assertEquals(1000, auth.rateLimitPerMinute)
-        assertEquals(1, log.warningsWith("auth.backoff.disable-at", "'1'", "'5'").size, log.warnings.toString())
+        assertEquals(1, log.warningsWith("auth.backoff.disable-at", "'-1'", "'0'").size, log.warnings.toString())
         assertEquals(1, log.warningsWith("auth.rate-limit-per-minute", "'100000'", "'1000'").size, log.warnings.toString())
-        assertEquals(1, log.warningsWith("auth.device.idle-expiry-days", "'0'", "'1'").size, log.warnings.toString())
+        assertEquals(1, log.warningsWith("auth.device.idle-expiry-days", "'-1'", "'0'").size, log.warnings.toString())
+        assertEquals(1, log.warningsWith("auth.session.reauth-idle-days", "'-5'", "'0'").size, log.warnings.toString())
+        assertEquals(1, log.warningsWith("auth.pin.max-failures", "'-3'", "'0'").size, log.warnings.toString())
+    }
+
+    @Test
+    fun zeroTurnsTheAuthLimitsOffAndIsNoWarning() {
+        val auth = loaded(
+            "  pin:\n    max-failures: 0\n" +
+                "  device:\n    idle-expiry-days: 0\n" +
+                "  session:\n    reauth-every-days: 0\n    reauth-idle-days: 0\n" +
+                "  backoff:\n    disable-at: 0\n",
+        ).auth
+
+        assertEquals(0, auth.pinMaxFailures)
+        assertEquals(0, auth.deviceIdleExpiryDays)
+        assertEquals(0, auth.reauthEveryDays)
+        assertEquals(0, auth.reauthIdleDays)
+        assertEquals(0, auth.backoffDisableAt)
+        assertEquals(emptyList(), log.warnings, log.warnings.toString())
     }
 }

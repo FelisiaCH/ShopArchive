@@ -205,6 +205,12 @@ internal class AuthEnv(
         return sender.messages.toList()
     }
 
+    /** What an admin does on a running server: writes [config] as the constructor does and reloads it. */
+    fun reconfigure(config: String) {
+        root.write("config/shoparchive.yml", withPasswordNodes(config))
+        settings.reload()
+    }
+
     /** A user, optionally an op, made through the console. */
     fun addUser(name: String, op: Boolean = false) {
         users.addUser(name, "none", emptyList())

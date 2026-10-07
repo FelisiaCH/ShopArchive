@@ -565,6 +565,23 @@ class AuthApiTest {
     }
 
     @Test
+    fun aMaxFailuresOfZeroNeverRemovesTheUserButStillCounts() = env("$NO_BACKOFF  pin:\n    max-failures: 0\n").run {
+        addUser("mali")
+        api {
+            val device = enrolled(this@run, "mali")
+            val file = root.resolve("data/devices/${device.deviceId}.yml").toFile()
+
+            repeat(20) { assertEquals(HttpStatusCode.Unauthorized, unlock(device, "mali", "000000").status) }
+
+            assertContains(file.readText(), "pin-failures: 20")
+            // Turned on, the count so far is already past it: the next wrong PIN removes the user.
+            reconfigure("$NO_BACKOFF  pin:\n    max-failures: 3\n")
+            assertEquals(HttpStatusCode.Unauthorized, unlock(device, "mali", "000000").status)
+            assertFalse(file.readText().contains("  mali:"))
+        }
+    }
+
+    @Test
     fun theCountOfWrongPinsSurvivesARestart() {
         val first = env("$NO_BACKOFF  pin:\n    max-failures: 3\n")
         first.addUser("mali")

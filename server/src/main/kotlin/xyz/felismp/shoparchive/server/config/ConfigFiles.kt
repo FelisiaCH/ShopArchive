@@ -82,14 +82,14 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
     )
     val pinLength = IntKey("auth.pin.length", 6, "Number of digits in a new PIN. A PIN already set keeps working when this changes.", min = 4, max = 12)
     val pinMaxFailures = IntKey(
-        "auth.pin.max-failures", 10,
-        "Wrong PINs or passwords on one device before that user is removed from that device (the user must pair it again).",
-        min = 3, max = 100,
+        "auth.pin.max-failures", 0,
+        "Wrong PINs or passwords on one device before that user is removed from that device (the user must pair it again). 0 turns this off.",
+        min = 0, max = 100,
     )
     val deviceIdleExpiryDays = IntKey(
-        "auth.device.idle-expiry-days", 90,
-        "A user not used on a device for this many days is taken off it (the user must pair it again), in days.",
-        min = 1, max = 3650,
+        "auth.device.idle-expiry-days", 0,
+        "A user not used on a device for this many days is taken off it (the user must pair it again), in days. 0 turns this off.",
+        min = 0, max = 3650,
     )
     val autoLockSharedMinutes = IntKey(
         "auth.device.auto-lock-shared-minutes", 3,
@@ -123,14 +123,14 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
         min = 1, max = 60,
     )
     val reauthEveryDays = IntKey(
-        "auth.session.reauth-every-days", 30,
-        "Unlocking asks for the password (not the PIN) if the user has one and the password was last entered more than this many days ago.",
-        min = 1, max = 365,
+        "auth.session.reauth-every-days", 0,
+        "Unlocking asks for the password (not the PIN) if the user has one and the password was last entered more than this many days ago. 0 turns this off.",
+        min = 0, max = 365,
     )
     val reauthIdleDays = IntKey(
-        "auth.session.reauth-idle-days", 14,
-        "Unlocking asks for the password (not the PIN) if the user has one and the device was last unlocked by the user more than this many days ago.",
-        min = 1, max = 365,
+        "auth.session.reauth-idle-days", 0,
+        "Unlocking asks for the password (not the PIN) if the user has one and the device was last unlocked by the user more than this many days ago. 0 turns this off.",
+        min = 0, max = 365,
     )
     val backoffStartSeconds = IntKey(
         "auth.backoff.start-seconds", 1,
@@ -139,9 +139,9 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
     )
     val backoffMaxMinutes = IntKey("auth.backoff.max-minutes", 15, "The longest an account is locked after a wrong PIN or password, in minutes.", min = 1, max = 1440)
     val backoffDisableAt = IntKey(
-        "auth.backoff.disable-at", 100,
-        "Wrong PINs or passwords in a row on one account (without a right one between) after which the account is disabled until the admin runs: user unlock <name>.",
-        min = 5, max = 10_000,
+        "auth.backoff.disable-at", 0,
+        "Wrong PINs or passwords in a row on one account (without a right one between) after which the account is disabled until the admin runs: user unlock <name>. 0 turns this off.",
+        min = 0, max = 10_000,
     )
     val rateLimitPerMinute = IntKey(
         "auth.rate-limit-per-minute", 10,
