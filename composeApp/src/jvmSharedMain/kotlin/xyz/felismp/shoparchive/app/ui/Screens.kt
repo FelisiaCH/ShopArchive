@@ -52,9 +52,7 @@ fun AppHost(flow: AppFlow) {
         is AppState.Locked -> LockedScreen(s, flow)
         is AppState.Unlocked -> flow.workspace?.let { Shell(s, flow, it) }
         is AppState.Settings -> SettingsScreen(s, flow)
-        AppState.PinMismatch -> ScreenFrame(stringResource(Res.string.pinmm_title)) {
-            ShopBanner(stringResource(Res.string.pinmm_body), Tone.Error)
-        }
+        is AppState.CertChanged -> CertChangedScreen(s, flow)
         is AppState.ProtocolMismatch -> ScreenFrame(stringResource(Res.string.proto_title)) {
             ShopBanner(stringResource(Res.string.proto_body), Tone.Error)
             ShopText(stringResource(Res.string.proto_versions, PROTOCOL_VERSION.toString(), s.serverProtocol?.toString() ?: stringResource(Res.string.proto_unknown)))
@@ -66,6 +64,21 @@ fun AppHost(flow: AppFlow) {
 private fun Status(busy: Boolean, problem: Problem?) {
     if (busy) ShopBanner(stringResource(Res.string.working), Tone.Info)
     problem?.let { ShopBanner(it.text(), Tone.Error) }
+}
+
+/** A saved server showed another key: Cancel is the safe default, trusting the new key is the secondary choice. */
+@Composable
+private fun CertChangedScreen(s: AppState.CertChanged, flow: AppFlow) {
+    ScreenFrame(stringResource(Res.string.pinmm_title)) {
+        ShopText(s.name.ifBlank { s.address }, TextRole.Title)
+        ShopText(s.address, TextRole.Caption, muted = true)
+        ShopBanner(stringResource(Res.string.cert_changed_body), Tone.Error)
+        Status(s.busy, s.problem)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ShopButton(stringResource(Res.string.cancel), flow::cancelCertChanged, enabled = !s.busy)
+            ShopButton(stringResource(Res.string.cert_trust), flow::trustNewKey, primary = false, enabled = !s.busy)
+        }
+    }
 }
 
 /** The home screen: the servers saved here, the others found on the local network, and adding one by its address. */
@@ -366,6 +379,7 @@ internal fun Problem.text(): String = when (this) {
     Problem.ReauthCancelled -> stringResource(Res.string.err_reauth_cancelled)
     is Problem.Rejected -> stringResource(refusalWords(code, reason))
     Problem.PinMismatch -> stringResource(Res.string.pinmm_body)
+    Problem.OtherServer -> stringResource(Res.string.err_other_server)
     Problem.ProtocolMismatch -> stringResource(Res.string.proto_body)
     Problem.Unknown -> stringResource(Res.string.err_unknown)
 }

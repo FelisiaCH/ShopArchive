@@ -380,6 +380,9 @@
     <string name="servers_add_label">Server address (IP:port or domain:port)</string>
     <string name="servers_add">Add server</string>
     <string name="servers_back">Server list</string>
+    <string name="cert_changed_body">This server's identity has changed since this device last connected. Someone may be intercepting the connection, or the server was reinstalled. Cancel unless the administrator has told you the server was reinstalled.</string>
+    <string name="cert_trust">Trust new key</string>
+    <string name="err_other_server">Another server answers at this address now. Check the address, or add it as a new server.</string>
     <plurals name="server_users">
         <item quantity="one">%1$d user</item>
         <item quantity="other">%1$d users</item>

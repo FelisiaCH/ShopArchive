@@ -380,6 +380,9 @@
     <string name="servers_add_label">ที่อยู่เซิร์ฟเวอร์ (IP:port หรือ domain:port)</string>
     <string name="servers_add">เพิ่มเซิร์ฟเวอร์</string>
     <string name="servers_back">รายการเซิร์ฟเวอร์</string>
+    <string name="cert_changed_body">ตัวตนของเซิร์ฟเวอร์นี้เปลี่ยนไปจากครั้งก่อนที่เครื่องนี้เชื่อมต่อ อาจมีคนดักการเชื่อมต่ออยู่ หรือมีการติดตั้งเซิร์ฟเวอร์ใหม่ ให้กดยกเลิก เว้นแต่ผู้ดูแลแจ้งว่าได้ติดตั้งเซิร์ฟเวอร์ใหม่</string>
+    <string name="cert_trust">เชื่อถือกุญแจใหม่</string>
+    <string name="err_other_server">ตอนนี้มีเซิร์ฟเวอร์อื่นตอบที่ที่อยู่นี้ ตรวจสอบที่อยู่ หรือเพิ่มเป็นเซิร์ฟเวอร์ใหม่</string>
     <plurals name="server_users">
         <item quantity="other">ผู้ใช้ %1$d คน</item>
     </plurals>

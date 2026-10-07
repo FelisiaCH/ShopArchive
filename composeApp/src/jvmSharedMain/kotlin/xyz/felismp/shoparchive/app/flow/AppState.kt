@@ -37,8 +37,10 @@ sealed interface Problem {
     data object ReauthCancelled : Problem
     /** The server said no: its error [code] and the machine [reason] key if it gave one, worded by the screen. */
     data class Rejected(val code: ErrorCode, val reason: String? = null) : Problem
-    /** The server's certificate is not the pinned one (the app also shows its blocking screen). */
+    /** The server's certificate is not the pinned one, and nothing of the server is held here to trust it for. */
     data object PinMismatch : Problem
+    /** Trusting a changed key: another server than the saved one answers at that address now. */
+    data object OtherServer : Problem
     /** The server speaks another protocol version (the app also shows its blocking screen). */
     data object ProtocolMismatch : Problem
     /** An unexpected local exception: said in general words, the exception's own message is never shown. */
@@ -114,8 +116,17 @@ sealed interface AppState {
         val problem: Problem? = null,
     ) : AppState
 
-    /** The server's key is not the one this device trusts: nothing more is sent. */
-    data object PinMismatch : AppState
+    /**
+     * The saved server [serverId] (called [name]) showed another key at [address] than the one this device trusts: someone may be
+     * intercepting, or the server was reinstalled. Nothing more is sent until the person cancels or trusts the new key. [busy] while it is checked.
+     */
+    data class CertChanged(
+        val serverId: String,
+        val name: String,
+        val address: String,
+        val busy: Boolean = false,
+        val problem: Problem? = null,
+    ) : AppState
 
     data class ProtocolMismatch(val serverProtocol: Int?) : AppState
 }

@@ -50,6 +50,9 @@ import kotlin.test.assertTrue
 private val PIN_HEX = "AB".repeat(32)
 private const val WRONG_PIN = "000000"
 private val PIN_FP = PIN_HEX.chunked(4).joinToString(" ")
+/** The key a reinstalled (or impersonated) server shows. */
+private val OTHER_HEX = "CD".repeat(32)
+private val OTHER_FP = OTHER_HEX.chunked(4).joinToString(" ")
 
 private class FakeStore(var all: StoredServers? = null) : CredentialStore {
     /** The first saved server, which is the only one in most tests; setting it makes it the only one. */
@@ -215,11 +218,12 @@ class AppFlowTest {
 
     // ---- start ----
 
-    /** From the server list to the pairing screen, by adding a server's address (the probe it takes is forgotten). */
+    /** From the server list to the pairing screen, by adding a server's address (the probe and the `/info` read it takes are forgotten). */
     private fun pairingFlow(): AppFlow = flow().apply {
         addServer("192.168.1.2:8443")
         assertIs<AppState.Pair>(state.value)
         probed = null
+        connected.clear()
     }
 
     @Test fun noStoredServerStartsAtTheEmptyServerListAndLooksOnTheNetwork() {
@@ -436,6 +440,100 @@ class AppFlowTest {
         assertEquals("192.168.1.9:8443", assertIs<AppState.Pair>(f.state.value).address)
     }
 
+    // ---- trust on first use ----
+
+    /** The saved Alice server, then back on the server list with a probe that finds [fingerprint]; what was connected so far is forgotten. */
+    private fun savedThenList(fingerprint: String = PIN_FP): AppFlow = lockedFlow().apply {
+        showServers()
+        probeResult = { fingerprint }
+        connected.clear()
+    }
+
+    @Test fun addingANewServerSavesItsKeyWithoutAskingAndOpensIt() {
+        val f = flow()
+        f.addServer(" 192.168.1.2:8443 ")
+        assertEquals("192.168.1.2:8443", probed)
+        assertEquals(Triple(PIN_HEX, "", listOf("192.168.1.2:8443")), connected.first(), "pinned to the key just probed")
+        assertEquals(StoredServer("sid-1", "Shop", PIN_HEX, listOf("192.168.1.2:8443")), store.stored, "saved with no device and no users")
+        assertEquals("sid-1", store.all?.lastServerId)
+        val pair = assertIs<AppState.Pair>(f.state.value)
+        assertNull(pair.check, "no fingerprint to confirm")
+        assertTrue(api.redeemed.isEmpty() && api.unlocks.isEmpty())
+    }
+
+    @Test fun addingAServerOfAnotherProtocolSavesNothing() {
+        api.protocol = PROTOCOL_VERSION + 1
+        val f = flow()
+        f.addServer("192.168.1.2:8443")
+        assertEquals(AppState.ProtocolMismatch(PROTOCOL_VERSION + 1), f.state.value)
+        assertNull(store.all)
+    }
+
+    @Test fun addingASavedServerWithTheSameKeyOpensItAndKeepsTheAddress() {
+        val f = savedThenList()
+        f.addServer("192.168.1.2:8443")
+        val locked = assertIs<AppState.Locked>(f.state.value)
+        assertEquals(listOf("alice"), locked.users)
+        assertEquals(storedAlice().copy(endpoints = listOf("192.168.1.2:8443", oldAddress)), store.stored)
+        assertEquals(1, store.all?.servers?.size)
+    }
+
+    @Test fun aSavedServerWithAnotherKeyWarnsAndSendsNothingButTheProbe() {
+        val f = savedThenList(OTHER_FP)
+        f.addServer("192.168.1.2:8443")
+        assertEquals(AppState.CertChanged("sid-1", "Shop", "192.168.1.2:8443"), f.state.value)
+        assertEquals(listOf(OTHER_HEX), connected.map { it.first }, "only the server's own /info is read, with the key it showed")
+        assertTrue(api.unlocks.isEmpty() && api.redeemed.isEmpty() && api.enrolled.isEmpty())
+        assertEquals(storedAlice(), store.stored, "nothing is saved")
+    }
+
+    @Test fun cancelOnAChangedKeyGoesBackToTheServerListAndChangesNothing() {
+        val f = savedThenList(OTHER_FP)
+        f.addServer("192.168.1.2:8443")
+        f.cancelCertChanged()
+        assertEquals(listOf(ServerRow("sid-1", "Shop", oldAddress, 1)), assertIs<AppState.Servers>(f.state.value).saved)
+        assertEquals(storedAlice(), store.stored)
+        assertTrue(api.unlocks.isEmpty())
+    }
+
+    @Test fun trustingTheNewKeyReplacesItAndKeepsTheUsers() {
+        val f = savedThenList(OTHER_FP)
+        f.addServer("192.168.1.2:8443")
+        probed = null
+        f.trustNewKey()
+        assertEquals("192.168.1.2:8443", probed, "the key is probed again")
+        assertEquals(storedAlice().copy(certPin = OTHER_HEX, endpoints = listOf("192.168.1.2:8443", oldAddress)), store.stored)
+        assertEquals(listOf("alice"), assertIs<AppState.Locked>(f.state.value).users)
+        assertEquals(OTHER_HEX, connected.last().first, "the server is opened with the new key")
+        f.unlock("483926")
+        assertEquals(UnlockRequest("dev-1", "alice", "cred", pin = "483926"), api.unlocks.single())
+    }
+
+    @Test fun trustingAKeyThatAnotherServerAnswersWithSavesNothing() {
+        val f = savedThenList(OTHER_FP)
+        f.addServer("192.168.1.2:8443")
+        api.infoServerId = "someone-else"
+        f.trustNewKey()
+        val s = assertIs<AppState.CertChanged>(f.state.value)
+        assertEquals(Problem.OtherServer, s.problem)
+        assertFalse(s.busy)
+        assertEquals(storedAlice(), store.stored)
+    }
+
+    @Test fun aChangedKeyOnUnlockWarnsAndCanBeTrusted() {
+        val f = lockedFlow()
+        api.failUnlock = ClientError.PinMismatch(null, oldAddress)
+        f.unlock("483926")
+        assertEquals(AppState.CertChanged("sid-1", "Shop", oldAddress), f.state.value)
+        assertNull(f.workspace)
+        api.failUnlock = null
+        probeResult = { OTHER_FP }
+        f.trustNewKey()
+        assertEquals(oldAddress, probed)
+        assertEquals(storedAlice().copy(certPin = OTHER_HEX), store.stored)
+        assertIs<AppState.Locked>(f.state.value)
+    }
+
     // ---- pair by link ----
 
     @Test fun pairByLinkShowsPreviewThenRedeemsWithSecret() {
@@ -549,20 +647,21 @@ class AppFlowTest {
 
     // ---- blocking states from any step ----
 
-    @Test fun pinMismatchBlocksFromEveryStep() {
+    @Test fun aChangedKeyFromEveryStepWarnsOrStops() {
         val mismatch = ClientError.PinMismatch()
-        // link redeem
-        flow().apply { api.failRedeem = mismatch; previewLink(link()); redeemLink(); assertEquals(AppState.PinMismatch, state.value) }
+        // link redeem: nothing of this server is held yet, so the pairing stops with the reason
+        flow().apply { api.failRedeem = mismatch; previewLink(link()); redeemLink(); assertEquals(Problem.PinMismatch, assertIs<AppState.Pair>(state.value).problem) }
         api.failRedeem = null
-        // manual probe never talks to a pinned server, but a mismatch on confirm blocks
-        pairingFlow().apply { api.failInfo = mismatch; submitManual("h:1", "a", "BCDFG-HJKLM"); confirmFingerprint(); assertEquals(AppState.PinMismatch, state.value) }
+        // manual probe never talks to a pinned server, but a mismatch on confirm stops the pairing
+        pairingFlow().apply { api.failInfo = mismatch; submitManual("h:1", "a", "BCDFG-HJKLM"); confirmFingerprint(); assertEquals(Problem.PinMismatch, assertIs<AppState.Pair>(state.value).problem) }
         api.failInfo = null
-        // enroll
-        flow().apply { enrolling(); api.failEnroll = mismatch; enroll(good); assertEquals(AppState.PinMismatch, state.value) }
+        store.all = null // the server the step above added is not part of this one
+        // enroll: the server is known by then, so its changed key is offered for trust
+        flow().apply { enrolling(); api.failEnroll = mismatch; enroll(good); assertEquals(AppState.CertChanged("sid-1", "", "192.168.1.2:8443"), state.value) }
         api.failEnroll = null
         // unlock from the lock screen
         store.stored = StoredServer("s", "", PIN_HEX, listOf("h:1"), "d", listOf(StoredUser("alice", "c")))
-        flow().apply { api.failUnlock = mismatch; unlock("483926"); assertEquals(AppState.PinMismatch, state.value) }
+        flow().apply { api.failUnlock = mismatch; unlock("483926"); assertEquals(AppState.CertChanged("s", "", "h:1"), state.value) }
     }
 
     @Test fun protocolMismatchBlocksWithServerVersion() {
@@ -1068,7 +1167,7 @@ class AppFlowTest {
         discovery.found = listOf(movedTo)
         val f = flow()
         f.unlock("483926")
-        assertIs<AppState.PinMismatch>(f.state.value)
+        assertIs<AppState.CertChanged>(f.state.value)
         assertEquals(0, discovery.searches)
     }
 

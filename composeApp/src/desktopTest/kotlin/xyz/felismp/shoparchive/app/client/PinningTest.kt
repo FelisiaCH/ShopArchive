@@ -32,7 +32,8 @@ class PinningTest {
     @Test fun wrongPinIsAPinMismatchAndNothingIsSent() = runBlocking {
         TlsServer().use { s ->
             val api = ApiClient("sid", "00".repeat(32), listOf(s.endpoint))
-            assertFailsWith<ClientError.PinMismatch> { api.redeem(RedeemRequest(secret = "x")) }
+            val e = assertFailsWith<ClientError.PinMismatch> { api.redeem(RedeemRequest(secret = "x")) }
+            assertEquals(s.endpoint, e.endpoint, "says which address showed the other key")
             assertEquals(0, s.requests.size)
             api.close()
         }

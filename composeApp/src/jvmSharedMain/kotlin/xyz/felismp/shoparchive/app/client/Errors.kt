@@ -9,8 +9,8 @@ sealed class ClientError(message: String, cause: Throwable? = null) : Exception(
         enum class Reason { NOT_A_PAIR_LINK, BAD_PAYLOAD, UNSUPPORTED_VERSION }
     }
 
-    /** The server answered with a certificate other than the pinned one: block and warn, never fall back. */
-    class PinMismatch(cause: Throwable? = null) : ClientError("The server's certificate is not the one this device was paired with", cause)
+    /** The server answered with a certificate other than the pinned one: block and warn, never fall back. [endpoint] is the address that showed it, when known. */
+    class PinMismatch(cause: Throwable? = null, val endpoint: String? = null) : ClientError("The server's certificate is not the one this device was paired with", cause)
 
     /** No endpoint could be reached. */
     class Unreachable(cause: Throwable? = null) : ClientError("The server could not be reached", cause)

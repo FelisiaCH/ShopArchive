@@ -369,7 +369,7 @@ class ApiClient(
             } catch (e: Exception) {
                 when {
                     e is CancellationException || e is ClientError -> throw e
-                    isPinFailure(e) -> throw ClientError.PinMismatch(e)
+                    isPinFailure(e) -> throw ClientError.PinMismatch(e, endpoint)
                     e is IOException -> last = e
                     else -> throw e
                 }

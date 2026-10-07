@@ -68,8 +68,9 @@ private val BROWSE_TIMEOUT: Duration = 3.seconds
 
 /**
  * The app's flow: Starting, then the server list (Servers), or straight to Locked when this device holds one server. Opening a
- * server shows Locked (it has users here) or Pair and Enroll (it has none yet), then Unlocked and Settings.
- * A changed server key or protocol from any call lands on a blocking state. Screens read [state] and call the actions;
+ * server shows Locked (it has users here) or Pair and Enroll (it has none yet), then Unlocked and Settings. A server added by address is
+ * trusted on first use: its key is saved without asking. A changed key of a saved server lands on CertChanged, which the person cancels or trusts;
+ * a changed protocol from any call lands on a blocking state. Screens read [state] and call the actions;
  * typed text stays in the screens and comes in as arguments. PINs, passwords and tokens are never stored here.
  * While unlocked the app reports interaction with [userActive]; no interaction for the server's auto-lock time locks it.
  */
@@ -274,7 +275,11 @@ class AppFlow(
         _state.value = pair()
     }
 
-    /** A server not saved here yet, by `host:port`: checked that it answers, then paired with by the manual code, which first shows its fingerprint. */
+    /**
+     * A server by `host:port`: its key is probed, and its `/info` read pinned to that key. A server not saved here yet is saved with that
+     * key (trust on first use, no fingerprint to compare) and opened; a saved one with the same key is opened with this address kept; a saved
+     * one with another key goes to [AppState.CertChanged], and nothing else is sent.
+     */
     fun addServer(address: String) {
         val s = _state.value as? AppState.Servers ?: return
         if (s.busy) return
@@ -285,10 +290,30 @@ class AppFlow(
         }
         _state.value = s.copy(busy = true, problem = null)
         scope.launch {
-            guarded({ withContext(io) { probe(target) } }) { p -> servers { it.copy(busy = false, problem = p) } } ?: return@launch
+            val fail = { p: Problem -> servers { it.copy(busy = false, problem = p) } }
+            val fingerprint = guarded({ withContext(io) { probe(target) } }, fail) ?: return@launch
             if (_state.value !is AppState.Servers) return@launch
-            pairAddress = target
-            _state.value = pair()
+            val pin = fingerprintToPin(fingerprint)
+            val api = connect(pin, "", listOf(target))
+            val info = try {
+                guarded({ api.info() }, fail)
+            } finally {
+                api.close()
+            } ?: return@launch
+            if (info.protocol != PROTOCOL_VERSION) {
+                _state.value = AppState.ProtocolMismatch(info.protocol)
+                return@launch
+            }
+            val saved = all.servers.firstOrNull { it.serverId == info.serverId }
+            if (saved != null && saved.certPin != pin) {
+                _state.value = AppState.CertChanged(saved.serverId, saved.name, target)
+                return@launch
+            }
+            val server = saved?.copy(endpoints = rememberEndpoints(target, emptyList(), saved.endpoints))
+                ?: StoredServer(info.serverId, info.name, pin, listOf(target))
+            guarded({ withContext(io) { saveLock.withLock { persist(server) } } }, fail) ?: return@launch
+            if (_state.value !is AppState.Servers) return@launch
+            open(server)
         }
     }
 
@@ -301,6 +326,11 @@ class AppFlow(
             is AppState.Pair -> if (s.busy) return
             else -> return
         }
+        leaveServer()
+    }
+
+    /** Ends the session as a lock does, closes this server's client and shows the server list. */
+    private fun leaveServer() {
         endSession()
         failReauth(ClientError.Locked())
         enrollGen++
@@ -313,6 +343,61 @@ class AppFlow(
         enrollmentToken = null
         pairAddress = null
         showList()
+    }
+
+    // ---- a changed server key ----
+
+    /** Cancel on the warning: back to the server list, nothing trusted and nothing changed. */
+    fun cancelCertChanged() {
+        val s = _state.value as? AppState.CertChanged ?: return
+        if (s.busy) return
+        leaveServer()
+    }
+
+    /**
+     * Trust new key: the key at the warning's address is probed again and, once that address names the same server, replaces the saved one.
+     * The device credentials and users stay. Then the server opens with the new key.
+     */
+    fun trustNewKey() {
+        val s = _state.value as? AppState.CertChanged ?: return
+        if (s.busy) return
+        _state.value = s.copy(busy = true, problem = null)
+        scope.launch {
+            val fail = { p: Problem -> certChanged { it.copy(busy = false, problem = p) } }
+            val fingerprint = guarded({ withContext(io) { probe(s.address) } }, fail) ?: return@launch
+            val pin = fingerprintToPin(fingerprint)
+            val api = connect(pin, s.serverId, listOf(s.address))
+            val info = try {
+                guarded({ api.info() }, fail)
+            } finally {
+                api.close()
+            } ?: return@launch
+            if (info.protocol != PROTOCOL_VERSION) {
+                _state.value = AppState.ProtocolMismatch(info.protocol)
+                return@launch
+            }
+            if (info.serverId != s.serverId) return@launch fail(Problem.OtherServer)
+            val trusted = guarded({
+                withContext(io) {
+                    saveLock.withLock {
+                        val base = all.servers.firstOrNull { it.serverId == s.serverId } ?: StoredServer(s.serverId, info.name, pin, emptyList())
+                        base.copy(certPin = pin, endpoints = rememberEndpoints(s.address, emptyList(), base.endpoints)).also { persist(it) }
+                    }
+                }
+            }, fail) ?: return@launch
+            if (_state.value !is AppState.CertChanged) return@launch
+            // The client pinned to the old key goes; the server opens again with the new one.
+            session?.api?.close()
+            session = null
+            stored = null
+            persisted = null
+            addingTo = null
+            open(trusted)
+        }
+    }
+
+    private fun certChanged(change: (AppState.CertChanged) -> AppState.CertChanged) {
+        (_state.value as? AppState.CertChanged)?.let { _state.value = change(it) }
     }
 
     // ---- pairing: link ----
@@ -1017,9 +1102,14 @@ class AppFlow(
         _state.value = state
     }
 
+    private fun nameOf(serverId: String) = (all.servers.firstOrNull { it.serverId == serverId } ?: stored?.takeIf { it.serverId == serverId })?.name.orEmpty()
+
     private fun blockOr(e: Exception, fail: (Problem) -> Unit) {
         when (e) {
-            is ClientError.PinMismatch -> block(AppState.PinMismatch, e)
+            // A server this device holds (the open session's) can be trusted again; a pairing that has no server yet just stops.
+            is ClientError.PinMismatch -> session?.takeIf { it.serverId.isNotEmpty() }?.let { opened ->
+                block(AppState.CertChanged(opened.serverId, nameOf(opened.serverId), e.endpoint ?: opened.api.endpoints.firstOrNull() ?: opened.endpoints.first()), e)
+            } ?: fail(e.toProblem())
             is ClientError.ProtocolMismatch -> block(AppState.ProtocolMismatch(e.serverProtocol), e)
             // The server ended the session: back to the lock screen, with the reason.
             is ClientError.Locked -> if (unlocked != null) lockNow(Problem.SessionEnded) else fail(e.toProblem())
