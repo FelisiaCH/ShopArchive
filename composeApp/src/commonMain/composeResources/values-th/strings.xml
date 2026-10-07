@@ -279,6 +279,7 @@
     <string name="reason_pin_required">กรุณาใส่ PIN</string>
     <string name="reason_pin_length">PIN ต้องเป็นตัวเลขล้วน และมีจำนวนหลักตามที่เซิร์ฟเวอร์กำหนด</string>
     <string name="reason_pin_repeated">PIN ต้องไม่ใช่เลขตัวเดียวซ้ำกัน เช่น 111111</string>
+    <string name="reason_pin_not_set">บัญชีนี้ยังไม่มี PIN ให้ตั้ง PIN ใหม่</string>
     <string name="reason_pin_sequence">PIN ต้องไม่ใช่เลขเรียงกัน เช่น 123456</string>
     <string name="reason_password_required">กรุณาใส่รหัสผ่าน</string>
     <string name="reason_password_short">รหัสผ่านสั้นเกินไป</string>
@@ -345,6 +346,7 @@
     <string name="notif_state_failed">ส่งไม่สำเร็จ</string>
     <string name="notif_event_day">ปิดยอด</string>
     <string name="notif_event_entry">รายการใหม่</string>
+    <string name="notif_event_device">อุปกรณ์ใหม่</string>
     <string name="notif_attempts">ลองแล้ว %1$d ครั้ง</string>
     <string name="notif_resend">ส่งอีกครั้ง</string>
     <string name="notif_resend_failed">ส่งอีกครั้งไม่ได้</string>
@@ -383,6 +385,11 @@
     <string name="cert_changed_body">ตัวตนของเซิร์ฟเวอร์นี้เปลี่ยนไปจากครั้งก่อนที่เครื่องนี้เชื่อมต่อ อาจมีคนดักการเชื่อมต่ออยู่ หรือมีการติดตั้งเซิร์ฟเวอร์ใหม่ ให้กดยกเลิก เว้นแต่ผู้ดูแลแจ้งว่าได้ติดตั้งเซิร์ฟเวอร์ใหม่</string>
     <string name="cert_trust">เชื่อถือกุญแจใหม่</string>
     <string name="err_other_server">ตอนนี้มีเซิร์ฟเวอร์อื่นตอบที่ที่อยู่นี้ ตรวจสอบที่อยู่ หรือเพิ่มเป็นเซิร์ฟเวอร์ใหม่</string>
+    <string name="login_title">เข้าสู่ระบบ</string>
+    <string name="login_submit">เข้าสู่ระบบ</string>
+    <string name="login_set_pin">บัญชีนี้ยังไม่มี PIN ให้ตั้ง PIN ใหม่</string>
+    <string name="err_pin_digits">PIN ต้องเป็นตัวเลข 4 ถึง 12 หลัก</string>
+    <string name="err_personal_device">อุปกรณ์นี้ตั้งไว้สำหรับคนเดียว จึงเพิ่มผู้ใช้ไม่ได้ ให้ลบเซิร์ฟเวอร์นี้ออกจากเครื่อง (ในตั้งค่าหลังปลดล็อก) แล้วเพิ่มเซิร์ฟเวอร์ใหม่</string>
     <plurals name="server_users">
         <item quantity="other">ผู้ใช้ %1$d คน</item>
     </plurals>

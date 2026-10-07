@@ -5,6 +5,7 @@ import xyz.felismp.shoparchive.shared.DeviceInfo
 import xyz.felismp.shoparchive.shared.EnrollRequest
 import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.InfoResponse
+import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.ReauthRequest
 import xyz.felismp.shoparchive.shared.RedeemRequest
 import xyz.felismp.shoparchive.shared.RedeemResponse
@@ -23,6 +24,8 @@ interface ServerApi : RecordsApi, UpdatesApi {
     suspend fun info(): InfoResponse
     suspend fun redeem(request: RedeemRequest): RedeemResponse
     suspend fun enroll(enrollmentToken: String, request: EnrollRequest): EnrollResponse
+    /** Puts a user on this device by name and PIN, with no pairing; answers the device id and the user's device credential. */
+    suspend fun login(request: LoginRequest): EnrollResponse
     suspend fun unlock(request: UnlockRequest): UnlockResponse
     suspend fun config(): ConfigResponse
     /** Enters the PIN or password again for an action that asked for it. */

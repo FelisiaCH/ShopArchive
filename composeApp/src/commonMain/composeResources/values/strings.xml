@@ -279,6 +279,7 @@
     <string name="reason_pin_required">Enter a PIN.</string>
     <string name="reason_pin_length">The PIN must be only digits, and exactly the number of digits the server asks for.</string>
     <string name="reason_pin_repeated">The PIN must not be one digit repeated, like 111111.</string>
+    <string name="reason_pin_not_set">This account has no PIN yet. Choose one.</string>
     <string name="reason_pin_sequence">The PIN must not be a straight run of digits, like 123456.</string>
     <string name="reason_password_required">Enter a password.</string>
     <string name="reason_password_short">The password is too short.</string>
@@ -345,6 +346,7 @@
     <string name="notif_state_failed">Not sent</string>
     <string name="notif_event_day">Day closed</string>
     <string name="notif_event_entry">New entry</string>
+    <string name="notif_event_device">New device</string>
     <string name="notif_attempts">Tries: %1$d</string>
     <string name="notif_resend">Send again</string>
     <string name="notif_resend_failed">Could not send it again.</string>
@@ -383,6 +385,11 @@
     <string name="cert_changed_body">This server's identity has changed since this device last connected. Someone may be intercepting the connection, or the server was reinstalled. Cancel unless the administrator has told you the server was reinstalled.</string>
     <string name="cert_trust">Trust new key</string>
     <string name="err_other_server">Another server answers at this address now. Check the address, or add it as a new server.</string>
+    <string name="login_title">Log in</string>
+    <string name="login_submit">Log in</string>
+    <string name="login_set_pin">This account has no PIN yet. Choose one for it.</string>
+    <string name="err_pin_digits">The PIN is 4 to 12 digits.</string>
+    <string name="err_personal_device">This device was set up for one person, so no user can be added to it. Remove this server from this device (in Settings after unlocking), then add the server again.</string>
     <plurals name="server_users">
         <item quantity="one">%1$d user</item>
         <item quantity="other">%1$d users</item>

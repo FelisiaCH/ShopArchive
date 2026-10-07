@@ -50,6 +50,7 @@ import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorResponse
 import xyz.felismp.shoparchive.shared.InfoResponse
+import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.PROTOCOL_HEADER
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.ReauthRequest
@@ -107,6 +108,9 @@ class ApiClient(
     /** [enrollmentToken] is the one `redeem` returned. */
     override suspend fun enroll(enrollmentToken: String, request: EnrollRequest): EnrollResponse =
         decode(send(HttpMethod.Post, "/api/v1/enroll", clientJson.encodeToString(request), enrollmentToken))
+
+    /** The name and PIN in the body are the credential: no token is sent, so a 401 is a refusal ([ClientError.Api]), never [ClientError.Locked]. */
+    override suspend fun login(request: LoginRequest): EnrollResponse = post("/api/v1/login", request, auth = Auth.None)
 
     /** Keeps the access token in memory. */
     override suspend fun unlock(request: UnlockRequest): UnlockResponse =

@@ -28,7 +28,9 @@ import xyz.felismp.shoparchive.shared.DeviceMode
 import xyz.felismp.shoparchive.shared.EnrollRequest
 import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
+import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.InfoResponse
+import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.PairPayload
 import xyz.felismp.shoparchive.shared.ReauthRequest
@@ -125,6 +127,10 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
     private fun reach() { worksAt?.let { if (endpoints.firstOrNull() != it) throw ClientError.Unreachable() } }
     var failRedeem: Exception? = null
     var failEnroll: Exception? = null
+    var failLogin: Exception? = null
+    /** Users the fake server knows who have no PIN yet: a login without a new PIN is told `pin.not-set`. */
+    val noPinYet = mutableSetOf<String>()
+    val logins = mutableListOf<LoginRequest>()
     var failUnlock: Exception? = null
     var protocol = PROTOCOL_VERSION
     var redeemResponse = RedeemResponse("tok", "alice", passwordRequired = false, hasPassword = false, hasPin = false, pinLength = 6)
@@ -143,6 +149,13 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
         if (request.deviceCredential in badDeviceCredentials) throw ClientError.Api(401, ErrorCode.DEVICE_NOT_RECOGNIZED, "This device is not recognized for that user.")
         if (WRONG_PIN in listOf(request.pin, request.newPin)) throw ClientError.Api(401, ErrorCode.UNAUTHORIZED, "The password or PIN is wrong.")
         return EnrollResponse("dev-1", "cred-1")
+    }
+    override suspend fun login(request: LoginRequest): EnrollResponse {
+        reach(); logins += request; failLogin?.let { throw it }
+        if (request.deviceCredential in badDeviceCredentials) throw ClientError.Api(401, ErrorCode.DEVICE_NOT_RECOGNIZED, "This device is not recognized for that user.")
+        if (request.username in noPinYet && request.newPin == null) throw ClientError.Api(401, ErrorCode.UNAUTHORIZED, "Set a PIN.", reason = ErrorReasons.PIN_NOT_SET)
+        if (WRONG_PIN in listOf(request.pin, request.newPin)) throw ClientError.Api(401, ErrorCode.UNAUTHORIZED, "Login failed.")
+        return EnrollResponse(request.deviceId ?: "dev-new", "cred-${request.username}")
     }
     override suspend fun unlock(request: UnlockRequest): UnlockResponse {
         reach(); unlocks += request; failUnlock?.let { throw it }; token = true; return UnlockResponse("access", 900)
@@ -218,12 +231,14 @@ class AppFlowTest {
 
     // ---- start ----
 
-    /** From the server list to the pairing screen, by adding a server's address (the probe and the `/info` read it takes are forgotten). */
+    /**
+     * The empty pairing screen. Nothing on the server list leads there any more (a server opens its login), so it is reached the one way
+     * left: leaving the preview of a pasted link. Nothing is probed or connected on the way.
+     */
     private fun pairingFlow(): AppFlow = flow().apply {
-        addServer("192.168.1.2:8443")
+        previewLink(link())
+        cancelPreview()
         assertIs<AppState.Pair>(state.value)
-        probed = null
-        connected.clear()
     }
 
     @Test fun noStoredServerStartsAtTheEmptyServerListAndLooksOnTheNetwork() {
@@ -339,11 +354,12 @@ class AppFlowTest {
         assertEquals(UnlockRequest("dev-sid-2", "bob", "cred-bob", pin = "483926"), api.unlocks.single())
     }
 
-    @Test fun openingAServerWithoutUsersGoesToPairingWithItsAddress() {
+    @Test fun aServerWithoutUsersOpensItsLogin() {
         store.all = StoredServers(listOf(server("sid-1", "10.0.0.5:8443", "alice"), server("sid-2", "10.0.0.6:8443").copy(deviceId = null)))
         val f = flow()
         f.openServer("sid-2")
-        assertEquals("10.0.0.6:8443", assertIs<AppState.Pair>(f.state.value).address)
+        assertEquals(AppState.Login("10.0.0.6:8443", "Shop sid-2"), f.state.value)
+        assertEquals(Triple(PIN_HEX, "sid-2", listOf("10.0.0.6:8443")), connected.single())
     }
 
     @Test fun pairingASecondServerKeepsTheFirst() {
@@ -413,7 +429,7 @@ class AppFlowTest {
         assertEquals(2, discovery.browses)
     }
 
-    @Test fun addingAServerChecksTheAddressProbesItThenPairsWithItFilledIn() {
+    @Test fun addingAServerChecksTheAddressProbesItThenOpensItsLogin() {
         val f = flow()
         f.addServer("no-port")
         assertEquals(Problem.BadAddress, assertIs<AppState.Servers>(f.state.value).problem)
@@ -426,9 +442,7 @@ class AppFlowTest {
         probeResult = { PIN_FP }
         f.addServer(" shop.example.com:25655 ")
         assertEquals("shop.example.com:25655", probed)
-        assertEquals("shop.example.com:25655", assertIs<AppState.Pair>(f.state.value).address)
-        f.submitManual("shop.example.com:25655", "alice", "BCDFG-HJKLM")
-        assertEquals(PIN_FP, assertNotNull(assertIs<AppState.Pair>(f.state.value).check).fingerprint)
+        assertEquals(AppState.Login("shop.example.com:25655", "Shop"), f.state.value)
     }
 
     @Test fun openingAFoundServerAddsItsAddress() {
@@ -437,7 +451,7 @@ class AppFlowTest {
         val f = flow()
         f.openFound(found)
         assertEquals("192.168.1.9:8443", probed)
-        assertEquals("192.168.1.9:8443", assertIs<AppState.Pair>(f.state.value).address)
+        assertEquals("192.168.1.9:8443", assertIs<AppState.Login>(f.state.value).server)
     }
 
     // ---- trust on first use ----
@@ -456,8 +470,7 @@ class AppFlowTest {
         assertEquals(Triple(PIN_HEX, "", listOf("192.168.1.2:8443")), connected.first(), "pinned to the key just probed")
         assertEquals(StoredServer("sid-1", "Shop", PIN_HEX, listOf("192.168.1.2:8443")), store.stored, "saved with no device and no users")
         assertEquals("sid-1", store.all?.lastServerId)
-        val pair = assertIs<AppState.Pair>(f.state.value)
-        assertNull(pair.check, "no fingerprint to confirm")
+        assertEquals(AppState.Login("192.168.1.2:8443", "Shop"), f.state.value, "no fingerprint to confirm")
         assertTrue(api.redeemed.isEmpty() && api.unlocks.isEmpty())
     }
 
@@ -532,6 +545,123 @@ class AppFlowTest {
         assertEquals(oldAddress, probed)
         assertEquals(storedAlice().copy(certPin = OTHER_HEX), store.stored)
         assertIs<AppState.Locked>(f.state.value)
+    }
+
+    // ---- login ----
+
+    /** A server saved by its address, with nobody on this device yet: its login form. */
+    private fun loginFlow(): AppFlow = flow().apply {
+        addServer("192.168.1.2:8443")
+        assertIs<AppState.Login>(state.value)
+        api.closed = false // the client that read /info
+    }
+
+    @Test fun theFirstLoginOnThisDeviceSavesTheDeviceAndTheUserAndUnlocks() {
+        val f = loginFlow()
+        f.login(" alice ", "483926")
+        assertEquals(LoginRequest("alice", "Test PC", "windows", DeviceMode.SHARED, pin = "483926"), api.logins.single())
+        assertEquals(StoredServer("sid-1", "Shop", PIN_HEX, listOf("192.168.1.2:8443"), "dev-new", listOf(StoredUser("alice", "cred-alice")), DeviceMode.SHARED), store.stored)
+        assertEquals(UnlockRequest("dev-new", "alice", "cred-alice", pin = "483926"), api.unlocks.single())
+        assertEquals("alice", assertIs<AppState.Unlocked>(f.state.value).username)
+        val text = Json.encodeToString(StoredServers.serializer(), assertNotNull(store.all))
+        assertFalse("483926" in text || "access" in text, "no PIN or token is saved")
+    }
+
+    @Test fun aUserWithoutAPinIsAskedForANewOneAndThenUnlocks() {
+        api.noPinYet += "alice"
+        val f = loginFlow()
+        f.login("alice", "")
+        assertEquals(LoginRequest("alice", "Test PC", "windows", DeviceMode.SHARED), api.logins.single())
+        val s = assertIs<AppState.Login>(f.state.value)
+        assertTrue(s.needsNewPin)
+        assertNull(s.problem)
+        assertFalse(s.busy)
+        assertNull(store.stored?.deviceId)
+        f.login("alice", "", newPin = "4839", newPinRepeat = "4839")
+        assertEquals(LoginRequest("alice", "Test PC", "windows", DeviceMode.SHARED, newPin = "4839"), api.logins.last())
+        assertEquals(UnlockRequest("dev-new", "alice", "cred-alice", pin = "4839"), api.unlocks.single())
+        assertIs<AppState.Unlocked>(f.state.value)
+    }
+
+    @Test fun aNewPinIsCheckedBeforeItIsSent() {
+        api.noPinYet += "alice"
+        val f = loginFlow()
+        f.login("alice", "")
+        f.login("alice", "", newPin = "4839", newPinRepeat = "4893")
+        assertEquals(Problem.PinsDiffer, assertIs<AppState.Login>(f.state.value).problem)
+        f.login("alice", "", newPin = "483", newPinRepeat = "483")
+        assertEquals(Problem.PinDigits, assertIs<AppState.Login>(f.state.value).problem)
+        f.login("alice", "", newPin = "48a926", newPinRepeat = "48a926")
+        assertEquals(Problem.PinDigits, assertIs<AppState.Login>(f.state.value).problem)
+        f.login(" ", "483926")
+        assertEquals(Problem.BadUsername, assertIs<AppState.Login>(f.state.value).problem)
+        assertEquals(1, api.logins.size, "only the first try was sent")
+    }
+
+    @Test fun aWrongPinSaysSoAndSavesNothing() {
+        val f = loginFlow()
+        val before = store.all
+        f.login("alice", WRONG_PIN)
+        val s = assertIs<AppState.Login>(f.state.value)
+        assertEquals(Problem.WrongCredentials, s.problem)
+        assertFalse(s.busy)
+        assertEquals(before, store.all)
+        assertTrue(api.unlocks.isEmpty())
+    }
+
+    @Test fun aLockedAccountShowsTheWait() {
+        api.failLogin = ClientError.Api(429, ErrorCode.RATE_LIMITED, "Too many wrong tries.", retryAfterSeconds = 120)
+        val f = loginFlow()
+        f.login("alice", "483926")
+        assertEquals(Problem.TooManyAttempts(120), assertIs<AppState.Login>(f.state.value).problem)
+    }
+
+    @Test fun anOldPersonalDeviceSaysToRemoveTheServerAndAddItAgain() {
+        val f = lockedFlow()
+        f.addUser()
+        api.failLogin = ClientError.Api(403, ErrorCode.FORBIDDEN, "This device is personal.", reason = ErrorReasons.DEVICE_PERSONAL)
+        f.login("bob", "483926")
+        assertEquals(Problem.PersonalDevice, assertIs<AppState.Login>(f.state.value).problem)
+        assertEquals(storedAlice(), store.stored)
+    }
+
+    @Test fun addUserFromTheLockScreenLogsInWithThisDeviceAndKeepsBoth() {
+        val f = lockedFlow(storedAlice(DeviceMode.SHARED))
+        f.addUser()
+        assertEquals(AppState.Login("10.0.0.5:8443", "Shop", adding = true), f.state.value)
+        f.login("bob", "483926")
+        assertEquals(LoginRequest("bob", "Test PC", "windows", DeviceMode.SHARED, pin = "483926", deviceId = "dev-1", deviceCredential = "cred"), api.logins.single())
+        assertEquals(listOf(StoredUser("alice", "cred"), StoredUser("bob", "cred-bob")), store.stored?.users)
+        assertEquals("dev-1", store.stored?.deviceId)
+        assertEquals(DeviceMode.SHARED, store.stored?.mode)
+        assertEquals(UnlockRequest("dev-1", "bob", "cred-bob", pin = "483926"), api.unlocks.single())
+        assertEquals("bob", assertIs<AppState.Unlocked>(f.state.value).username)
+    }
+
+    @Test fun addUserTriesTheNextCredentialWhenTheServerDoesNotKnowOne() {
+        api.badDeviceCredentials += "cred"
+        val f = lockedFlow(storedShared())
+        f.addUser()
+        f.login("carol", "483926")
+        assertEquals(listOf("cred", "cred-bob"), api.logins.map { it.deviceCredential })
+        assertEquals(listOf("alice", "bob", "carol"), store.stored?.users?.map { it.username })
+        assertTrue(store.stored!!.users.first { it.username == "alice" }.rejected, "tried last next time")
+        assertIs<AppState.Unlocked>(f.state.value)
+    }
+
+    @Test fun backFromAddingAUserShowsTheLockScreenAgain() {
+        val f = lockedFlow(storedShared())
+        f.addUser()
+        f.cancelLogin()
+        assertEquals(listOf("alice", "bob"), assertIs<AppState.Locked>(f.state.value).users)
+        assertTrue(api.logins.isEmpty())
+    }
+
+    @Test fun theServerListFromTheLoginClosesItsClient() {
+        val f = loginFlow()
+        f.showServers()
+        assertEquals(listOf(ServerRow("sid-1", "Shop", "192.168.1.2:8443", 0)), assertIs<AppState.Servers>(f.state.value).saved)
+        assertTrue(api.closed)
     }
 
     // ---- pair by link ----
@@ -900,7 +1030,7 @@ class AppFlowTest {
 
     @Test fun addUserGoesToPairAndTheEnrollJoinsThisDevice() {
         val f = lockedFlow(storedShared())
-        f.addUser()
+        f.addUserByPairing()
         assertTrue(assertIs<AppState.Pair>(f.state.value).adding)
         api.redeemResponse = RedeemResponse("tok", "carol", passwordRequired = false, hasPassword = false, hasPin = false, pinLength = 6)
         f.previewLink(link().replace("alice", "alice")); f.redeemLink()
@@ -920,13 +1050,13 @@ class AppFlowTest {
 
     @Test fun addUserIsOnlyOfferedOnSharedDevices() {
         val f = lockedFlow()
-        f.addUser()
+        f.addUserByPairing()
         assertIs<AppState.Locked>(f.state.value)
     }
 
     @Test fun addUserRefusesAPairingForAnotherServerBeforeUsingIt() {
         val f = lockedFlow(storedShared())
-        f.addUser()
+        f.addUserByPairing()
         val other = Json.encodeToString(PairPayload(1, "other-sid", PIN_HEX, "s", "carol", listOf("h:1")))
         f.previewLink("shoparchive://pair?d=" + Base64.getUrlEncoder().withoutPadding().encodeToString(other.toByteArray()))
         f.redeemLink()
@@ -936,7 +1066,7 @@ class AppFlowTest {
 
     @Test fun cancelAddUserReturnsToTheLockScreen() {
         val f = lockedFlow(storedShared())
-        f.addUser(); f.cancelAddUser()
+        f.addUserByPairing(); f.cancelAddUser()
         val locked = assertIs<AppState.Locked>(f.state.value)
         assertEquals(listOf("alice", "bob"), locked.users)
         f.selectUser("alice"); f.unlock("111111")
@@ -957,7 +1087,7 @@ class AppFlowTest {
 
     @Test fun aUserAddedWithANewAddressKeepsItFirstAndTheOldOnesAfterIt() {
         val f = lockedFlow(storedShared())
-        f.addUser()
+        f.addUserByPairing()
         f.previewLink(link(endpoints = listOf(newAddress))); f.redeemLink()
         f.enroll(EnrollInput(pin = "654321", pinRepeat = "654321"))
         assertEquals(listOf(newAddress, oldAddress), store.stored?.endpoints)
@@ -970,7 +1100,7 @@ class AppFlowTest {
     @Test fun storedAddressesAreCappedDroppingTheOldest() {
         val many = (1..4).map { "10.0.0.$it:8443" }
         val f = lockedFlow(storedShared().copy(endpoints = many))
-        f.addUser()
+        f.addUserByPairing()
         f.previewLink(link(endpoints = listOf("10.0.1.1:8443", "10.0.1.2:8443"))); f.redeemLink()
         f.enroll(EnrollInput(pin = "654321", pinRepeat = "654321"))
         assertEquals(listOf("10.0.1.1:8443", "10.0.1.2:8443", "10.0.0.1:8443", "10.0.0.2:8443"), store.stored?.endpoints)
@@ -1081,7 +1211,7 @@ class AppFlowTest {
             assertTrue(gated.entered.await(30, java.util.concurrent.TimeUnit.SECONDS), "the address save reached the store")
             // Meanwhile the device is locked and carol is added: her enrollment save has to wait behind the address save.
             f.lockNow()
-            f.addUser()
+            f.addUserByPairing()
             f.previewLink(link(endpoints = listOf(newAddress))); f.redeemLink()
             val before = io.sent.get()
             f.enroll(EnrollInput(pin = "654321", pinRepeat = "654321"))
@@ -1114,7 +1244,7 @@ class AppFlowTest {
         val f = AppFlow(scope, flaky, ThisDevice("Test PC", "windows"), { _, _, eps -> api.also { it.endpoints = eps } }, { PIN_FP }, prefs, { clock }, Dispatchers.Unconfined)
         f.selectUser("alice"); f.unlock("111111")
         assertEquals(listOf(oldAddress), store.stored?.endpoints, "the address save failed")
-        f.lockNow(); f.addUser(); f.cancelAddUser()
+        f.lockNow(); f.addUserByPairing(); f.cancelAddUser()
         assertEquals(listOf("alice", "bob"), assertIs<AppState.Locked>(f.state.value).users)
         failing = false
         f.selectUser("alice"); f.unlock("111111")
@@ -1579,7 +1709,7 @@ class AppFlowTest {
     // ---- review fixes ----
 
     private fun addCarol(f: AppFlow) {
-        f.addUser()
+        f.addUserByPairing()
         api.redeemResponse = RedeemResponse("tok", "carol", passwordRequired = false, hasPassword = false, hasPin = false, pinLength = 6)
         f.previewLink(link()); f.redeemLink()
     }
@@ -1657,7 +1787,7 @@ class AppFlowTest {
             }
         }
         val g = AppFlow(scope, store, ThisDevice("Test PC", "windows"), { _, _, eps -> counting.also { api.endpoints = eps } }, { PIN_FP }, prefs, { clock }, Dispatchers.Unconfined)
-        g.addUser()
+        g.addUserByPairing()
         g.previewLink(link()); g.redeemLink()
         g.enroll(EnrollInput(pin = "654321", pinRepeat = "654321"))
         assertEquals(users.map { it.username }, names(store.stored), "all six are still stored")

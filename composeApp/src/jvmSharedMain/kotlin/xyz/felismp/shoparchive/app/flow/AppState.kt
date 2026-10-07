@@ -24,6 +24,10 @@ sealed interface Problem {
     data object PasswordsDiffer : Problem
     data class PinFormat(val length: Int) : Problem
     data object PinsDiffer : Problem
+    /** A PIN typed at login is not 4 to 12 digits (the server's own length is not known before login; it refuses a wrong one). */
+    data object PinDigits : Problem
+    /** Adding a user: this device was set up as personal, so it holds one user; it has to be removed and the server added again. */
+    data object PersonalDevice : Problem
     data object LabelEmpty : Problem
     /** The access token is gone (the server ended the session): unlock again. */
     data object SessionEnded : Problem
@@ -89,6 +93,19 @@ sealed interface AppState {
         val adding: Boolean = false,
         /** When the enrollment runs out, in [AppFlow]'s monotonic milliseconds (see [AppFlow.enrollSecondsLeft]); null when the server did not say. */
         val deadlineMs: Long? = null,
+    ) : AppState
+
+    /**
+     * Logging in on [server] (called [serverName]) with a user name and PIN, without pairing. [needsNewPin] once the server said the user
+     * has no PIN yet: the form then asks for a new one twice. [adding] when another user joins this device from the lock screen, which the screen offers a way back to.
+     */
+    data class Login(
+        val server: String,
+        val serverName: String,
+        val needsNewPin: Boolean = false,
+        val busy: Boolean = false,
+        val problem: Problem? = null,
+        val adding: Boolean = false,
     ) : AppState
 
     /**

@@ -14,6 +14,7 @@ internal val REASON_WORDS: Map<String, StringResource> = mapOf(
     ErrorReasons.PIN_LENGTH to Res.string.reason_pin_length,
     ErrorReasons.PIN_REPEATED to Res.string.reason_pin_repeated,
     ErrorReasons.PIN_SEQUENCE to Res.string.reason_pin_sequence,
+    ErrorReasons.PIN_NOT_SET to Res.string.reason_pin_not_set,
     ErrorReasons.PASSWORD_REQUIRED to Res.string.reason_password_required,
     ErrorReasons.PASSWORD_SHORT to Res.string.reason_password_short,
     ErrorReasons.PASSWORD_LONG to Res.string.reason_password_long,

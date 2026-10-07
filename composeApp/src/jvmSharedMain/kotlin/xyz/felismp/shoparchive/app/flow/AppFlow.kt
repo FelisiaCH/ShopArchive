@@ -38,6 +38,8 @@ import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.DeviceMode
 import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
+import xyz.felismp.shoparchive.shared.ErrorReasons
+import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.AppVersion
 import xyz.felismp.shoparchive.shared.ReauthRequest
@@ -68,7 +70,7 @@ private val BROWSE_TIMEOUT: Duration = 3.seconds
 
 /**
  * The app's flow: Starting, then the server list (Servers), or straight to Locked when this device holds one server. Opening a
- * server shows Locked (it has users here) or Pair and Enroll (it has none yet), then Unlocked and Settings. A server added by address is
+ * server shows Locked (it has users here) or Login (it has none yet), then Unlocked and Settings. A server added by address is
  * trusted on first use: its key is saved without asking. A changed key of a saved server lands on CertChanged, which the person cancels or trusts;
  * a changed protocol from any call lands on a blocking state. Screens read [state] and call the actions;
  * typed text stays in the screens and comes in as arguments. PINs, passwords and tokens are never stored here.
@@ -175,13 +177,14 @@ class AppFlow(
         }
     }
 
-    /** Builds the client for what the device holds and shows the lock screen. */
+    /** Builds the client for what the device holds and shows the lock screen, or the login when nobody is on this device yet. */
     private fun resume(creds: StoredServer, readFromDisk: Boolean = true) {
         stored = creds
         // Only what was just read from disk is known to be there; a snapshot from memory must not hide a save that is still owed.
         if (readFromDisk) persisted = creds
         session = Session(connect(creds.certPin, creds.serverId, creds.endpoints), creds.certPin, creds.serverId, creds.endpoints)
-        _state.value = lockedFor(creds)
+        _state.value = if (creds.deviceId != null && creds.users.isNotEmpty()) lockedFor(creds)
+        else AppState.Login(creds.endpoints.firstOrNull().orEmpty(), creds.name)
     }
 
     private fun lockedFor(creds: StoredServer, username: String? = null, needsPassword: Boolean = false, problem: Problem? = null): AppState.Locked {
@@ -245,7 +248,7 @@ class AppFlow(
         }
     }
 
-    /** Opens a saved server: its lock screen, or the pairing when nobody is paired with it here yet. It is remembered as the last one opened. */
+    /** Opens a saved server: its lock screen, or its login when nobody is on this device yet. It is remembered as the last one opened. */
     fun openServer(serverId: String) {
         val s = _state.value as? AppState.Servers ?: return
         if (s.busy) return
@@ -269,11 +272,7 @@ class AppFlow(
         }
     }
 
-    private fun open(server: StoredServer) {
-        if (server.deviceId != null && server.users.isNotEmpty()) return resume(server)
-        pairAddress = server.endpoints.firstOrNull()
-        _state.value = pair()
-    }
+    private fun open(server: StoredServer) = resume(server)
 
     /**
      * A server by `host:port`: its key is probed, and its `/info` read pinned to that key. A server not saved here yet is saved with that
@@ -319,10 +318,11 @@ class AppFlow(
 
     fun openFound(found: FoundServer) = addServer(found.endpoint)
 
-    /** Back to the server list from the lock screen or the pairing: ends the session as a lock does and closes this server's client. */
+    /** Back to the server list from the lock screen, the login or the pairing: ends the session as a lock does and closes this server's client. */
     fun showServers() {
         when (val s = _state.value) {
             is AppState.Locked -> if (s.busy) return
+            is AppState.Login -> if (s.busy) return
             is AppState.Pair -> if (s.busy) return
             else -> return
         }
@@ -795,8 +795,16 @@ class AppFlow(
         }
     }
 
-    /** Shared device: pair another user onto it. The pairing screens come first, and the enroll then joins this device. */
+    /** Another user logs in on this device: the login of the same server, which then joins this device. */
     fun addUser() {
+        val s = _state.value as? AppState.Locked ?: return
+        val creds = stored ?: return
+        if (s.busy) return
+        _state.value = AppState.Login(s.server, creds.name, adding = true)
+    }
+
+    /** Shared device: pair another user onto it. The pairing screens come first, and the enroll then joins this device. Nothing leads here since [addUser] logs in. */
+    fun addUserByPairing() {
         val s = _state.value as? AppState.Locked ?: return
         val creds = stored ?: return
         if (!s.shared || s.busy) return
@@ -815,6 +823,114 @@ class AppFlow(
         session?.api?.close()
         // The newest credentials in memory (an address save may have moved them on since adding began); [persisted] stays what it was.
         resume(stored ?: adding, readFromDisk = false)
+    }
+
+    // ---- login ----
+
+    /** Back from adding a user to the lock screen. */
+    fun cancelLogin() {
+        val s = _state.value as? AppState.Login ?: return
+        val creds = stored ?: return
+        if (s.busy || !s.adding) return
+        _state.value = lockedFor(creds)
+    }
+
+    /**
+     * Logs [username] in with [pin], or with [newPin] (typed twice, the second time [newPinRepeat]) once the server said the user has none.
+     * The first login on this device makes it a shared one with this platform's name; when it already holds users, one of their device
+     * credentials puts the new user on it. The device id and the user's credential are saved (never the PIN), and the PIN just typed unlocks.
+     */
+    fun login(username: String, pin: String, newPin: String? = null, newPinRepeat: String? = null) {
+        val s = _state.value as? AppState.Login ?: return
+        val opened = session ?: return
+        val creds = stored ?: return
+        if (s.busy) return
+        val name = username.trim()
+        val secret = if (s.needsNewPin) newPin.orEmpty() else pin
+        val problem = when {
+            name.isEmpty() -> Problem.BadUsername
+            // An empty PIN is sent as none: a user who has no PIN yet does not know one, and the server then asks for a new one.
+            (s.needsNewPin || secret.isNotEmpty()) && (secret.length !in 4..12 || !secret.all { it in '0'..'9' }) -> Problem.PinDigits
+            s.needsNewPin && newPin != newPinRepeat -> Problem.PinsDiffer
+            else -> null
+        }
+        if (problem != null) {
+            _state.value = s.copy(problem = problem)
+            return
+        }
+        _state.value = s.copy(busy = true, problem = null)
+        val request = LoginRequest(
+            name, device.label, device.platform, DeviceMode.SHARED,
+            pin = secret.takeIf { !s.needsNewPin && it.isNotEmpty() }, newPin = secret.takeIf { s.needsNewPin },
+        )
+        scope.launch {
+            val rejected = mutableListOf<String>()
+            val accepted = mutableListOf<String>()
+            val done = try {
+                try {
+                    loginTrying(opened, creds, request, rejected, accepted)
+                } finally {
+                    withContext(NonCancellable) { markRejected(rejected, accepted) }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val reason = (e as? ClientError.Api)?.reason
+                when (reason) {
+                    ErrorReasons.PIN_NOT_SET -> _state.value = s.copy(needsNewPin = true, busy = false, problem = null)
+                    ErrorReasons.DEVICE_PERSONAL -> _state.value = s.copy(busy = false, problem = Problem.PersonalDevice)
+                    else -> blockOr(e) { _state.value = s.copy(busy = false, problem = it) }
+                }
+                return@launch
+            }
+            val user = StoredUser(name, done.credential)
+            // Built from the newest [stored] under the save lock, like an enroll: a queued address save then writes this user too.
+            val saved = guarded({
+                withContext(io) {
+                    saveLock.withLock {
+                        val base = stored ?: creds
+                        val first = creds.deviceId == null || creds.users.isEmpty()
+                        val made = base.copy(
+                            deviceId = done.deviceId,
+                            users = (if (first) emptyList() else base.users.filter { it.username != name }) + user,
+                            endpoints = mergeEndpoints(opened.api.endpoints, base.endpoints),
+                            mode = if (first) DeviceMode.SHARED else base.mode,
+                        )
+                        persist(made)
+                        stored = made
+                        persisted = made
+                        made
+                    }
+                }
+            }) { _state.value = s.copy(busy = false, problem = it) } ?: return@launch
+            // The server's AuthPolicy (unlock without a PIN) is only known after an unlock; the PIN just typed always unlocks.
+            val unlock = UnlockRequest(done.deviceId, name, done.credential, pin = secret)
+            val locked = lockedFor(saved, name)
+            if (guarded({ opened.api.unlock(unlock) }) { _state.value = locked.copy(problem = it) } != null) enterUnlocked(opened, name)
+        }
+    }
+
+    /**
+     * Logs in; on a device that holds users already, tries their device credentials (not rejected first, the last to unlock first) until the
+     * server accepts one. Only [ErrorCode.DEVICE_NOT_RECOGNIZED] moves on: the server answers it before it looks at the PIN, so it costs no wrong try.
+     */
+    private suspend fun loginTrying(
+        opened: Session, creds: StoredServer, request: LoginRequest,
+        rejected: MutableList<String>, accepted: MutableList<String>,
+    ): EnrollResponse {
+        val deviceId = creds.deviceId
+        if (deviceId == null || creds.users.isEmpty()) return opened.api.login(request)
+        var last: ClientError.Api? = null
+        for (user in creds.users.sortedWith(compareBy({ it.rejected }, { it.username != lastUnlocked }))) {
+            try {
+                return opened.api.login(request.copy(deviceId = deviceId, deviceCredential = user.credential)).also { accepted += user.username }
+            } catch (e: ClientError.Api) {
+                if (e.code != ErrorCode.DEVICE_NOT_RECOGNIZED) throw e
+                rejected += user.username
+                last = e
+            }
+        }
+        throw last ?: ClientError.Api(401, ErrorCode.DEVICE_NOT_RECOGNIZED, "This device holds no credential to add a user with.")
     }
 
     private fun enterUnlocked(opened: Session, username: String) {

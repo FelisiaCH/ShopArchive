@@ -279,6 +279,7 @@
     <string name="reason_pin_required">ກະລຸນາໃສ່ PIN</string>
     <string name="reason_pin_length">PIN ຕ້ອງເປັນຕົວເລກລ້ວນ ແລະ ມີຈຳນວນຫຼັກຕາມທີ່ເຊີບເວີກຳນົດ</string>
     <string name="reason_pin_repeated">PIN ຕ້ອງບໍ່ແມ່ນເລກໂຕດຽວຊ້ຳກັນ ເຊັ່ນ 111111</string>
+    <string name="reason_pin_not_set">ບັນຊີນີ້ຍັງບໍ່ມີ PIN. ໃຫ້ຕັ້ງ PIN ໃໝ່.</string>
     <string name="reason_pin_sequence">PIN ຕ້ອງບໍ່ແມ່ນເລກລຽງກັນ ເຊັ່ນ 123456</string>
     <string name="reason_password_required">ກະລຸນາໃສ່ລະຫັດຜ່ານ</string>
     <string name="reason_password_short">ລະຫັດຜ່ານສັ້ນເກີນໄປ</string>
@@ -345,6 +346,7 @@
     <string name="notif_state_failed">ສົ່ງບໍ່ສຳເລັດ</string>
     <string name="notif_event_day">ປິດຍອດ</string>
     <string name="notif_event_entry">ລາຍການໃໝ່</string>
+    <string name="notif_event_device">ອຸປະກອນໃໝ່</string>
     <string name="notif_attempts">ລອງແລ້ວ %1$d ເທື່ອ</string>
     <string name="notif_resend">ສົ່ງອີກຄັ້ງ</string>
     <string name="notif_resend_failed">ສົ່ງອີກຄັ້ງບໍ່ໄດ້.</string>
@@ -383,6 +385,11 @@
     <string name="cert_changed_body">ຕົວຕົນຂອງເຊີບເວີນີ້ປ່ຽນໄປຈາກຄັ້ງກ່ອນທີ່ເຄື່ອງນີ້ເຊື່ອມຕໍ່. ອາດມີຄົນດັກການເຊື່ອມຕໍ່ຢູ່, ຫຼື ມີການຕິດຕັ້ງເຊີບເວີໃໝ່. ໃຫ້ກົດຍົກເລີກ ເວັ້ນເສຍແຕ່ຜູ້ດູແລແຈ້ງວ່າໄດ້ຕິດຕັ້ງເຊີບເວີໃໝ່.</string>
     <string name="cert_trust">ເຊື່ອຖືກະແຈໃໝ່</string>
     <string name="err_other_server">ຕອນນີ້ມີເຊີບເວີອື່ນຕອບຢູ່ທີ່ຢູ່ນີ້. ກວດເບິ່ງທີ່ຢູ່, ຫຼື ເພີ່ມເປັນເຊີບເວີໃໝ່.</string>
+    <string name="login_title">ເຂົ້າສູ່ລະບົບ</string>
+    <string name="login_submit">ເຂົ້າສູ່ລະບົບ</string>
+    <string name="login_set_pin">ບັນຊີນີ້ຍັງບໍ່ມີ PIN. ໃຫ້ຕັ້ງ PIN ໃໝ່.</string>
+    <string name="err_pin_digits">PIN ຕ້ອງເປັນຕົວເລກ 4 ຫາ 12 ຫຼັກ.</string>
+    <string name="err_personal_device">ອຸປະກອນນີ້ຕັ້ງໄວ້ສຳລັບຄົນດຽວ ຈຶ່ງເພີ່ມຜູ້ໃຊ້ບໍ່ໄດ້. ໃຫ້ລຶບເຊີບເວີນີ້ອອກຈາກເຄື່ອງ (ໃນຕັ້ງຄ່າຫຼັງປົດລັອກ) ແລ້ວເພີ່ມເຊີບເວີໃໝ່.</string>
     <plurals name="server_users">
         <item quantity="other">ຜູ້ໃຊ້ %1$d ຄົນ</item>
     </plurals>

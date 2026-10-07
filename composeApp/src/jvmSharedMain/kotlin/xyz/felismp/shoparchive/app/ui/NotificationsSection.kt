@@ -49,6 +49,7 @@ private fun Message(ws: Workspace, n: NotificationDto, canSend: Boolean, enabled
             when (n.event) {
                 "day.closed" -> stringResource(Res.string.notif_event_day)
                 "entry.created" -> stringResource(Res.string.notif_event_entry)
+                "device.new" -> stringResource(Res.string.notif_event_device)
                 else -> n.event
             } + " · " + branch,
             TextRole.Title,

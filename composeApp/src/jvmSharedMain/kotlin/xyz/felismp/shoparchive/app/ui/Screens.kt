@@ -49,6 +49,7 @@ fun AppHost(flow: AppFlow) {
         is AppState.Servers -> ServersScreen(s, flow)
         is AppState.Pair -> PairScreen(s, flow)
         is AppState.Enroll -> EnrollScreen(s, flow)
+        is AppState.Login -> LoginScreen(s, flow)
         is AppState.Locked -> LockedScreen(s, flow)
         is AppState.Unlocked -> flow.workspace?.let { Shell(s, flow, it) }
         is AppState.Settings -> SettingsScreen(s, flow)
@@ -258,6 +259,37 @@ private fun pinHintWords(hint: PinHint): String = when (hint) {
     is PinHint.Run -> stringResource(Res.string.hint_pin_run, hint.first.toString(), hint.last.toString())
 }
 
+/** A user name and PIN, without pairing; a user who has no PIN yet chooses one (typed twice). */
+@Composable
+private fun LoginScreen(s: AppState.Login, flow: AppFlow) {
+    var username by rememberSaveable { mutableStateOf("") }
+    // Secrets use remember, never rememberSaveable, like the other forms.
+    var pin by remember { mutableStateOf("") }
+    var newPin by remember(s.needsNewPin) { mutableStateOf("") }
+    var newPinRepeat by remember(s.needsNewPin) { mutableStateOf("") }
+    ScreenFrame(stringResource(if (s.adding) Res.string.add_user_title else Res.string.login_title)) {
+        ShopText(s.serverName.ifBlank { s.server }, TextRole.Title)
+        ShopText(s.server, TextRole.Caption, muted = true)
+        ShopTextField(username, { username = it }, stringResource(Res.string.username_label), enabled = !s.busy)
+        if (s.needsNewPin) {
+            ShopText(stringResource(Res.string.login_set_pin))
+            // The server's PIN length is not known before login: 4 to 12 digits, and the server refuses a wrong length in words.
+            ShopTextField(newPin, { newPin = it }, stringResource(Res.string.pin_new, "4–12"), kind = FieldKind.Pin, enabled = !s.busy)
+            ShopTextField(newPinRepeat, { newPinRepeat = it }, stringResource(Res.string.pin_repeat), kind = FieldKind.Pin, enabled = !s.busy)
+        } else {
+            ShopTextField(pin, { pin = it }, stringResource(Res.string.pin_field), kind = FieldKind.Pin, enabled = !s.busy)
+        }
+        Status(s.busy, s.problem)
+        ShopButton(
+            stringResource(Res.string.login_submit),
+            { flow.login(username, pin, newPin.takeIf { s.needsNewPin }, newPinRepeat.takeIf { s.needsNewPin }) },
+            Modifier.fillMaxWidth(), enabled = !s.busy,
+        )
+        if (s.adding) ShopButton(stringResource(Res.string.add_user_back), flow::cancelLogin, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
+        ShopButton(stringResource(Res.string.servers_back), flow::showServers, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
+    }
+}
+
 /** Personal device: the one user. Shared device: the people paired here, then the PIN of the one picked. */
 @Composable
 private fun LockedScreen(s: AppState.Locked, flow: AppFlow) {
@@ -283,6 +315,8 @@ private fun LockedScreen(s: AppState.Locked, flow: AppFlow) {
                 { flow.unlock(secret) }, Modifier.fillMaxWidth(), enabled = !s.busy,
             )
             if (s.shared) ShopButton(stringResource(Res.string.lock_other_user), { flow.selectUser(null) }, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
+            // A personal device has no list of users to pick from: adding one starts here (an old personal device is told what to do).
+            else ShopButton(stringResource(Res.string.lock_add_user), flow::addUser, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
         }
         ShopButton(stringResource(Res.string.servers_back), flow::showServers, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
     }
@@ -371,6 +405,8 @@ internal fun Problem.text(): String = when (this) {
     Problem.PasswordsDiffer -> stringResource(Res.string.err_passwords_differ)
     is Problem.PinFormat -> stringResource(Res.string.err_pin_format, length.toString())
     Problem.PinsDiffer -> stringResource(Res.string.err_pins_differ)
+    Problem.PinDigits -> stringResource(Res.string.err_pin_digits)
+    Problem.PersonalDevice -> stringResource(Res.string.err_personal_device)
     Problem.LabelEmpty -> stringResource(Res.string.err_label_empty)
     Problem.SessionEnded -> stringResource(Res.string.err_session_ended)
     Problem.DeviceRejected -> stringResource(Res.string.err_device_rejected)
