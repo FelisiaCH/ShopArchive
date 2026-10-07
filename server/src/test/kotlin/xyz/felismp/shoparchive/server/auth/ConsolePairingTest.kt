@@ -22,10 +22,10 @@ class ConsolePairingTest {
     private fun env(config: String? = null) = AuthEnv(root, config)
 
     @Test
-    fun userPairShowsTheQrTheLinkTheCodeAndTheFingerprintAndTellsTheSenderOnlyThatItDid() = env().run {
+    fun aPairingShowsTheQrTheLinkTheCodeAndTheFingerprintAndTellsTheSenderOnlyThatItDid() = env().run {
         addUser("mali")
 
-        val replies = console("user pair mali")
+        val replies = showPairing("mali")
 
         assertEquals(1, replies.size)
         assertFalse(replies.single().contains("shoparchive://") || replies.single().contains("-"), replies.single())
@@ -38,22 +38,35 @@ class ConsolePairingTest {
     }
 
     @Test
-    fun userAddCreatesTheUserAndThenShowsItsPairing() = env().run {
+    fun userAddCreatesTheUserAndShowsNoPairing() = env().run {
         val replies = console("user add noy")
 
-        assertEquals(listOf("User 'noy' created", "Pairing for 'noy' is shown on the console only, not in the log."), replies)
-        assertTrue(terminal.any { it.startsWith("Link: shoparchive://pair?d=") })
-        assertEquals(1, auth.pairing.pendingCount())
+        assertEquals(listOf("User 'noy' created. They open the app, type the name 'noy' and set their own PIN."), replies)
+        assertTrue(terminal.isEmpty(), terminal.toString())
+        assertFalse(replies.any { "shoparchive://" in it || "Manual code" in it || '█' in it }, replies.toString())
+        assertEquals(0, auth.pairing.pendingCount())
     }
 
     @Test
-    fun userPairNeedsAnExistingEnabledUserAndTheConsoleSource() = env().run {
-        assertEquals(listOf("No user 'nobody'"), console("user pair nobody"))
-        assertEquals(listOf("Usage: user pair <name> [--png]"), console("user pair"))
-        assertEquals(listOf("Usage: user pair <name> [--png]"), console("user pair mali --jpg"))
+    fun userPairIsGoneAndAnswersWithTheUsageLine() = env().run {
+        addUser("mali")
+
+        val usage = listOf("Usage: user add|list|info|enable|disable|unlock|reset|rename|role|branch ...")
+        assertEquals(usage, console("user pair mali"))
+        assertEquals(usage, console("user pair mali --png"))
+        assertEquals(usage, console("user"))
+        assertEquals(listOf("add"), commands.complete(listOf("user", "a")))
+        assertFalse("pair" in commands.complete(listOf("user", "")))
+        assertTrue(terminal.isEmpty())
+        assertEquals(0, auth.pairing.pendingCount())
+    }
+
+    @Test
+    fun aPairingNeedsAnExistingEnabledUser() = env().run {
+        assertEquals(listOf("No such user."), showPairing("nobody"))
         addUser("mali")
         users.setEnabled("mali", false)
-        assertEquals(listOf("That user is disabled."), console("user pair mali"))
+        assertEquals(listOf("That user is disabled."), showPairing("mali"))
         assertTrue(terminal.isEmpty())
     }
 
@@ -61,10 +74,10 @@ class ConsolePairingTest {
     fun theConsoleCanBeTurnedOffAsASource() = env("config-version: 1\nauth:\n  pairing:\n    sources: [admin, self]\n").run {
         addUser("mali")
 
-        assertContains(console("user pair mali").single(), "turned off")
+        assertContains(showPairing("mali").single(), "turned off")
         assertTrue(terminal.isEmpty())
-        // user add still makes the user; it just does not pair.
-        assertContains(console("user add noy").last(), "turned off")
+        // user add makes the user and does not pair, whatever the setting.
+        assertEquals(listOf("User 'noy' created. They open the app, type the name 'noy' and set their own PIN."), console("user add noy"))
         assertTrue(users.userNames().contains("noy"))
     }
 
@@ -86,7 +99,8 @@ class ConsolePairingTest {
     fun theFirstRunHintNamesTheThreeSteps() {
         val env = env()
 
-        assertTrue(env.log.infos.any { "user add <name>" in it && "op <name>" in it && "user pair <name>" in it }, env.log.infos.toString())
+        assertTrue(env.log.infos.any { "user add <name>" in it && "op <name>" in it && "set their own PIN" in it }, env.log.infos.toString())
+        assertFalse(env.log.infos.any { "user pair" in it }, env.log.infos.toString())
     }
 
     @Test

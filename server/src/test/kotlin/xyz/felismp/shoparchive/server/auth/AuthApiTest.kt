@@ -384,7 +384,7 @@ class AuthApiTest {
             users.setEnabled("mali", false)
 
             assertEquals(ErrorCode.PAIRING_INVALID, redeem(RedeemRequest(secret = pairing.secret)).errorCode())
-            assertTrue(console("user pair mali").single().contains("disabled"))
+            assertTrue(showPairing("mali").single().contains("disabled"))
         }
     }
 
@@ -705,7 +705,7 @@ class AuthApiTest {
             assertEquals(HttpStatusCode.Forbidden, createPairing(token, "noy").status) // self
             addUser("mali")
             assertEquals(HttpStatusCode.Forbidden, createPairing(token, "mali").status) // admin
-            assertEquals(1, console("user pair mali").size) // the console is still allowed: one line, the rest is terminal-only
+            assertEquals(1, showPairing("mali").size) // the console is still allowed: one line, the rest is terminal-only
             assertTrue(terminal.isNotEmpty())
         }
     }

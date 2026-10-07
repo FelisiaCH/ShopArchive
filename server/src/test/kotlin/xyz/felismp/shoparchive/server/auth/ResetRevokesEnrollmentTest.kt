@@ -9,6 +9,7 @@ import xyz.felismp.shoparchive.server.users.isUsableCredential
 import xyz.felismp.shoparchive.shared.DeviceMode
 import xyz.felismp.shoparchive.shared.EnrollRequest
 import xyz.felismp.shoparchive.shared.ErrorCode
+import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.RedeemRequest
 import xyz.felismp.shoparchive.shared.RedeemResponse
 import java.nio.file.Path
@@ -43,7 +44,10 @@ private class BlockingHasher : Hasher(2, TEST_COST) {
     }
 }
 
-/** `user reset` and `user disable` end every enrollment grant and pending pairing of the account, not only its access tokens. */
+/**
+ * `user reset` and `user disable` end every enrollment grant of the account, not only its access tokens. A pending pairing is no
+ * longer cancelled by them: after a reset anyone with the name sets the PIN at login anyway, and pairing itself is going away.
+ */
 class ResetRevokesEnrollmentTest {
     @TempDir
     lateinit var root: Path
@@ -61,7 +65,7 @@ class ResetRevokesEnrollmentTest {
         redeem(env.pair(name).secret).parsed(RedeemResponse.serializer())
 
     @Test
-    fun anEnrollmentTokenHeldBeforeUserResetIsDeadAndOnlyTheNewPairingEnrolls() = env().run {
+    fun anEnrollmentTokenHeldBeforeUserResetIsDeadAndTheUserSetsANewPinAtLogin() = env().run {
         enroll("mali") // has a PIN and a device
         api {
             val held = grant(this@run, "mali")
@@ -73,11 +77,9 @@ class ResetRevokesEnrollmentTest {
             assertFalse(isUsableCredential(users.user("mali").pin))
             assertTrue(auth.devices.devicesOf(users.user("mali").id).isEmpty())
 
-            val fresh = terminal.last { it.startsWith("Link: ") }.removePrefix("Link: ")
-            val redeemed = redeem(Pairing(fresh, null).secret)
-            assertEquals(HttpStatusCode.OK, redeemed.status)
-            val token = redeemed.parsed(RedeemResponse.serializer()).enrollmentToken
-            assertEquals(HttpStatusCode.OK, enroll(token, newPin = NEW_PIN).status)
+            assertTrue(terminal.isEmpty(), "the reset shows no pairing")
+            val login = postJson("/api/v1/login", LoginRequest.serializer(), LoginRequest("mali", "Phone", "android", DeviceMode.PERSONAL, newPin = NEW_PIN))
+            assertEquals(HttpStatusCode.OK, login.status)
             assertTrue(isUsableCredential(users.user("mali").pin))
         }
     }
@@ -118,13 +120,20 @@ class ResetRevokesEnrollmentTest {
     }
 
     @Test
-    fun aRedeemWaitingOnTheAccountLockWhileUserResetRunsGetsNoGrant() = redeemRacing("user reset mali")
+    fun aRedeemWaitingOnTheAccountLockWhileUserResetRunsSeesTheAccountAfterTheReset() {
+        // The pairing outlives the reset now, but the redeem waits for the reset to finish: its grant is not one the reset left half-revoked.
+        val result = redeemRacing("user reset mali")
+        assertTrue(result is RedeemResponse && !result.hasPin && !result.hasPassword, "redeem returned $result")
+    }
 
     @Test
-    fun aRedeemWaitingOnTheAccountLockWhileUserDisableRunsGetsNoGrant() = redeemRacing("user disable mali")
+    fun aRedeemWaitingOnTheAccountLockWhileUserDisableRunsGetsNoGrant() {
+        val result = redeemRacing("user disable mali")
+        assertTrue(result is ApiError && result.status == 401 && result.code == ErrorCode.PAIRING_INVALID, "redeem returned $result")
+    }
 
-    /** The redeem has found its pairing and waits for the account lock, which the console command holds when it revokes. */
-    private fun redeemRacing(command: String) = AuthEnv(root).run {
+    /** The redeem has found its pairing and waits for the account lock, which the console command holds when it revokes; what the redeem returned or threw. */
+    private fun redeemRacing(command: String): Any? = AuthEnv(root).run {
         addUser("mali")
         val secret = pair("mali").secret
         val outcome = AtomicReference<Any>()
@@ -140,12 +149,11 @@ class ResetRevokesEnrollmentTest {
         }
         redeeming.join(10_000)
 
-        val result = outcome.get()
-        assertTrue(result is ApiError && result.status == 401 && result.code == ErrorCode.PAIRING_INVALID, "redeem returned $result")
+        outcome.get()
     }
 
     @Test
-    fun anEnrollmentTokenAndAPairingHeldBeforeUserDisableStayDeadAfterEnable() = env().run {
+    fun anEnrollmentTokenHeldBeforeUserDisableStaysDeadAfterEnableAndAPairingIsNoWayInWithoutThePin() = env().run {
         enroll("mali")
         api {
             val held = grant(this@run, "mali")
@@ -157,9 +165,12 @@ class ResetRevokesEnrollmentTest {
 
             console("user enable mali")
 
-            // Enabling again must not bring the old grant or the old pairing back.
+            // Enabling again must not bring the old grant back.
             assertEquals(HttpStatusCode.Unauthorized, enroll(held.enrollmentToken, pin = TEST_PIN).status)
-            assertEquals(HttpStatusCode.Unauthorized, redeem(pending.secret).status)
+            // The pairing outlives the disable now, but its grant still needs the PIN the user has.
+            val again = redeem(pending.secret)
+            assertEquals(HttpStatusCode.OK, again.status)
+            assertEquals(HttpStatusCode.Unauthorized, enroll(again.parsed(RedeemResponse.serializer()).enrollmentToken).status)
             assertEquals(HttpStatusCode.OK, redeem(pair("mali").secret).status)
         }
     }

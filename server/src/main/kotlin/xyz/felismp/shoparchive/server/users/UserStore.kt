@@ -67,7 +67,7 @@ internal class UserStore(
         for (name in names("user", ::isValidUserName)) readUser(name)
         writePermissionsTxt()
         log.info("user/: ${users.size} users and ${roles.size} roles loaded")
-        if (users.isEmpty()) log.info("No users yet. Create the first one with: user add <name>   then make it an admin with: op <name>   then pair a device with: user pair <name>")
+        if (users.isEmpty()) log.info("No users yet. Create the first one with: user add <name>   then make it an admin with: op <name>   then they open the app, type that name and set their own PIN")
     }
 
     @Synchronized fun userNames(): List<String> = users.keys.toList()

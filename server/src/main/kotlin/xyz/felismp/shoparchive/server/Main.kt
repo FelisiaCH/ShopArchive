@@ -143,7 +143,7 @@ fun main(args: Array<String>) {
         registerRecordCommands(commands, records)
         registerNotifyCommand(commands, notify.outbox)
         registerBackupCommand(commands, backup, root)
-        registerUserCommands(commands, users, auth.console::show, auth.accounts::reset, auth.accounts::disable)
+        registerUserCommands(commands, users, auth.accounts::reset, auth.accounts::disable)
         auth.accounts.register(commands)
         registerIpBanCommands(commands, network.bans)
         registerSayCommand(commands, services)

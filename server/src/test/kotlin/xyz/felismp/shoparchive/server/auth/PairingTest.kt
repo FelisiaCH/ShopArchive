@@ -158,7 +158,7 @@ class PairingTest {
         fun images() = Files.list(root.resolve("tmp")).use { files -> files.toList().map { it.fileName.toString() } }
 
         // used
-        console("user pair mali --png")
+        showPairing("mali", png = true)
         assertEquals(1, images().size)
         val image = root.resolve("tmp").resolve(images().single())
         val link = terminal.first { it.startsWith("Link: ") }.removePrefix("Link: ")
@@ -167,13 +167,13 @@ class PairingTest {
         assertEquals(0, images().size)
 
         // replaced
-        console("user pair mali --png")
+        showPairing("mali", png = true)
         assertEquals(1, images().size)
-        console("user pair mali")
+        showPairing("mali")
         assertEquals(0, images().size)
 
         // run out
-        console("user pair mali --png")
+        showPairing("mali", png = true)
         assertEquals(1, images().size)
         clock.advance(Duration.ofMinutes(11))
         assertEquals(0, auth.pairing.pendingCount())

@@ -5,7 +5,9 @@ import xyz.felismp.shoparchive.api.ApiError
 import xyz.felismp.shoparchive.shared.DeviceMode
 import xyz.felismp.shoparchive.shared.EnrollRequest
 import xyz.felismp.shoparchive.shared.ErrorCode
+import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.ErrorResponse
+import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.RedeemRequest
 import xyz.felismp.shoparchive.shared.UnlockRequest
 import java.nio.file.Files
@@ -387,7 +389,7 @@ class AccountPolicyTest {
     // --- user reset, devices ---
 
     @Test
-    fun userResetTakesTheUserOffEveryDeviceClearsPasswordAndPinAndShowsANewPairingOnTheTerminalOnly() {
+    fun userResetTakesTheUserOffEveryDeviceClearsPasswordAndPinAndShowsNoPairing() {
         val env = AuthEnv(root, backoff(startSeconds = 60))
         val phone = env.enroll("mali")
         val shared = env.enroll("mali", DeviceMode.SHARED)
@@ -398,11 +400,10 @@ class AccountPolicyTest {
 
         val replies = env.console("user reset mali")
 
-        assertEquals("User 'mali' reset: off 2 devices, password and PIN cleared", replies.first())
-        assertEquals("Pairing for 'mali' is shown on the console only, not in the log.", replies.last())
-        assertTrue(replies.none { "shoparchive://" in it || "Manual code" in it }, replies.toString())
-        assertTrue(env.terminal.any { it.startsWith("Link: shoparchive://pair?d=") })
-        assertTrue(env.terminal.any { it.startsWith("Manual code: ") })
+        assertEquals(listOf("User 'mali' reset: off 2 devices, password and PIN cleared. They set a new PIN at their next login."), replies)
+        assertTrue(replies.none { "shoparchive://" in it || "Manual code" in it || '█' in it }, replies.toString())
+        assertTrue(env.terminal.isEmpty(), env.terminal.toString())
+        assertEquals(0, env.auth.pairing.pendingCount())
         assertFalse("  mali:" in deviceFile(phone.deviceId))
         assertFalse("  mali:" in deviceFile(shared.deviceId))
         assertTrue("  kham:" in deviceFile(shared.deviceId))
@@ -414,8 +415,10 @@ class AccountPolicyTest {
         assertNull(env.authService().authenticate(token))
         assertEquals(401, assertFailsWith<ApiError> { env.unlock(phone, "mali") }.status)
         assertContains(env.audit(), "account.reset user=mali")
-        // The pairing works: the user chooses a new PIN, and the other user of the shared device is untouched.
-        env.unlock(env.enroll("mali"), "mali")
+        // The user chooses a new PIN at the next login, and the other user of the shared device is untouched.
+        val pinNotSet = assertFailsWith<ApiError> { env.authService().login(LoginRequest("mali", "Phone", "android", DeviceMode.PERSONAL), "127.0.0.1") }
+        assertEquals(ErrorReasons.PIN_NOT_SET, pinNotSet.reason)
+        env.unlock(env.authService().login(LoginRequest("mali", "Phone", "android", DeviceMode.PERSONAL, newPin = TEST_PIN), "127.0.0.1"), "mali")
         env.unlock(kham, "kham")
         // An unknown user changes nothing.
         assertEquals(listOf("No user 'nobody'"), env.console("user reset nobody"))
@@ -432,7 +435,8 @@ class AccountPolicyTest {
         env.console("user reset mali")
 
         assertTrue(env.users.find("mali")!!.enabled)
-        assertTrue(env.terminal.any { it.startsWith("Link: shoparchive://pair?d=") })
+        assertTrue(env.terminal.isEmpty())
+        env.authService().login(LoginRequest("mali", "Phone", "android", DeviceMode.PERSONAL, newPin = TEST_PIN), "127.0.0.1")
     }
 
     @Test

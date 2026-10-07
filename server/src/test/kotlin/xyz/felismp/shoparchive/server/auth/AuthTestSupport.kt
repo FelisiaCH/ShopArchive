@@ -161,6 +161,9 @@ internal class AuthEnv(
     /** What the console printed for the secrets: the pairing text, one entry per line. */
     val terminal = mutableListOf<String>()
 
+    /** Shows pairings like the server's console does, printing to [terminal]. */
+    val pairingConsole: PairingConsole
+
     init {
         prepareRoot(root)
         // Most tests make many wrong tries in a row and must not wait between them; the backoff tests say so in their own config.
@@ -185,13 +188,13 @@ internal class AuthEnv(
             hasher ?: Hasher(settings.auth.hashConcurrency, TEST_COST), records ?: NoRecords, barrier,
         )
         services.register(CommandService::class.java, DefaultCommandService(commands, auth.audit, services), 0, "core")
-        val console = PairingConsole(root, settings, auth.pairing) { terminal += it }
+        pairingConsole = PairingConsole(root, settings, auth.pairing) { terminal += it }
         registerCoreCommands(
             commands, settings, mapOf("devices" to auth.devices::load) + (if (records != null) mapOf("data" to records::loadData) else emptyMap()),
             alsoOnReload = setOf("devices"),
         )
-        val accounts = AccountConsole(users, auth.devices, auth.sessions, auth.audit, auth.pairing, console, barrier)
-        registerUserCommands(commands, users, console::show, accounts::reset, accounts::disable)
+        val accounts = AccountConsole(users, auth.devices, auth.sessions, auth.audit, barrier)
+        registerUserCommands(commands, users, accounts::reset, accounts::disable)
         accounts.register(commands)
         registerSayCommand(commands, services)
         if (records != null) registerRecordCommands(commands, records)
@@ -202,6 +205,13 @@ internal class AuthEnv(
     fun console(line: String): List<String> {
         sender.messages.clear()
         commands.run(sender, line)
+        return sender.messages.toList()
+    }
+
+    /** Shows a pairing for [name] as the console does and returns what it said to the sender. */
+    fun showPairing(name: String, png: Boolean = false): List<String> {
+        sender.messages.clear()
+        pairingConsole.show(sender, name, png)
         return sender.messages.toList()
     }
 

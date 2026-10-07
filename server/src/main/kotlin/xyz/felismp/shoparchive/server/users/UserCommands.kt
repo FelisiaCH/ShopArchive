@@ -30,23 +30,19 @@ private fun parseBool(word: String): Boolean = when (word) {
     else -> throw UserException("Expected true or false, not '$word'")
 }
 
-/** Shows a pairing for a user on the console: the sender, the user name, and whether to also write a QR image. */
-internal typealias ShowPairing = (CommandSender, String, Boolean) -> Unit
-
-/** Starts an account over (no devices, no password, no PIN) and shows a new pairing for it. */
+/** Starts an account over (no devices, no password, no PIN); the user sets a new PIN at their next login. */
 internal typealias ResetUser = (CommandSender, String) -> Unit
 
-/** `user`, `perm`, `role`, `op` and `deop`, registered like any plugin command. Without [pairing] there is no `user pair`, without [reset] no `user reset`; [disable] also revokes the grants and pairings of the account (same type as [reset]). */
-internal fun registerUserCommands(commands: CommandRegistry, users: UserStore, pairing: ShowPairing? = null, reset: ResetUser? = null, disable: ResetUser? = null) {
+/** `user`, `perm`, `role`, `op` and `deop`, registered like any plugin command. Without [reset] there is no `user reset`; [disable] also revokes the grants of the account (same type as [reset]). */
+internal fun registerUserCommands(commands: CommandRegistry, users: UserStore, reset: ResetUser? = null, disable: ResetUser? = null) {
     val bools = listOf("true", "false")
 
-    commands.register(UserCommand("user", "Manage users: add, pair, list, info, enable, disable, unlock, reset, rename, role, branch", { sender, args -> userCommand(users, sender, args, pairing, reset, disable) }) { args ->
+    commands.register(UserCommand("user", "Manage users: add, list, info, enable, disable, unlock, reset, rename, role, branch", { sender, args -> userCommand(users, sender, args, reset, disable) }) { args ->
         val sub = args.first()
         when {
-            args.size == 1 -> listOf("add", "pair", "list", "info", "enable", "disable", "unlock", "reset", "rename", "role", "branch")
+            args.size == 1 -> listOf("add", "list", "info", "enable", "disable", "unlock", "reset", "rename", "role", "branch")
             sub == "add" -> addCompletion(users, args)
-            sub == "pair" && args.size == 3 -> listOf("--png")
-            args.size == 2 && sub in setOf("pair", "info", "enable", "disable", "unlock", "reset", "rename", "role", "branch") -> users.userNames()
+            args.size == 2 && sub in setOf("info", "enable", "disable", "unlock", "reset", "rename", "role", "branch") -> users.userNames()
             args.size == 3 && sub == "role" -> users.roleNames() + NO_ROLE
             args.size == 3 && sub == "branch" -> listOf("add", "remove")
             args.size == 4 && sub == "branch" && args[2] == "remove" -> runCatching { users.user(args[1]).branches }.getOrDefault(emptyList())
@@ -91,21 +87,17 @@ private fun addCompletion(users: UserStore, args: List<String>): List<String> {
     }
 }
 
-private fun userCommand(users: UserStore, sender: CommandSender, args: List<String>, pairing: ShowPairing?, reset: ResetUser?, disable: ResetUser?) {
+private fun userCommand(users: UserStore, sender: CommandSender, args: List<String>, reset: ResetUser?, disable: ResetUser?) {
     val rest = args.drop(1)
     when (args.firstOrNull()) {
         "add" -> {
             if (rest.isEmpty()) usage("user add <name> [--role <role>] [--branch <branch>...]")
             val (role, branches) = parseAddFlags(rest.drop(1))
             users.addUser(rest[0], role, branches)
-            sender.sendMessage("User '${rest[0]}' created" + (if (role != NO_ROLE) ", role $role" else "") + (if (branches.isNotEmpty()) ", branches ${branches.joinToString()}" else ""))
-            pairing?.invoke(sender, rest[0], false)
-        }
-        "pair" -> {
-            if (pairing == null) usage("user add|list|info|enable|disable|rename|role|branch ...")
-            if (rest.isEmpty() || rest.size > 2 || (rest.size == 2 && rest[1] != "--png")) usage("user pair <name> [--png]")
-            users.user(rest[0]) // "No user" before a pairing is made
-            pairing(sender, rest[0], rest.size == 2)
+            sender.sendMessage(
+                "User '${rest[0]}' created" + (if (role != NO_ROLE) ", role $role" else "") + (if (branches.isNotEmpty()) ", branches ${branches.joinToString()}" else "") +
+                    ". They open the app, type the name '${rest[0]}' and set their own PIN.",
+            )
         }
         "list" -> {
             if (users.userNames().isEmpty()) sender.sendMessage("No users yet. Create one with: user add <name>")
@@ -157,7 +149,7 @@ private fun userCommand(users: UserStore, sender: CommandSender, args: List<Stri
             if (rest[1] == "add") users.addBranch(rest[0], rest[2]) else users.removeBranch(rest[0], rest[2])
             sender.sendMessage("User '${rest[0]}': branch '${rest[2]}' ${if (rest[1] == "add") "added" else "removed"}")
         }
-        else -> usage("user add|pair|list|info|enable|disable|unlock|reset|rename|role|branch ...")
+        else -> usage("user add|list|info|enable|disable|unlock|reset|rename|role|branch ...")
     }
 }
 

@@ -13,18 +13,15 @@ internal class AccountConsole(
     private val devices: DeviceStore,
     private val sessions: Sessions,
     private val audit: AuditLog,
-    private val pairings: DefaultPairingService,
-    private val pairing: PairingConsole,
     private val barrier: DataBarrier = DataBarrier(),
 ) {
     /**
-     * Takes the user off every device, clears the password and PIN, ends the access tokens, and shows a new pairing (terminal only).
-     * The grants and pairings made before go first, under the enroll lock: with credentials gone, whoever still held one could
-     * enroll with a PIN of their own choosing. Only the pairing shown at the end is good.
+     * Takes the user off every device, clears the password and PIN, and ends the access tokens; the user sets a new PIN at their next login.
+     * The grants made before go first, under the enroll lock: with credentials gone, whoever still held one could enroll with a PIN of their own choosing.
      */
     fun reset(sender: CommandSender, name: String) {
         val user = users.user(name)
-        // From the app the reset would end the very session the new pairing is asked with, leaving no way back in.
+        // From the app the reset would end the very session it is asked from, and the op's own device with it.
         if (sender is RemoteSender && sender.principal.userId == user.id) {
             sender.sendMessage("Your own account can only be reset on the server console.")
             return
@@ -33,7 +30,6 @@ internal class AccountConsole(
         val removed = barrier.mutate {
             sessions.withAccount(user.id) {
                 sessions.revokeEnrollments(user.id)
-                pairings.cancel(user.id)
                 val removed = devices.removeAccount(user.id)
                 users.resetCredentials(name)
                 sessions.revokeAccess(user.id, null)
@@ -41,16 +37,14 @@ internal class AccountConsole(
             }
         }
         audit.record("account.reset", name, null, "console", "ok,devices=$removed")
-        sender.sendMessage("User '$name' reset: off $removed ${if (removed == 1) "device" else "devices"}, password and PIN cleared")
-        pairing.show(sender, name, png = false)
+        sender.sendMessage("User '$name' reset: off $removed ${if (removed == 1) "device" else "devices"}, password and PIN cleared. They set a new PIN at their next login.")
     }
 
-    /** `user disable`: a disabled account must not be enrollable, and enabling it again must not bring back a grant or pairing made before. */
+    /** `user disable`: a disabled account must not be enrollable, and enabling it again must not bring back a grant made before. */
     fun disable(sender: CommandSender, name: String) {
         val user = users.user(name)
         sessions.withAccount(user.id) {
             sessions.revokeEnrollments(user.id)
-            pairings.cancel(user.id)
             users.setEnabled(name, false)
         }
         sender.sendMessage("User '$name' disabled")

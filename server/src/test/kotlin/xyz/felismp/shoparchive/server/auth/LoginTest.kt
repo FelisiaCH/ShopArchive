@@ -93,6 +93,37 @@ class LoginTest {
     }
 
     @Test
+    fun aUserMadeWithUserAddLogsInWithTheNameAndSetsTheirOwnPin() = AuthEnv(root).run {
+        console("user add staff1")
+        api {
+            val notSet = login(loginRequest("staff1"))
+            assertEquals(HttpStatusCode.Unauthorized, notSet.status)
+            assertEquals(ErrorReasons.PIN_NOT_SET, notSet.errorReason())
+
+            val device = loggedIn(loginRequest("staff1", newPin = TEST_PIN))
+            assertEquals(HttpStatusCode.OK, unlock(device, "staff1", TEST_PIN).status)
+        }
+    }
+
+    @Test
+    fun afterUserResetTheOldDeviceIsDeadAndTheUserSetsANewPinAtLogin() = AuthEnv(root).run {
+        addUser("staff1")
+        api {
+            val old = loggedIn(loginRequest("staff1", newPin = TEST_PIN))
+
+            console("user reset staff1")
+
+            assertEquals(HttpStatusCode.Unauthorized, unlock(old, "staff1", TEST_PIN).status)
+            val notSet = login(loginRequest("staff1"))
+            assertEquals(HttpStatusCode.Unauthorized, notSet.status)
+            assertEquals(ErrorReasons.PIN_NOT_SET, notSet.errorReason())
+            val device = loggedIn(loginRequest("staff1", newPin = OTHER_PIN))
+            assertEquals(HttpStatusCode.OK, unlock(device, "staff1", OTHER_PIN).status)
+            assertEquals(0, auth.pairing.pendingCount(), "no pairing was made")
+        }
+    }
+
+    @Test
     fun twoParallelFirstLoginsSetOnePin() {
         // Both requests are under way when the first one reaches the hash; with the account lock the second waits, so this times out.
         val bothIn = CountDownLatch(2)

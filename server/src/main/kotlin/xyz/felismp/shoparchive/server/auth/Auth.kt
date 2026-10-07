@@ -81,7 +81,7 @@ internal class Auth(
 
     val pairing = DefaultPairingService(root, config, users, policy, sessions, audit, services, serverId, endpoints, clock)
     val console = PairingConsole(root, config, pairing)
-    val accounts = AccountConsole(users, devices, sessions, audit, pairing, console, barrier)
+    val accounts = AccountConsole(users, devices, sessions, audit, barrier)
 
     init {
         // The device files are keyed by name for the admin to read; the account behind a block is its user-id, and the name follows a rename.

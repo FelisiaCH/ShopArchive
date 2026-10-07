@@ -91,7 +91,7 @@ class UsersTest {
 
         val reply = run("user add noy --role cashier --branch market")
 
-        assertEquals(listOf("User 'noy' created, role cashier, branches market"), reply)
+        assertEquals(listOf("User 'noy' created, role cashier, branches market. They open the app, type the name 'noy' and set their own PIN."), reply)
         val lines = content("user/noy.yml")
         assertEquals(
             listOf("file-version: 1", "id:", "display-name: \"noy\"", "enabled: true", "op: false", "role: cashier",
@@ -603,6 +603,8 @@ class UsersTest {
         assertEquals(listOf("search"), commands.complete(listOf("perm", "s")))
         assertEquals(listOf("cashier"), commands.complete(listOf("role", "perm", "c")))
         assertEquals(listOf("noy"), commands.complete(listOf("op", "noy")))
+        assertEquals(emptyList(), commands.complete(listOf("user", "pa")), "there is no user pair")
+        assertEquals(emptyList(), commands.complete(listOf("user", "pair", "no")))
         assertEquals(listOf("users"), commands.complete(listOf("reload", "u")))
     }
 
