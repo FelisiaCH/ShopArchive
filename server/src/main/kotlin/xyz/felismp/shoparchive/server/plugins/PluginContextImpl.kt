@@ -252,7 +252,9 @@ internal class PluginContextImpl(
                 return
             }
             Files.createDirectories(dataFolder)
-            writeAtomically(configFile, resource.openStream().use { it.readBytes() })
+            // Not through the JVM's jar cache: a cached connection keeps the plugin's jar open (locked, on Windows) after its loader is closed.
+            val connection = resource.openConnection().apply { useCaches = false }
+            writeAtomically(configFile, connection.getInputStream().use { it.readBytes() })
         }
         reloadConfig()
     }

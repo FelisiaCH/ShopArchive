@@ -24,8 +24,12 @@ class DataFixTest {
 
     private val folder get() = root.resolve("data/datafix/Fix-fix1")
 
+    /** Disabled at the end, which closes the plugin jars (on Windows the temp folder cannot be deleted while they are open). */
+    private val managers = mutableListOf<PluginManager>()
+
     @AfterTest
-    fun clearMode() {
+    fun tearDown() {
+        managers.forEach { it.disableAll() }
         System.clearProperty("testplugins.datafix")
     }
 
@@ -45,6 +49,7 @@ class DataFixTest {
             root, PluginSettings(requireApproval = false), Services(), Commands(), Permissions(),
             clock = Clock.fixed(Instant.parse("2026-03-04T05:06:07Z"), ZoneOffset.UTC),
         )
+        managers += manager
         manager.loadAll()
         manager.enableAll()
         return manager.entries.single()

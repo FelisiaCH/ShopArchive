@@ -61,7 +61,8 @@ class UpdatesApiTest {
         download("notes.txt", "ignored")
         download("ShopArchive-1.0.1.zip", "ignored")
         download("ShopArchive-latest.apk", "ignored")
-        download("shoparchive-1.0.1.apk", "ignored")
+        // Not shoparchive-1.0.1.apk: on a file system that ignores case (Windows) that would overwrite ShopArchive-1.0.1.apk.
+        download("shoparchive-1.0.2.apk", "ignored")
         val token = login("noy")
         api {
             val files = getPath("/api/v1/updates", token).parsed(ListSerializer(UpdateFile.serializer()))

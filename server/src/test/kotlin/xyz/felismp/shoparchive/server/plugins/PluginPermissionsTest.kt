@@ -14,6 +14,7 @@ import xyz.felismp.shoparchive.server.config.text
 import xyz.felismp.shoparchive.server.users.UserStore
 import xyz.felismp.shoparchive.server.users.registerUserCommands
 import java.nio.file.Path
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -29,13 +30,21 @@ class PluginPermissionsTest {
         override fun sendMessage(message: String) { messages += message }
     }
 
+    /** Disabled at the end, which closes the plugin jars (on Windows the temp folder cannot be deleted while they are open). */
+    private var manager: PluginManager? = null
+
+    @AfterTest
+    fun tearDown() {
+        manager?.disableAll()
+    }
+
     private fun startServerPartsWith(vararg jars: Pair<String, String>): Pair<UserStore, Commands> {
         prepareRoot(root)
         // (plugin name, main class of a fixture under testplugins/<package>/)
         jars.forEach { (name, main) -> buildPluginJar(root.resolve("plugins/$name.jar"), main.split('.')[1], pluginYml(name, main)) }
         val nodes = Permissions()
         val commands = Commands()
-        PluginManager(root, PluginSettings(requireApproval = false), Services(), commands, nodes).loadAll()
+        manager = PluginManager(root, PluginSettings(requireApproval = false), Services(), commands, nodes).also { it.loadAll() }
         val config = ConfigService(root, log = RecordingLog(), clock = FIXED_CLOCK).also { it.load() }
         val users = UserStore(root, nodes, config, RecordingLog(), FIXED_CLOCK).also { it.load() }
         registerUserCommands(commands, users)

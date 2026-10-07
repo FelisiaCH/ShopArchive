@@ -30,6 +30,7 @@ import xyz.felismp.shoparchive.shared.PROTOCOL_HEADER
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import java.lang.reflect.Proxy
 import java.nio.file.Path
+import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -67,6 +68,10 @@ class PluginRoutesTest {
         manager = PluginManager(root, PluginSettings(requireApproval = false, disableTimeoutMs = 2_000), services, Commands(), Permissions())
         services.register(PluginRouteService::class.java, DefaultPluginRouteService(manager.routes, services), 0, "core")
     }
+
+    /** Closes the plugin jars (on Windows the temp folder cannot be deleted while they are open). */
+    @AfterTest
+    fun tearDown() = manager.disableAll()
 
     private fun jar(name: String, pkg: String, main: String) = buildPluginJar(plugins.resolve("$name.jar"), pkg, pluginYml(name, main))
 

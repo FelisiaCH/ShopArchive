@@ -265,21 +265,32 @@ internal class PluginManager(
         }
     }
 
-    /** False if `onDisable` was still running when the time was up. */
+    /** False if `onDisable` was still running when the time was up; its loader is then closed when it does return. */
     private fun runWithTimeout(entry: PluginEntry): Boolean {
+        val lock = Any()
+        var finished = false
+        var abandoned = false
         val thread = Thread({
             try {
                 entry.instance?.onDisable()
             } catch (e: Throwable) {
                 val context = entry.context
                 Log.error("Plugin ${entry.displayName}: onDisable threw ${e.javaClass.simpleName}: ${context?.maskSecrets(e.message.orEmpty()) ?: e.message}", context?.maskSecrets(e) ?: e)
+            } finally {
+                synchronized(lock) {
+                    finished = true
+                    if (abandoned) closeLoader(entry)
+                }
             }
         }, "plugin-disable-${entry.displayName}")
         thread.isDaemon = true
         thread.contextClassLoader = entry.loader
         thread.start()
         thread.join(settings.disableTimeoutMs.toLong())
-        return !thread.isAlive
+        synchronized(lock) {
+            if (!finished) abandoned = true
+            return finished
+        }
     }
 
     override fun names(): List<String> = synchronized(this) { enabledPlugins().map { it.displayName } }

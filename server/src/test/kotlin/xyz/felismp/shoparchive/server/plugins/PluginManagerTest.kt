@@ -31,6 +31,9 @@ class PluginManagerTest {
     private val plugins get() = root.resolve("plugins")
     private val hello = "testplugins.hello.HelloPlugin"
 
+    /** Every start of a test: its plugins are disabled at the end, which closes their jars (on Windows the temp folder cannot be deleted while they are open). */
+    private val starts = mutableListOf<Start>()
+
     /** What one server start sees: fresh registries (the core's own service in them), and a manager over [root]. */
     private inner class Start(
         settings: PluginSettings = PluginSettings(requireApproval = false, disableTimeoutMs = 2_000),
@@ -50,6 +53,10 @@ class PluginManagerTest {
             hostKotlin = hostKotlin, apiVersion = apiVersion,
             clock = Clock.fixed(Instant.parse("2026-01-02T03:04:05Z"), ZoneOffset.UTC),
         )
+
+        init {
+            starts += this
+        }
 
         fun run(): Start {
             manager.loadAll()
@@ -72,7 +79,8 @@ class PluginManagerTest {
         jar("$name.jar", "plain", pluginYml(name, "testplugins.plain.PlainPlugin", apiVersion = apiVersion, depend = depend, softdepend = soft))
 
     @AfterTest
-    fun clearOrderFile() {
+    fun tearDown() {
+        starts.forEach { it.manager.disableAll() }
         System.clearProperty("testplugins.orderFile")
         System.clearProperty("testplugins.leak")
         xyz.felismp.shoparchive.server.Log.close()
@@ -391,6 +399,9 @@ class PluginManagerTest {
         assertEquals(PluginState.DISABLED, start.state("Slow"))
         // The slow one did not stop the others from being disabled.
         assertContains(Files.readAllLines(plugins.resolve("Hello/events.txt")), "disable")
+        // Once its onDisable does return, its jar is closed too.
+        Thread.getAllStackTraces().keys.filter { it.name == "plugin-disable-Slow" }.forEach { it.join() }
+        assertNull(start.entry("Slow").loader!!.ownResource("plugin.yml"))
     }
 
     @Test
@@ -584,7 +595,7 @@ class PluginManagerTest {
     @Test
     fun snapshotsOfEarlierRunsAreDeletedAtTheNextStart() {
         val jar = helloJar()
-        Start().run()
+        Start().run().manager.disableAll() // the earlier run has ended: it holds no snapshot open
         val first = Files.list(root.resolve("cache/plugins")).use { it.toList() }.single()
         helloJar(version = "2.0")
         Start().run()

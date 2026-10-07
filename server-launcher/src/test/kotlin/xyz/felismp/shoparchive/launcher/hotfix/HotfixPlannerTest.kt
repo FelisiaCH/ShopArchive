@@ -4,6 +4,7 @@ import xyz.felismp.shoparchive.launcher.ShopArchiveClassLoader
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -15,6 +16,12 @@ import org.junit.jupiter.api.io.TempDir
 class HotfixPlannerTest {
     @TempDir
     lateinit var root: Path
+
+    /** Every loader a test opened: each holds its jars open (on Windows the temp folder cannot be deleted until they are closed). */
+    private val loaders = mutableListOf<ShopArchiveClassLoader>()
+
+    @AfterTest
+    fun closeLoaders() = loaders.forEach { it.close() }
 
     private fun plan(build: Int = 5, fixed: String = "", noPatches: Boolean = false, ignore: Set<String> = emptySet()): HotfixPlan {
         val core = coreJar(root.resolve("core"), build, fixed)
@@ -33,7 +40,7 @@ class HotfixPlannerTest {
         // The core's own libraries (here: the Kotlin runtime the fixture class links against) sit next to it in the real loader.
         val stdlib = Unit::class.java.protectionDomain.codeSource.location
         val urls = ((listOf(root.resolve("core/core.jar").toFile()) + plan.extraJars).map { it.toURI().toURL() } + stdlib).toTypedArray()
-        val loader = ShopArchiveClassLoader(urls, platform, plan.patched)
+        val loader = ShopArchiveClassLoader(urls, platform, plan.patched).also { loaders += it }
         return loader.loadClass(TARGET_CLASS).getDeclaredConstructor().newInstance()
     }
 
@@ -56,8 +63,8 @@ class HotfixPlannerTest {
     fun theOriginalBytesStayReadableAsAResource() {
         install("Fix1")
         val plan = plan()
-        val loader = ShopArchiveClassLoader(arrayOf(root.resolve("core/core.jar").toUri().toURL()), ClassLoader::class.java.getMethod("getPlatformClassLoader").invoke(null) as ClassLoader, plan.patched)
-        val bytes = loader.getResourceAsStream("$TARGET_INTERNAL.class")!!.readBytes()
+        val loader = ShopArchiveClassLoader(arrayOf(root.resolve("core/core.jar").toUri().toURL()), ClassLoader::class.java.getMethod("getPlatformClassLoader").invoke(null) as ClassLoader, plan.patched).also { loaders += it }
+        val bytes = loader.getResourceAsStream("$TARGET_INTERNAL.class")!!.use { it.readBytes() }
         assertEquals(sha256(targetBytes()), sha256(bytes))
         assertNotEquals(sha256(targetBytes()), sha256(plan.patched.getValue(TARGET_CLASS).bytes))
     }
