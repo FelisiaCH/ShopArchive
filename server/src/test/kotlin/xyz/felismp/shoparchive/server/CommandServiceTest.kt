@@ -8,6 +8,7 @@ import xyz.felismp.shoparchive.api.CommandSender
 import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.server.auth.AuthEnv
 import xyz.felismp.shoparchive.server.auth.NO_BACKOFF
+import xyz.felismp.shoparchive.server.auth.TEST_PASSWORD
 import xyz.felismp.shoparchive.server.auth.TEST_PIN
 import xyz.felismp.shoparchive.server.auth.api
 import xyz.felismp.shoparchive.server.auth.authService
@@ -23,6 +24,7 @@ import xyz.felismp.shoparchive.shared.CompleteResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.ReauthRequest
+import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
 import kotlin.test.Test
@@ -86,21 +88,70 @@ class CommandServiceTest {
     }
 
     @Test
-    fun anOpHoldsEveryCommandNodeButOpAndDeopAreNeverRunOverHttp() = env().run {
+    fun noCommandIsConsoleOnlyNowAndAnOpRunsOpAndDeopFromTheApp() = env().run {
+        assertEquals(emptySet(), CONSOLE_ONLY_COMMANDS)
         val boss = login("boss", op = true)
-        addUser("noy")
+        addUser("staff1")
         api {
-            for (line in listOf("op noy", "deop boss", "OP noy")) {
-                val refused = runLine(line, boss)
+            val made = runLine("op staff1", boss)
+            assertEquals(HttpStatusCode.OK, made.status)
+            assertEquals(listOf("staff1 is an op now: every permission"), made.parsed(CommandResponse.serializer()).lines)
+            assertTrue(users.user("staff1").op)
+            assertContains(Files.readString(root.resolve("user/staff1.yml")), "op: true")
+
+            assertEquals(HttpStatusCode.OK, runLine("deop staff1", boss).status)
+            assertFalse(users.user("staff1").op)
+            assertContains(Files.readString(root.resolve("user/staff1.yml")), "op: false")
+            assertContains(audit(), "result=op_staff1")
+            assertContains(audit(), "result=deop_staff1")
+            assertEquals(HttpStatusCode.OK, runLine("user add zed", boss).status)
+            assertNotNull(users.find("zed"))
+        }
+    }
+
+    @Test
+    fun aNonOpWithTheOpNodeCannotRunOpOrDeop() = env().run {
+        login("boss", op = true)
+        val noy = login("noy", grant = listOf("shoparchive.command.op", "shoparchive.command.deop"))
+        api {
+            for (line in listOf("op noy", "deop boss")) {
+                val refused = runLine(line, noy)
                 assertEquals(HttpStatusCode.Forbidden, refused.status, line)
-                assertEquals(ErrorReasons.COMMAND_CONSOLE_ONLY, refused.errorReason(), line)
+                assertEquals(ErrorReasons.PERMISSION_MISSING, refused.errorReason(), line)
             }
             assertFalse(users.user("noy").op)
             assertTrue(users.user("boss").op)
-            assertEquals(emptyList(), candidates("deo", boss), "deop is not offered")
-            assertEquals(HttpStatusCode.OK, runLine("user add zed", boss).status)
-            assertNotNull(users.find("zed"))
-            assertFalse(audit().contains("result=op_noy"), "a refused line is not a run")
+            assertFalse("command.run" in audit(), "a refused line is not a run")
+        }
+    }
+
+    @Test
+    fun anOpWithoutARecentReauthIsAskedForItBeforeOp() = env().run {
+        val boss = login("boss", op = true)
+        addUser("staff1")
+        api {
+            clock.advance(Duration.ofMinutes(6))
+            val asked = runLine("op staff1", boss)
+            assertEquals(HttpStatusCode.Unauthorized, asked.status)
+            assertEquals(ErrorCode.REAUTH_REQUIRED, asked.errorCode())
+            assertFalse(users.user("staff1").op)
+
+            postJson("/api/v1/reauth", ReauthRequest.serializer(), ReauthRequest(pin = TEST_PIN, password = TEST_PASSWORD), boss)
+            assertEquals(HttpStatusCode.OK, runLine("op staff1", boss).status)
+            assertTrue(users.user("staff1").op)
+        }
+    }
+
+    @Test
+    fun completionOffersOpAndDeopToAnOpAndNotToANonOp() = env().run {
+        val boss = login("boss", op = true)
+        val noy = login("noy", grant = listOf("shoparchive.command.op", "shoparchive.command.deop", "shoparchive.command.version"))
+        api {
+            assertTrue("op" in candidates("", boss) && "deop" in candidates("", boss), candidates("", boss).toString())
+            assertEquals(listOf("deop"), candidates("deo", boss))
+            assertEquals(listOf("noy"), candidates("op no", boss))
+            assertEquals(listOf("version"), candidates("", noy))
+            assertEquals(HttpStatusCode.Forbidden, completeLine("op ", noy).status)
         }
     }
 
@@ -242,5 +293,6 @@ class CommandServiceTest {
         assertEquals(emptyList(), missing.map { it.name })
         assertTrue(nodes.all().filter { it.node.startsWith("shoparchive.command.") }.none { it.default })
         assertEquals("shoparchive.command.user", commands.find("user")!!.permission)
+        assertTrue(nodes.all().any { it.node == "shoparchive.command.op" } && nodes.all().any { it.node == "shoparchive.command.deop" })
     }
 }

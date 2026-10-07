@@ -19,14 +19,17 @@ import java.util.Locale
 /** The commands the core registers that a user may be given in the app; each gets the node `shoparchive.command.<name>`, off for everyone but an op. */
 private val APP_COMMANDS = listOf(
     "help", "version", "status", "stop", "reload", "plugins", "backup", "say", "ban-ip", "pardon-ip", "notify",
-    "branch", "category", "records", "export", "user", "perm", "role", "devices",
+    "branch", "category", "records", "export", "user", "perm", "role", "devices", "op", "deop",
 )
 
-/** What changes who is an admin is not something a stolen, still-unlocked phone may do: only the console runs these. */
-internal val CONSOLE_ONLY_COMMANDS = setOf("op", "deop")
+/** The core commands only the console runs, never the app. None at the moment; the check stays for a command that needs it. */
+internal val CONSOLE_ONLY_COMMANDS = emptySet<String>()
 
-/** What manages accounts, roles and devices is not for anyone but an op, whatever node they hold: with `user reset` or `perm` a user would become the op. */
-internal val OP_ONLY_COMMANDS = setOf("user", "perm", "role", "devices")
+/**
+ * What manages accounts, roles, devices and who is an admin is not for anyone but an op, whatever node they hold: with `user reset`,
+ * `perm` or `op` a user would become the op. Like every command from the app, these need the PIN or password entered recently.
+ */
+internal val OP_ONLY_COMMANDS = setOf("user", "perm", "role", "devices", "op", "deop")
 
 /** The word an op alone holds: [xyz.felismp.shoparchive.server.users.UserStore] gives an op every node, registered or not (as `auth.password.required-for` reads it). */
 private const val OP_NODE = "op"
@@ -71,7 +74,7 @@ private class AppSender(override val principal: Principal, override val ip: Stri
 
 /**
  * `POST /api/v1/command`: a user in the app runs the commands the console runs. Each command is checked against its own node
- * ([Command.permission]); `op` and `deop` are never run here, and [OP_ONLY_COMMANDS] only by an op. Like deleting an entry it needs the PIN or password entered recently, and
+ * ([Command.permission]); [OP_ONLY_COMMANDS] (`op` and `deop` among them) only by an op, and [CONSOLE_ONLY_COMMANDS] never. Like deleting an entry it needs the PIN or password entered recently, and
  * every run is written to the audit log with the line as typed.
  */
 internal class DefaultCommandService(
