@@ -17,6 +17,7 @@ import xyz.felismp.shoparchive.shared.EnrollRequest
 import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
+import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.Refusal
 import xyz.felismp.shoparchive.shared.ReauthRequest
 import xyz.felismp.shoparchive.shared.UnlockRequest
@@ -79,73 +80,49 @@ internal class DefaultAuthService(
             // The account got a credential this request meant to set (it brings a new one and no proof of an old one): another
             // grant was first. Not a wrong secret - the token stays good, and the app asks for the existing PIN or password.
             if ((hasPassword && request.password == null && request.newPassword != null) || (hasPin && request.pin == null && request.newPin != null)) {
-                throw credentialsChanged(username, request.deviceId, ip)
+                throw credentialsChanged(username, request.deviceId, ip, "enroll")
             }
 
             // The device first, before any secret is looked at: a device that is not accepted costs the enrollment one wrong try
             // and the account none, and the PIN of whoever is typing is not tested against it.
-            val existing = request.deviceId?.let { id ->
-                val device = devices.get(id)
-                val owner = request.deviceCredential?.let { devices.ownerOf(id, it) }
-                if (device == null || owner == null || users.findById(owner)?.second?.enabled != true) {
-                    wrongSecret(enrollmentToken, enrollment, username, id, ip, deviceNotRecognized = true)
-                }
-                id to device
-            }
+            val existing = existingDevice(request) { id -> wrongSecret(enrollmentToken, enrollment, username, id, ip, deviceNotRecognized = true) }
 
             // What the user already has must be proven first: whoever holds a pairing is not thereby the user.
-            val proves = hasPassword || hasPin
-            if (proves) backoff.requireNotLocked(user, "enroll", username, request.deviceId, ip)
-            val passwordOk = !hasPassword || checkExisting(request.password, user.password, password = true)
-            val pinOk = !hasPin || checkExisting(request.pin, user.pin, password = false)
-            if (!passwordOk || !pinOk) {
-                backoff.failed(user.id, username, request.deviceId, ip)
-                wrongSecret(enrollmentToken, enrollment, username, request.deviceId, ip)
-            }
-            if (proves) backoff.succeeded(user)
+            proveExisting(username, user, request, "enroll", ip) { wrongSecret(enrollmentToken, enrollment, username, request.deviceId, ip) }
+            val secrets = newSecrets(username, user, request)
+            return addToDevice(username, user, request, existing, secrets, "enroll", ip) { sessions.endEnrollment(enrollmentToken) }
+        }
+    }
 
-            val newPassword = if (!hasPassword && policy.passwordRequired(username)) {
-                policy.checkPassword(request.newPassword)?.let { throw invalid(it) }
-                hasher.hash(normalizePassword(request.newPassword!!))
-            } else {
-                null
+    override fun login(request: LoginRequest, ip: String): EnrollResponse {
+        val username = request.username.takeIf { it.length <= 32 && isValidUserName(it) }
+        val found = username?.let(users::find)?.takeIf { it.enabled }
+        // Unknown, disabled or not a name at all: the same work and the same answer as a wrong PIN.
+        val unknown = {
+            hasher.verify("-", null)
+            audit.record("login.fail", username, request.deviceId, ip, "unknown")
+            unauthorized("Login failed.")
+        }
+        if (username == null || found == null) throw unknown()
+        // The same lock as enroll: two first logins must not both find the account without a PIN and each set one.
+        return sessions.withAccount(found.id) {
+            // Read again under the lock: what the account has is decided here. A rename meanwhile makes the name unknown.
+            val user = users.findFreshById(found.id)?.takeIf { it.first == username && it.second.enabled }?.second ?: throw unknown()
+            // The device first: a device that is not accepted costs the account no wrong try, and the PIN is not tested against it.
+            val shared = request.asEnroll()
+            val existing = existingDevice(shared) { id ->
+                audit.record("login.fail", username, id, ip, "device-not-recognized")
+                throw ApiError(401, ErrorCode.DEVICE_NOT_RECOGNIZED, "This device is not recognized for that user.")
             }
-            val newPin = if (!hasPin) {
-                policy.checkPin(request.newPin)?.let { throw invalid(it) }
-                hasher.hash(request.newPin!!)
-            } else {
-                null
+            proveExisting(username, user, shared, "login", ip) {
+                audit.record("login.fail", username, request.deviceId, ip, "wrong-secret")
+                throw unauthorized("Login failed.")
             }
-
-            existing?.let { (id, device) ->
-                if (device.mode == DeviceMode.PERSONAL && device.users.values.any { it.userId != user.id }) {
-                    audit.record("enroll.fail", username, id, ip, "personal-device")
-                    throw ApiError(403, ErrorCode.FORBIDDEN, "This device is personal: it holds one user.", reason = ErrorReasons.DEVICE_PERSONAL)
-                }
+            // This tells whoever asks that the name exists and has no PIN; the app needs it to ask for a new PIN.
+            if (!isUsableCredential(user.pin) && request.newPin == null) {
+                throw ApiError(401, ErrorCode.UNAUTHORIZED, "Set a PIN.", reason = ErrorReasons.PIN_NOT_SET)
             }
-
-            val credential = randomToken(32)
-            // The user file and the device file are one change for a backup.
-            val (deviceId, label) = barrier.mutate {
-                // The user's own file first: if the device file then fails, the secrets chosen here are not lost.
-                if ((newPassword != null || newPin != null) && !users.setCredentials(user.id, newPassword, newPin)) {
-                    throw credentialsChanged(username, request.deviceId, ip)
-                }
-                if (existing != null) {
-                    if (!devices.putUser(existing.first, username, user.id, credential)) {
-                        audit.record("enroll.fail", username, existing.first, ip, "device-unavailable")
-                        throw ApiError(401, ErrorCode.DEVICE_NOT_RECOGNIZED, "The device is not available. Pair again.")
-                    }
-                    existing.first to existing.second.label
-                } else {
-                    val newLabel = clean(request.deviceLabel, 64, "Device")
-                    devices.create(newLabel, clean(request.platform, 32, "unknown"), request.mode, username, user.id, credential) to newLabel
-                }
-            }
-            sessions.endEnrollment(enrollmentToken)
-            audit.record("enroll.ok", username, deviceId, ip, "ok,mode=${(existing?.second?.mode ?: request.mode).name.lowercase()}")
-            events()?.notifyUser(user.id, DevicePairedMessage(deviceId, label), exceptDeviceId = deviceId)
-            return EnrollResponse(deviceId, credential)
+            addToDevice(username, user, shared, existing, newSecrets(username, user, shared), "login", ip)
         }
     }
 
@@ -281,6 +258,90 @@ internal class DefaultAuthService(
         return !entry.lastUsed.plus(Duration.ofDays(config.auth.deviceIdleExpiryDays.toLong())).isAfter(clock.instant())
     }
 
+    /** The device [request] adds the user to, by its id and one of its credentials, or null for a new device; [refuse] is called with the id when it is not accepted. */
+    private fun existingDevice(request: EnrollRequest, refuse: (String) -> Nothing): Pair<String, DeviceData>? =
+        request.deviceId?.let { id ->
+            val device = devices.get(id)
+            val owner = request.deviceCredential?.let { devices.ownerOf(id, it) }
+            if (device == null || owner == null || users.findById(owner)?.second?.enabled != true) refuse(id)
+            id to device
+        }
+
+    /** The password and PIN the user already has, each against [request]; a wrong one counts against the account ([Backoff]) and then [wrong] refuses. */
+    private fun proveExisting(username: String, user: UserData, request: EnrollRequest, event: String, ip: String, wrong: () -> Nothing) {
+        val hasPassword = isUsableCredential(user.password)
+        val hasPin = isUsableCredential(user.pin)
+        val proves = hasPassword || hasPin
+        if (proves) backoff.requireNotLocked(user, event, username, request.deviceId, ip)
+        val passwordOk = !hasPassword || checkExisting(request.password, user.password, password = true)
+        val pinOk = !hasPin || checkExisting(request.pin, user.pin, password = false)
+        if (!passwordOk || !pinOk) {
+            backoff.failed(user.id, username, request.deviceId, ip)
+            wrong()
+        }
+        if (proves) backoff.succeeded(user)
+    }
+
+    /** The hashes of the password (if the user needs one) and the PIN the user does not have yet, from [request]; null for what they have. */
+    private fun newSecrets(username: String, user: UserData, request: EnrollRequest): Pair<String?, String?> {
+        val newPassword = if (!isUsableCredential(user.password) && policy.passwordRequired(username)) {
+            policy.checkPassword(request.newPassword)?.let { throw invalid(it) }
+            hasher.hash(normalizePassword(request.newPassword!!))
+        } else {
+            null
+        }
+        val newPin = if (!isUsableCredential(user.pin)) {
+            policy.checkPin(request.newPin)?.let { throw invalid(it) }
+            hasher.hash(request.newPin!!)
+        } else {
+            null
+        }
+        return newPassword to newPin
+    }
+
+    /**
+     * Stores the [secrets] and puts the user on the [existing] device, or on a new one, with a new credential. [written] runs
+     * once both are stored, before the success is recorded.
+     */
+    private fun addToDevice(
+        username: String, user: UserData, request: EnrollRequest, existing: Pair<String, DeviceData>?, secrets: Pair<String?, String?>,
+        event: String, ip: String, written: () -> Unit = {},
+    ): EnrollResponse {
+        val (newPassword, newPin) = secrets
+        existing?.let { (id, device) ->
+            if (device.mode == DeviceMode.PERSONAL && device.users.values.any { it.userId != user.id }) {
+                audit.record("$event.fail", username, id, ip, "personal-device")
+                throw ApiError(403, ErrorCode.FORBIDDEN, "This device is personal: it holds one user.", reason = ErrorReasons.DEVICE_PERSONAL)
+            }
+        }
+
+        val credential = randomToken(32)
+        // The user file and the device file are one change for a backup.
+        val (deviceId, label) = barrier.mutate {
+            // The user's own file first: if the device file then fails, the secrets chosen here are not lost.
+            if ((newPassword != null || newPin != null) && !users.setCredentials(user.id, newPassword, newPin)) {
+                throw credentialsChanged(username, request.deviceId, ip, event)
+            }
+            if (existing != null) {
+                if (!devices.putUser(existing.first, username, user.id, credential)) {
+                    audit.record("$event.fail", username, existing.first, ip, "device-unavailable")
+                    throw ApiError(401, ErrorCode.DEVICE_NOT_RECOGNIZED, "The device is not available. Pair again.")
+                }
+                existing.first to existing.second.label
+            } else {
+                val newLabel = clean(request.deviceLabel, 64, "Device")
+                devices.create(newLabel, clean(request.platform, 32, "unknown"), request.mode, username, user.id, credential) to newLabel
+            }
+        }
+        written()
+        audit.record("$event.ok", username, deviceId, ip, "ok,mode=${(existing?.second?.mode ?: request.mode).name.lowercase()}")
+        events()?.notifyUser(user.id, DevicePairedMessage(deviceId, label), exceptDeviceId = deviceId)
+        return EnrollResponse(deviceId, credential)
+    }
+
+    /** What a login shares with an enrollment: the device, the secrets and the new device's details. */
+    private fun LoginRequest.asEnroll() = EnrollRequest(deviceLabel, platform, mode, password, newPassword, pin, newPin, deviceId, deviceCredential)
+
     private fun checkExisting(given: String?, stored: String?, password: Boolean): Boolean {
         if (given == null || !policy.fitsToVerify(given, password)) {
             hasher.verify("-", null)
@@ -317,8 +378,8 @@ internal class DefaultAuthService(
         }
     }
 
-    private fun credentialsChanged(username: String, deviceId: String?, ip: String): ApiError {
-        audit.record("enroll.fail", username, deviceId, ip, "credentials-changed")
+    private fun credentialsChanged(username: String, deviceId: String?, ip: String, event: String): ApiError {
+        audit.record("$event.fail", username, deviceId, ip, "credentials-changed")
         return ApiError(409, ErrorCode.CREDENTIALS_CHANGED, "This account has a PIN or password now. Enter the existing one and try again.")
     }
 

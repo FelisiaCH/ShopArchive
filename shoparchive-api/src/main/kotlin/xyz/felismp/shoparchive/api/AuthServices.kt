@@ -7,6 +7,7 @@ import xyz.felismp.shoparchive.shared.DeviceMode
 import xyz.felismp.shoparchive.shared.EnrollRequest
 import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
+import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.PairingResponse
 import xyz.felismp.shoparchive.shared.ReauthRequest
 import xyz.felismp.shoparchive.shared.RedeemRequest
@@ -56,6 +57,13 @@ interface PairingService {
 interface AuthService {
     /** @throws ApiError the enrollment token is wrong or has run out ([ErrorCode.ENROLLMENT_EXPIRED]), the device is not known ([ErrorCode.DEVICE_NOT_RECOGNIZED]), a secret is wrong, or a new secret is not acceptable */
     fun enroll(enrollmentToken: String, request: EnrollRequest, ip: String): EnrollResponse
+
+    /**
+     * Signs a user in on a device by name and PIN (or password), with no pairing; a user who has none yet sets it here.
+     * @throws ApiError the user or secret is wrong (the same answer for both), the user has no PIN and sent no new one
+     * ([xyz.felismp.shoparchive.shared.ErrorReasons.PIN_NOT_SET]), the device is not known ([ErrorCode.DEVICE_NOT_RECOGNIZED]), or a new secret is not acceptable
+     */
+    fun login(request: LoginRequest, ip: String): EnrollResponse
 
     /** @throws ApiError the device, user or secret is wrong; the answer is the same for all of them */
     fun unlock(request: UnlockRequest, ip: String): UnlockResponse

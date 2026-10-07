@@ -68,6 +68,7 @@ import xyz.felismp.shoparchive.shared.EnrollRequest
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.ErrorResponse
+import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.PROTOCOL_HEADER
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.ReauthRequest
@@ -247,6 +248,11 @@ internal fun Application.apiModule(
                     val token = call.bearerToken() ?: throw unauthorized("Pair first.")
                     val body = call.receive<EnrollRequest>()
                     call.respond(blocking { services.require<AuthService>().enroll(token, body, call.ip) })
+                }
+                // The name and the PIN or password in the body are the credential here.
+                post("/login") {
+                    val body = call.receive<LoginRequest>()
+                    call.respond(blocking { services.require<AuthService>().login(body, call.ip) })
                 }
                 // The device credential in the body is the credential here.
                 post("/unlock") {

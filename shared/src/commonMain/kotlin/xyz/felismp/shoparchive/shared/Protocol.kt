@@ -64,6 +64,8 @@ object ErrorReasons {
     const val PIN_LENGTH = "pin.length"
     const val PIN_REPEATED = "pin.repeated"
     const val PIN_SEQUENCE = "pin.sequence"
+    /** `/login` for a user who has no PIN yet: send it again with `newPin`. */
+    const val PIN_NOT_SET = "pin.not-set"
     const val PASSWORD_REQUIRED = "password.required"
     const val PASSWORD_SHORT = "password.short"
     const val PASSWORD_LONG = "password.long"
@@ -203,6 +205,26 @@ data class EnrollRequest(
     val newPassword: String? = null,
     val pin: String? = null,
     val newPin: String? = null,
+    val deviceId: String? = null,
+    val deviceCredential: String? = null,
+)
+
+/**
+ * Body of `POST /api/v1/login`: no pairing, the [username] and the PIN (or the password if the user needs one) are enough.
+ * [password] and [pin] are the ones the user already has; [newPassword] and [newPin] set them when the user has none (a user
+ * without a PIN is told so with [ErrorReasons.PIN_NOT_SET]). A shared device adds a second user by sending its [deviceId] and one
+ * of its [deviceCredential]s; the label, platform and mode of the device are then the ones it already has.
+ */
+@Serializable
+data class LoginRequest(
+    val username: String,
+    val deviceLabel: String,
+    val platform: String,
+    val mode: DeviceMode,
+    val pin: String? = null,
+    val newPin: String? = null,
+    val password: String? = null,
+    val newPassword: String? = null,
     val deviceId: String? = null,
     val deviceCredential: String? = null,
 )
