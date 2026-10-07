@@ -100,10 +100,14 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
     var wsFails = false
     /** Makes the next socket find the session gone (the server restarted and forgot the token). */
     var wsLocked = false
+    /** Like [wsLocked], for the next socket only; the token is forgotten as the real client does. */
+    var wsLockedOnce = false
     /** Set to make the next open socket end when this completes (once). */
     var dropSocket: CompletableDeferred<Unit>? = null
     var sharedMinutes = 2
     var personalMinutes = 10
+    /** What `GET /config` says about unlocking a one-user device with its credential alone. */
+    var unlockWithoutPin = false
     var devicesList = listOf(
         DeviceInfo("dev-1", "Till 1", "windows", DeviceMode.PERSONAL, "2026-10-01", 1, current = true),
         DeviceInfo("dev-2", "Phone", "android", DeviceMode.PERSONAL, "2026-10-02", 1, current = false),
@@ -164,7 +168,7 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
         reach()
         failConfig?.let { throw it }
         return ConfigResponse(
-            AuthPolicy(6, false, sharedMinutes, personalMinutes, false, 5), announced, emptyList(),
+            AuthPolicy(6, false, sharedMinutes, personalMinutes, false, 5, unlockWithoutPin), announced, emptyList(),
             records.configBranches.map { xyz.felismp.shoparchive.shared.BranchDto(it, it, false) },
             permissions = permissions,
         )
@@ -172,7 +176,13 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
     var reauthGate: CompletableDeferred<Unit>? = null
     override suspend fun reauth(request: ReauthRequest) { reauths += request; reauthGate?.await(); failReauth?.let { throw it } }
     var devicesGate: CompletableDeferred<Unit>? = null
-    override suspend fun devices(): List<DeviceInfo> { val list = devicesList; devicesGate?.await(); failDevices?.let { throw it }; return list }
+    /** Errors the next device lists throw, in order; a [ClientError.Locked] forgets the token first, as the real client does on a 401. */
+    val devicesErrors = ArrayDeque<Exception>()
+    override suspend fun devices(): List<DeviceInfo> {
+        val list = devicesList; devicesGate?.await(); failDevices?.let { throw it }
+        devicesErrors.removeFirstOrNull()?.let { if (it is ClientError.Locked) token = false; throw it }
+        return list
+    }
     override suspend fun revokeDevice(id: String) { revokeGate?.await(); token_at_revoke += token; revokeErrors.removeFirstOrNull()?.let { throw it }; revoked += id }
     override fun lock() { locks++; token = false }
     var offered: List<xyz.felismp.shoparchive.shared.UpdateFile> = emptyList()
@@ -182,6 +192,7 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
     override suspend fun webSocketSession(onOpen: () -> Unit, onText: (String) -> Unit) {
         if (wsFails) throw ClientError.Unreachable()
         if (wsLocked) throw ClientError.Locked()
+        if (wsLockedOnce) { wsLockedOnce = false; token = false; throw ClientError.Locked() }
         reach()
         this.onOpen = onOpen; onOpen()
         while (dropSocket?.isCompleted != true) delay(20) // open until cancelled, or until a test drops it
@@ -1512,6 +1523,185 @@ class AppFlowTest {
         api.failDevices = ClientError.Locked()
         f.loadDevices()
         assertEquals(Problem.SessionEnded, assertIs<AppState.Locked>(f.state.value).problem)
+    }
+
+    // ---- one user who needs no PIN ----
+
+    /** The device holds alice alone, and the last config said her credential alone unlocks. */
+    private fun withoutPinFlow(mode: DeviceMode = DeviceMode.PERSONAL): AppFlow {
+        api.unlockWithoutPin = true
+        return lockedFlow(storedAlice(mode).copy(unlockWithoutPin = true))
+    }
+
+    private val credentialOnly = UnlockRequest("dev-1", "alice", "cred")
+
+    @Test fun oneUserWhoNeedsNoPinOpensUnlockedWithTheCredentialAlone() {
+        for (mode in DeviceMode.entries) {
+            api.unlocks.clear()
+            val f = withoutPinFlow(mode)
+            assertEquals("alice", assertIs<AppState.Unlocked>(f.state.value).username, "$mode")
+            assertEquals(listOf(credentialOnly), api.unlocks, "no PIN is sent ($mode)")
+            assertNull(f.reauth.value)
+        }
+    }
+
+    @Test fun oneUserWhoNeedsNoPinStaysUnlockedWhenIdleAndTheNextCallGetsANewTokenWithoutAPin() {
+        val f = withoutPinFlow()
+        clock += 99 * minute; f.checkIdle()
+        assertIs<AppState.Unlocked>(f.state.value)
+        assertFalse(api.token, "the token is dropped")
+        assertNotNull(f.workspace)
+        f.openSettings() // loads the device list
+        assertEquals(listOf(credentialOnly, credentialOnly), api.unlocks)
+        assertEquals(listOf("dev-1", "dev-2"), assertIs<AppState.Settings>(f.state.value).devices?.map { it.id })
+        f.closeSettings()
+        clock += 99 * minute; f.appResumed()
+        assertIs<AppState.Unlocked>(f.state.value)
+    }
+
+    @Test fun oneUserWhoNeedsNoPinGetsANewTokenWhenTheServerEndedTheOldOne() {
+        val f = withoutPinFlow(); f.openSettings()
+        api.devicesErrors += ClientError.Locked() // the access token ran out
+        f.loadDevices()
+        val s = assertIs<AppState.Settings>(f.state.value)
+        assertEquals(listOf("dev-1", "dev-2"), s.devices?.map { it.id })
+        assertNull(s.problem)
+        assertEquals(listOf(credentialOnly, credentialOnly), api.unlocks)
+    }
+
+    @Test fun oneUserWhoNeedsNoPinGetsANewTokenWhenTheSocketFindsTheSessionGone() {
+        val f = withoutPinFlow()
+        assertTrue(f.canWrite.value)
+        val drop = CompletableDeferred<Unit>().also { api.dropSocket = it }
+        api.wsLockedOnce = true
+        drop.complete(Unit)
+        awaitTrue("a new token") { api.unlocks.size == 2 && f.canWrite.value }
+        assertIs<AppState.Unlocked>(f.state.value)
+        assertEquals(credentialOnly, api.unlocks.last())
+    }
+
+    @Test fun aTokenTheServerKeepsEndingLocksOnceAndDoesNotLoop() {
+        val f = withoutPinFlow(); f.openSettings()
+        api.devicesErrors += listOf(ClientError.Locked(), ClientError.Locked()) // the new token is refused too
+        f.loadDevices()
+        assertEquals(Problem.SessionEnded, assertIs<AppState.Locked>(f.state.value).problem)
+        assertEquals(2, api.unlocks.size, "one new token, then the lock screen")
+    }
+
+    @Test fun oneUserWithoutTheServersLeaveIsLockedAndThePinUnlocksAsBefore() {
+        api.unlockWithoutPin = true // the server allows it, but this device has not read that yet
+        val f = lockedFlow(storedAlice(DeviceMode.SHARED))
+        val locked = assertIs<AppState.Locked>(f.state.value)
+        assertTrue(api.unlocks.isEmpty())
+        f.selectUser("alice")
+        f.unlock("483926")
+        assertIs<AppState.Unlocked>(f.state.value)
+        assertEquals(UnlockRequest("dev-1", "alice", "cred", pin = "483926"), api.unlocks.single())
+        assertEquals(listOf("alice"), locked.users)
+    }
+
+    @Test fun aRefusedCredentialOnlyUnlockShowsThatUsersLockScreenOnceWithTheReason() {
+        api.failUnlock = ClientError.Api(401, ErrorCode.UNAUTHORIZED, "Unlock failed.")
+        val f = withoutPinFlow(DeviceMode.SHARED)
+        val locked = assertIs<AppState.Locked>(f.state.value)
+        assertEquals("alice", locked.username, "the PIN field is shown for her")
+        assertEquals(Problem.WrongCredentials, locked.problem)
+        assertEquals(listOf(credentialOnly), api.unlocks)
+        assertFalse(store.stored!!.unlockWithoutPin, "the next start asks for the PIN rather than trying again")
+        clock += 99 * minute; f.checkIdle()
+        assertEquals(1, api.unlocks.size, "no loop")
+        api.failUnlock = null
+        f.unlock("483926")
+        assertIs<AppState.Unlocked>(f.state.value)
+        assertEquals("483926", api.unlocks.last().pin)
+        assertTrue(store.stored!!.unlockWithoutPin, "the config read after the unlock turns it on again")
+    }
+
+    @Test fun anUnreachableServerShowsTheLockScreenAndKeepsTheSetting() {
+        api.failUnlock = ClientError.Unreachable()
+        val f = withoutPinFlow()
+        assertEquals(Problem.Unreachable, assertIs<AppState.Locked>(f.state.value).problem)
+        assertTrue(store.stored!!.unlockWithoutPin)
+    }
+
+    @Test fun whenTheServerAsksForThePasswordTheDeviceStopsTryingWithoutIt() {
+        api.failUnlock = ClientError.Api(401, ErrorCode.REAUTH_REQUIRED, "Enter your password to unlock.", passwordRequired = true)
+        val f = withoutPinFlow()
+        val locked = assertIs<AppState.Locked>(f.state.value)
+        assertTrue(locked.needsPassword)
+        assertNull(locked.problem)
+        assertFalse(store.stored!!.unlockWithoutPin)
+    }
+
+    @Test fun aRefusedNewTokenWhileUnlockedShowsTheLockScreenOnce() {
+        val f = withoutPinFlow(); f.openSettings()
+        api.failUnlock = ClientError.Api(401, ErrorCode.UNAUTHORIZED, "Unlock failed.")
+        api.devicesErrors += ClientError.Locked()
+        f.loadDevices()
+        val locked = assertIs<AppState.Locked>(f.state.value)
+        assertEquals(Problem.WrongCredentials, locked.problem)
+        assertEquals("alice", locked.username)
+        assertEquals(2, api.unlocks.size)
+        assertNull(f.workspace)
+    }
+
+    @Test fun twoUsersLockWithThePickerWhenIdleAndUnlockWithThePin() {
+        api.unlockWithoutPin = true
+        val f = lockedFlow(storedShared().copy(unlockWithoutPin = true))
+        assertNull(assertIs<AppState.Locked>(f.state.value).username, "the picker")
+        assertTrue(api.unlocks.isEmpty())
+        f.selectUser("alice"); f.unlock("111111")
+        assertEquals("111111", api.unlocks.single().pin)
+        clock += 2 * minute; f.checkIdle() // the shared minutes
+        val locked = assertIs<AppState.Locked>(f.state.value)
+        assertNull(locked.username)
+        assertFalse(api.token)
+    }
+
+    @Test fun theIdleTimeFollowsHowManyUsersTheDeviceHoldsNotItsMode() {
+        val f = lockedFlow(storedAlice(DeviceMode.SHARED)) // a login makes a shared device with one user
+        f.selectUser("alice"); f.unlock("483926")
+        clock += 9 * minute; f.checkIdle()
+        assertIs<AppState.Unlocked>(f.state.value, "the personal minutes (10), not the shared ones (2)")
+        clock += minute; f.checkIdle()
+        assertIs<AppState.Locked>(f.state.value)
+    }
+
+    @Test fun withoutAPinOnlyTheServersRequestAsksForItBeforeADeleteAndExportAsksNothing() {
+        api.records.configBranches = listOf("main")
+        api.records.listed = listOf(testEntry())
+        val f = withoutPinFlow()
+        val ws = assertNotNull(f.workspace)
+        ws.export.export()
+        assertEquals(1, api.records.exports.size)
+        assertNull(f.reauth.value, "export asks for nothing")
+        ws.history.reload()
+        ws.history.open(ws.history.ui.value.entries!!.single())
+        val detail = assertNotNull(ws.history.detail.value)
+        detail.askDelete()
+        assertNull(f.reauth.value, "nothing is asked before the server does")
+        api.records.changeError = ClientError.Api(401, ErrorCode.REAUTH_REQUIRED, "Enter your PIN again.")
+        detail.confirmDelete()
+        assertEquals(ReauthPrompt(needsPassword = false), f.reauth.value)
+        api.records.changeError = null
+        f.submitReauth("483926")
+        assertEquals(ReauthRequest(pin = "483926"), api.reauths.single())
+        assertNull(f.reauth.value)
+        assertEquals(listOf("e1", "e1"), api.records.deletes, "tried once more after the PIN")
+        assertIs<AppState.Unlocked>(f.state.value)
+    }
+
+    @Test fun theConfigKeepsWhetherThePinIsNeededAndAnOldFileReadsAsNeedingIt() {
+        val f = lockedFlow()
+        assertFalse(store.stored!!.unlockWithoutPin)
+        api.unlockWithoutPin = true
+        f.unlock("483926")
+        assertTrue(store.stored!!.unlockWithoutPin)
+        api.unlockWithoutPin = false
+        f.workspace!!.retry() // the config is read again
+        assertFalse(store.stored!!.unlockWithoutPin)
+        val old = """{"servers":[{"serverId":"s","name":"n","certPin":"p","endpoints":["h:1"],"deviceId":"d","users":[{"username":"a","credential":"c"}]}]}"""
+        assertFalse(xyz.felismp.shoparchive.app.client.decodeServers(old.toByteArray()).servers.single().unlockWithoutPin)
     }
 
     // ---- re-auth ----

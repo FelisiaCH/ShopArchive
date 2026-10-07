@@ -75,6 +75,8 @@ private val BROWSE_TIMEOUT: Duration = 3.seconds
  * a changed protocol from any call lands on a blocking state. Screens read [state] and call the actions;
  * typed text stays in the screens and comes in as arguments. PINs, passwords and tokens are never stored here.
  * While unlocked the app reports interaction with [userActive]; no interaction for the server's auto-lock time locks it.
+ * One user on a device the server lets unlock without a PIN never sees the lock screen: the device credential alone opens the server
+ * and gets each new token, and the PIN is asked only when the server asks for it again ([withReauth]).
  */
 class AppFlow(
     private val scope: CoroutineScope,
@@ -132,7 +134,7 @@ class AppFlow(
     // Runs a screen's call: asks for the PIN again when the server wants it, and lets a changed key, protocol or ended session block or lock the app.
     private val calls = object : Calls {
         override suspend fun <T> run(block: suspend () -> T): T = try {
-            withReauth(block)
+            withReauth { withToken(block) }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -177,14 +179,59 @@ class AppFlow(
         }
     }
 
-    /** Builds the client for what the device holds and shows the lock screen, or the login when nobody is on this device yet. */
-    private fun resume(creds: StoredServer, readFromDisk: Boolean = true) {
+    /**
+     * Builds the client for what the device holds and shows the lock screen, or the login when nobody is on this device yet.
+     * One user who needs no PIN is unlocked with the device credential alone instead, unless [withoutPin] is false.
+     */
+    private fun resume(creds: StoredServer, readFromDisk: Boolean = true, withoutPin: Boolean = true) {
         stored = creds
         // Only what was just read from disk is known to be there; a snapshot from memory must not hide a save that is still owed.
         if (readFromDisk) persisted = creds
-        session = Session(connect(creds.certPin, creds.serverId, creds.endpoints), creds.certPin, creds.serverId, creds.endpoints)
+        val opened = Session(connect(creds.certPin, creds.serverId, creds.endpoints), creds.certPin, creds.serverId, creds.endpoints)
+        session = opened
+        if (withoutPin && unlocksWithoutPin(creds)) return unlockWithoutPin(opened, creds)
         _state.value = if (creds.deviceId != null && creds.users.isNotEmpty()) lockedFor(creds)
         else AppState.Login(creds.endpoints.firstOrNull().orEmpty(), creds.name)
+    }
+
+    /** One user on this device, and the server said at the last config read that the device credential alone unlocks: no lock screen to open. */
+    private fun unlocksWithoutPin(creds: StoredServer?) = creds != null && creds.unlockWithoutPin && creds.deviceId != null && creds.users.size == 1
+
+    private fun credentialOnly(creds: StoredServer): UnlockRequest = creds.users.single().let { UnlockRequest(creds.deviceId!!, it.username, it.credential) }
+
+    /**
+     * Opens the server for its one user with the device credential alone. Any refusal shows that user's lock screen with the PIN field and
+     * the reason, and is not tried again by itself; a refusal from the server also turns [StoredServer.unlockWithoutPin] off until the next config read.
+     */
+    private fun unlockWithoutPin(opened: Session, creds: StoredServer) {
+        val user = creds.users.single()
+        _state.value = AppState.Starting
+        scope.launch {
+            try {
+                unlockFindingServer(opened, credentialOnly(creds))
+                if (session !== opened) return@launch
+                if (user.rejected) markRejected(emptyList(), listOf(user.username))
+                enterUnlocked(opened, user.username)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (session !== opened) return@launch
+                val locked = lockedFor(stored ?: creds, user.username, needsPassword = refusedWithoutPin(e))
+                if (locked.needsPassword) _state.value = locked
+                else blockOr(e) { _state.value = locked.copy(problem = it) }
+            }
+        }
+    }
+
+    /**
+     * The server refused the device credential alone: it is not tried again until a config read says it may be. Returns whether the
+     * server asked for the password.
+     */
+    private fun refusedWithoutPin(e: Exception): Boolean {
+        if (e !is ClientError.Api) return false
+        stored?.let { if (it.unlockWithoutPin) stored = it.copy(unlockWithoutPin = false) }
+        saveOwed()
+        return e.code == ErrorCode.REAUTH_REQUIRED && e.passwordRequired
     }
 
     private fun lockedFor(creds: StoredServer, username: String? = null, needsPassword: Boolean = false, problem: Problem? = null): AppState.Locked {
@@ -775,6 +822,19 @@ class AppFlow(
         val creds = stored ?: return
         val merged = rememberEndpoints(api.endpoints.firstOrNull(), announced, creds.endpoints)
         if (merged != creds.endpoints) stored = creds.copy(endpoints = merged)
+        saveOwed()
+    }
+
+    /** Keeps whether the server lets this device's one user unlock without a PIN (never for a user who needs the password), as config read [policy] says. */
+    private fun savePolicy(policy: AuthPolicy) {
+        val creds = stored ?: return
+        val withoutPin = policy.unlockWithoutPin && !policy.passwordRequired
+        if (creds.unlockWithoutPin != withoutPin) stored = creds.copy(unlockWithoutPin = withoutPin)
+        saveOwed()
+    }
+
+    /** Writes [stored] when it differs from what is on disk; a failed write is tried again by the next call. */
+    private fun saveOwed() {
         if (stored == persisted) return
         scope.launch {
             try {
@@ -822,7 +882,7 @@ class AppFlow(
         enrollmentToken = null
         session?.api?.close()
         // The newest credentials in memory (an address save may have moved them on since adding began); [persisted] stays what it was.
-        resume(stored ?: adding, readFromDisk = false)
+        resume(stored ?: adding, readFromDisk = false, withoutPin = false)
     }
 
     // ---- login ----
@@ -934,7 +994,8 @@ class AppFlow(
     }
 
     private fun enterUnlocked(opened: Session, username: String) {
-        val connection = LiveConnection(scope, { opened.api.isUnlocked }) { onOpen, onText -> liveSession(opened, onOpen, onText) }
+        // A token dropped while idle does not end the socket loop where the credential alone gets a new one.
+        val connection = LiveConnection(scope, { opened.api.isUnlocked || unlocksWithoutPin(stored) }) { onOpen, onText -> liveSession(opened, onOpen, onText) }
         lastLiveSearchMs = null
         live?.stop()
         live = connection
@@ -944,8 +1005,8 @@ class AppFlow(
         lastUnlocked = username
         unlocked = state
         _state.value = state
-        // From here on: lock after the idle time, and follow the connection for canWrite.
-        val shared = stored?.mode == DeviceMode.SHARED
+        // From here on: lock after the idle time (the shared one where several people use this device), and follow the connection for canWrite.
+        val shared = (stored?.users?.size ?: 0) > 1
         lastActivity = now()
         idleLimitMs = (if (shared) FALLBACK_LOCK_SHARED_MINUTES else FALLBACK_LOCK_PERSONAL_MINUTES) * 60_000L
         watchJobs.forEach { it.cancel() }
@@ -955,13 +1016,14 @@ class AppFlow(
             sessionScope.launch { while (true) { delay(IDLE_CHECK_MS); checkIdle() } },
             sessionScope.launch { connection.status.collect { _canWrite.value = it == ConnectionStatus.CONNECTED } },
             sessionScope.launch {
-                val policy = guarded({ opened.api.config().auth }) { } ?: return@launch // the fallback stays if the server cannot be asked now
+                val policy = guarded({ withToken { opened.api.config().auth } }) { } ?: return@launch // the fallback stays if the server cannot be asked now
                 idleLimitMs = policy.lockMinutes(shared) * 60_000L
+                savePolicy(policy)
             },
         )
         workspace = Workspace(
             sessionScope, opened.api, calls, canWrite, connection.refetch, connection.messages,
-            onConfig = { saveEndpoints(opened.api, it.endpoints) },
+            onConfig = { saveEndpoints(opened.api, it.endpoints); savePolicy(it.auth) },
             savedBranch = try { prefs.load().branch } catch (_: Exception) { null },
             saveBranch = ::saveBranch, compressor = compressor,
             today = { Instant.ofEpochMilli(now()).atZone(ZoneId.systemDefault()).toLocalDate() }, now = now,
@@ -975,14 +1037,16 @@ class AppFlow(
      */
     private suspend fun liveSession(opened: Session, onOpen: () -> Unit, onText: (String) -> Unit) {
         try {
-            try {
-                opened.api.webSocketSession(onOpen, onText)
-            } catch (e: ClientError.Unreachable) {
-                val last = lastLiveSearchMs
-                if (last != null && monotonicMs() - last < LIVE_SEARCH_COOLDOWN_MS) throw e
-                lastLiveSearchMs = monotonicMs()
-                if (!rediscover(opened)) throw e
-                opened.api.webSocketSession(onOpen, onText)
+            withToken {
+                try {
+                    opened.api.webSocketSession(onOpen, onText)
+                } catch (e: ClientError.Unreachable) {
+                    val last = lastLiveSearchMs
+                    if (last != null && monotonicMs() - last < LIVE_SEARCH_COOLDOWN_MS) throw e
+                    lastLiveSearchMs = monotonicMs()
+                    if (!rediscover(opened)) throw e
+                    opened.api.webSocketSession(onOpen, onText)
+                }
             }
         } catch (e: ClientError.Locked) {
             lockNow(Problem.SessionEnded) // stops this loop too; the throw below only ends this attempt
@@ -1002,18 +1066,27 @@ class AppFlow(
     /** The app came back to the front: time spent away counts as idle. */
     fun appResumed() = checkIdle()
 
-    /** Locks when there has been no interaction for the auto-lock time. Called by a timer, and on resume. */
+    /**
+     * Locks when there has been no interaction for the auto-lock time. Called by a timer, and on resume. One user who needs no PIN is
+     * not locked: the token is dropped, and the next call gets a new one with the device credential alone.
+     */
     internal fun checkIdle() {
-        if (unlocked != null && now() - lastActivity >= idleLimitMs) lockNow()
+        if (unlocked == null || now() - lastActivity < idleLimitMs) return
+        if (!unlocksWithoutPin(stored)) return lockNow()
+        session?.api?.lock()
+        lastActivity = now() // once per idle time
     }
 
     /** Forgets the access token, stops the live connection and shows the lock screen. */
-    fun lockNow(problem: Problem? = null) {
+    fun lockNow(problem: Problem? = null) = lock(problem)
+
+    /** [username] is who the lock screen is shown for; null leaves a shared device's pick open. */
+    private fun lock(problem: Problem?, username: String? = null, needsPassword: Boolean = false) {
         if (unlocked == null || removing) return
         val creds = stored
         endSession()
         failReauth(ClientError.Locked())
-        _state.value = if (creds == null) pair() else lockedFor(creds, problem = problem)
+        _state.value = if (creds == null) pair() else lockedFor(creds, username, needsPassword, problem)
     }
 
     /** Everything that exists only while unlocked. */
@@ -1029,6 +1102,47 @@ class AppFlow(
         watchJobs.forEach { it.cancel() }
         watchJobs = emptyList()
         _canWrite.value = false
+    }
+
+    // ---- a new token without the PIN ----
+
+    private val renewLock = Mutex() // several calls that find the token gone get one new token
+
+    /**
+     * Runs [block], an authorized call. Where this device's one user needs no PIN, a token that is gone (dropped while idle, or ended by
+     * the server) is replaced with the device credential alone: before [block] when it is already known gone, else once when [block] finds it gone.
+     * Anywhere else this is just [block].
+     */
+    private suspend fun <T> withToken(block: suspend () -> T): T {
+        val started = generation
+        if (session?.api?.isUnlocked == false) renewToken(started)
+        return try {
+            block()
+        } catch (e: ClientError.Locked) {
+            if (!renewToken(started)) throw e
+            block()
+        }
+    }
+
+    /**
+     * Gets a new token with the device credential alone, without any screen; false when this device cannot (more users, or the PIN is needed),
+     * or the session that asked has ended. A refusal shows the user's lock screen with the reason and throws [ClientError.Locked]; a server that
+     * cannot be reached throws as any call does.
+     */
+    private suspend fun renewToken(started: Int): Boolean = renewLock.withLock {
+        val opened = session
+        val creds = stored
+        if (opened == null || started != generation || unlocked == null || !unlocksWithoutPin(creds)) return@withLock false
+        if (opened.api.isUnlocked) return@withLock true // another call got one meanwhile
+        try {
+            opened.api.unlock(credentialOnly(creds!!))
+            true
+        } catch (e: ClientError.Api) {
+            if (started != generation) throw ClientError.Locked()
+            val needsPassword = refusedWithoutPin(e)
+            lock(e.toProblem().takeUnless { needsPassword }, creds!!.users.single().username, needsPassword)
+            throw ClientError.Locked()
+        }
     }
 
     // ---- re-auth ----
@@ -1143,7 +1257,7 @@ class AppFlow(
         val opened = session ?: return
         if (_state.value !is AppState.Settings) return
         sessionScope.launch {
-            val list = guarded({ opened.api.devices() }) { p -> settings { it.copy(problem = p) } } ?: return@launch
+            val list = guarded({ withToken { opened.api.devices() } }) { p -> settings { it.copy(problem = p) } } ?: return@launch
             settings { it.copy(devices = list, problem = null) }
         }
     }
@@ -1155,7 +1269,7 @@ class AppFlow(
         if (s.busy || s.devices?.any { it.id == id && !it.current } != true) return
         _state.value = s.copy(busy = true, problem = null)
         sessionScope.launch {
-            val done = guarded({ withReauth { opened.api.revokeDevice(id) } }) { p -> settings { it.copy(busy = false, problem = p) } }
+            val done = guarded({ withReauth { withToken { opened.api.revokeDevice(id) } } }) { p -> settings { it.copy(busy = false, problem = p) } }
             if (done == null) return@launch
             settings { it.copy(busy = false) }
             loadDevices()

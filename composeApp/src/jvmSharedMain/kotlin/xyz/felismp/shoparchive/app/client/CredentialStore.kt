@@ -29,6 +29,8 @@ data class StoredServer(
     /** One on a personal device; every user paired on a shared one. */
     val users: List<StoredUser> = emptyList(),
     val mode: DeviceMode = DeviceMode.PERSONAL,
+    /** The server's [xyz.felismp.shoparchive.shared.AuthPolicy.unlockWithoutPin] at the last config read: one user here then opens with the credential alone. Files from before have no such field. */
+    val unlockWithoutPin: Boolean = false,
 )
 
 /** What this device keeps between runs: every server it knows, and the one opened last. */
