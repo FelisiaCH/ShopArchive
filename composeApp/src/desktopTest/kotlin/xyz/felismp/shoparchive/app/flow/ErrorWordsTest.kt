@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 /** Every error the client core can raise is worded by the app from its own strings; an exception's English message never reaches a screen. */
 class ErrorWordsTest {
     private val everyClientError: List<ClientError> =
-        ClientError.InvalidPairLink.Reason.entries.map { ClientError.InvalidPairLink(it) } + listOf(
+        listOf<ClientError>(
             ClientError.PinMismatch(), ClientError.PinMismatch(RuntimeException("x509 detail")),
             ClientError.Unreachable(), ClientError.Unreachable(java.io.IOException("connect timed out")),
             ClientError.ProtocolMismatch(9, "Server speaks protocol 9"),

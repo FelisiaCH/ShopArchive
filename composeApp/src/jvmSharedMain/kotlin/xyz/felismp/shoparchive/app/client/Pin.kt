@@ -17,7 +17,7 @@ import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.X509TrustManager
 
 /*
- * The pin is the server's `PairPayload.fp`: SHA-256 of the leaf certificate's SubjectPublicKeyInfo, hex without
+ * The pin is the server key this device saved when it first added the server: SHA-256 of the leaf certificate's SubjectPublicKeyInfo, hex without
  * spaces (the console prints the same value in groups of four). Same approach as the P00 spike (device test T2):
  * the CA chain and the host name are not trusted, only the key is.
  */

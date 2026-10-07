@@ -7,7 +7,7 @@ import kotlinx.serialization.json.jsonObject
 import xyz.felismp.shoparchive.shared.DeviceMode
 
 /**
- * One user paired on this device, with the device credential the server issued for that user (each user gets their own).
+ * One user logged in on this device, with the device credential the server issued for that user (each user gets their own).
  * [rejected] is set when the server last answered DEVICE_NOT_RECOGNIZED for the credential (the user may be disabled or locked for a while, or removed):
  * it is only tried last when adding a user, and never deleted. A successful unlock clears it. Files from before have no such field.
  */
@@ -15,18 +15,18 @@ import xyz.felismp.shoparchive.shared.DeviceMode
 data class StoredUser(val username: String, val credential: String, val rejected: Boolean = false)
 
 /**
- * One server this device knows. [certPin] is the server certificate pin (not the user's PIN). [deviceId] is null until a user has paired here.
+ * One server this device knows. [certPin] is the server certificate pin (not the user's PIN). [deviceId] is null until a user has logged in here.
  * There is deliberately no field for the access token, PIN or password: those are never stored.
  */
 @Serializable
 data class StoredServer(
     val serverId: String,
-    /** The name the server gave when it was paired; blank for a server paired before names were kept. */
+    /** The name the server gave when it was added; blank for a server added before names were kept. */
     val name: String,
     val certPin: String,
     val endpoints: List<String>,
     val deviceId: String? = null,
-    /** One on a personal device; every user paired on a shared one. */
+    /** One on a personal device; every user who logged in on a shared one. */
     val users: List<StoredUser> = emptyList(),
     val mode: DeviceMode = DeviceMode.PERSONAL,
     /** The server's [xyz.felismp.shoparchive.shared.AuthPolicy.unlockWithoutPin] at the last config read: one user here then opens with the credential alone. Files from before have no such field. */

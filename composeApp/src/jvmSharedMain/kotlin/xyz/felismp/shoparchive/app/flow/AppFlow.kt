@@ -32,7 +32,6 @@ import xyz.felismp.shoparchive.app.client.StoredServer
 import xyz.felismp.shoparchive.app.client.StoredServers
 import xyz.felismp.shoparchive.app.client.StoredUser
 import xyz.felismp.shoparchive.app.client.fingerprintToPin
-import xyz.felismp.shoparchive.app.client.parsePairLink
 import xyz.felismp.shoparchive.shared.AuthPolicy
 import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.DeviceMode
@@ -43,15 +42,13 @@ import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.AppVersion
 import xyz.felismp.shoparchive.shared.ReauthRequest
-import xyz.felismp.shoparchive.shared.RedeemRequest
-import xyz.felismp.shoparchive.shared.RedeemResponse
 import xyz.felismp.shoparchive.shared.UnlockRequest
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-/** What this device calls itself to the server: [label] is only the form's default, [platform] goes in the enroll request. */
+/** What this device calls itself to the server: [label] is only the form's default, [platform] goes in the login request. */
 class ThisDevice(val label: String, val platform: String)
 
 /** What the server's own defaults are, used until `GET /config` has answered. */
@@ -91,7 +88,7 @@ class AppFlow(
     private val now: () -> Long = System::currentTimeMillis,
     private val io: CoroutineDispatcher = Dispatchers.IO,
     private val compressor: SlipCompressor = SlipCompressor { it },
-    /** Milliseconds that only move forward, for counting down the enrollment; injected so tests can move time. A wrong wall clock does not matter. */
+    /** Milliseconds that only move forward, for spacing the live socket's searches; injected so tests can move time. A wrong wall clock does not matter. */
     private val monotonicMs: () -> Long = { System.nanoTime() / 1_000_000 },
     /** Finds the server on the local network when none of its saved addresses answers (its address changed). */
     private val discovery: ServerDiscovery = NoDiscovery,
@@ -103,18 +100,13 @@ class AppFlow(
     private val _state = MutableStateFlow<AppState>(AppState.Starting)
     val state: StateFlow<AppState> = _state.asStateFlow()
 
-    /** The server being paired with, or the stored one. */
+    /** The server open now. */
     private class Session(val api: ServerApi, val pin: String, val serverId: String, val endpoints: List<String>)
 
     private var session: Session? = null
-    private var enrollmentToken: String? = null
-    private var enrolledUser: String? = null
-    private var manual: Pair<String, String>? = null // username, code of the manual pairing in progress
     private var live: LiveConnection? = null
     private var stored: StoredServer? = null // the server open now, as this device holds it
     private var all = StoredServers(emptyList()) // every server this device holds, as last read or written
-    private var pairAddress: String? = null // the address the pairing form starts with, when the server is already known
-    private var addingTo: StoredServer? = null // set while another user is being paired onto this shared device
     private var unlocked: AppState.Unlocked? = null // set from unlock to lock, also while Settings is shown
     private var lastActivity = 0L
     private var idleLimitMs = 0L
@@ -124,7 +116,6 @@ class AppFlow(
     private var removing = false
     private val saveLock = Mutex() // the stored credentials are written, and removed, one at a time
     private var persisted: StoredServer? = null // what is on disk for sure; [stored] differing from it means a save is still owed
-    private var enrollGen = 0 // changes when an enrollment is abandoned, so a late answer of the abandoned one is dropped
     private var lastLiveSearchMs: Long? = null // when the live socket last searched, to space the searches
 
     /** The screens' state while unlocked (also while Settings is shown); null from lock to the next unlock. */
@@ -242,13 +233,6 @@ class AppFlow(
         return AppState.Locked(creds.endpoints.firstOrNull().orEmpty(), names, shared, chosen, needsPassword, problem = problem)
     }
 
-    private fun pair(
-        preview: xyz.felismp.shoparchive.shared.PairPayload? = null,
-        check: FingerprintCheck? = null,
-        busy: Boolean = false,
-        problem: Problem? = null,
-    ) = AppState.Pair(preview, check, busy, problem, adding = addingTo != null, address = pairAddress.orEmpty())
-
     /**
      * Writes [server] into the list on disk in place of the one with its id (or after the others when it is new), as the last one opened.
      * Callers hold the save lock and run on [io].
@@ -365,12 +349,11 @@ class AppFlow(
 
     fun openFound(found: FoundServer) = addServer(found.endpoint)
 
-    /** Back to the server list from the lock screen, the login or the pairing: ends the session as a lock does and closes this server's client. */
+    /** Back to the server list from the lock screen or the login: ends the session as a lock does and closes this server's client. */
     fun showServers() {
         when (val s = _state.value) {
             is AppState.Locked -> if (s.busy) return
             is AppState.Login -> if (s.busy) return
-            is AppState.Pair -> if (s.busy) return
             else -> return
         }
         leaveServer()
@@ -380,15 +363,10 @@ class AppFlow(
     private fun leaveServer() {
         endSession()
         failReauth(ClientError.Locked())
-        enrollGen++
         session?.api?.close()
         session = null
         stored = null
         persisted = null
-        addingTo = null
-        manual = null
-        enrollmentToken = null
-        pairAddress = null
         showList()
     }
 
@@ -438,7 +416,6 @@ class AppFlow(
             session = null
             stored = null
             persisted = null
-            addingTo = null
             open(trusted)
         }
     }
@@ -447,233 +424,12 @@ class AppFlow(
         (_state.value as? AppState.CertChanged)?.let { _state.value = change(it) }
     }
 
-    // ---- pairing: link ----
-
-    fun previewLink(text: String) {
-        val payload = try {
-            parsePairLink(text)
-        } catch (e: ClientError.InvalidPairLink) {
-            _state.value = pair(problem = Problem.InvalidLink)
-            return
-        }
-        _state.value = pair(preview = payload)
-    }
-
-    /** The link carries the pin, so Continue on the preview is the whole confirmation. */
-    fun redeemLink() {
-        val s = _state.value as? AppState.Pair ?: return
-        val link = s.preview ?: return
-        if (s.busy) return
-        if (addingTo?.let { it.serverId != link.sid } == true) {
-            _state.value = s.copy(problem = Problem.WrongServer) // checked before redeeming: a pairing is used up once
-            return
-        }
-        _state.value = s.copy(busy = true, problem = null)
-        scope.launch {
-            val pin = fingerprintToPin(link.fp)
-            val opened = Session(connect(pin, link.sid, link.ep), pin, link.sid, link.ep)
-            val response = guarded({ opened.api.redeem(RedeemRequest(secret = link.sec)) }) { _state.value = s.copy(busy = false, problem = it) }
-            if (response == null) opened.api.close() else startEnroll(opened, response)
-        }
-    }
-
-    fun cancelPreview() {
-        _state.value = pair()
-    }
-
-    // ---- pairing: manual code ----
-
-    fun submitManual(address: String, username: String, code: String) {
-        val s = _state.value as? AppState.Pair ?: return
-        if (s.busy) return
-        val problem = when {
-            !validAddress(address.trim()) -> Problem.BadAddress
-            username.isBlank() -> Problem.BadUsername
-            normalizeCode(code) == null -> Problem.BadCode
-            else -> null
-        }
-        if (problem != null) {
-            _state.value = pair(problem = problem)
-            return
-        }
-        val target = address.trim()
-        _state.value = pair(busy = true)
-        scope.launch {
-            val fingerprint = guarded({ withContext(io) { probe(target) } }) { _state.value = pair(problem = it) } ?: return@launch
-            manual = username.trim() to normalizeCode(code)!!
-            _state.value = pair(check = FingerprintCheck(target, fingerprint))
-        }
-    }
-
-    fun cancelFingerprint() {
-        manual = null
-        _state.value = pair()
-    }
-
-    /** The user compared the fingerprint with the server console: trust it from now on and redeem the code. */
-    fun confirmFingerprint() {
-        val s = _state.value as? AppState.Pair ?: return
-        val check = s.check ?: return
-        val (username, code) = manual ?: return
-        if (s.busy) return
-        _state.value = s.copy(busy = true, problem = null)
-        scope.launch {
-            val pin = fingerprintToPin(check.fingerprint)
-            val endpoints = listOf(check.address)
-            val api = connect(pin, "", endpoints)
-            val fail = { p: Problem -> _state.value = s.copy(busy = false, problem = p) }
-            val info = guarded({ api.info() }, fail)
-            if (info == null) return@launch api.close()
-            if (info.protocol != PROTOCOL_VERSION) {
-                api.close()
-                _state.value = AppState.ProtocolMismatch(info.protocol)
-                return@launch
-            }
-            if (addingTo?.let { it.serverId != info.serverId } == true) {
-                api.close()
-                _state.value = s.copy(busy = false, problem = Problem.WrongServer)
-                return@launch
-            }
-            val response = guarded({ api.redeem(RedeemRequest(username = username, code = code)) }, fail)
-            if (response == null) api.close() else startEnroll(Session(api, pin, info.serverId, endpoints), response)
-        }
-    }
-
-    // ---- enroll ----
-
-    private fun startEnroll(opened: Session, response: RedeemResponse) {
-        manual = null
-        session = opened
-        enrollmentToken = response.enrollmentToken
-        enrolledUser = response.username
-        // The server counted the time from when it answered, so the deadline is that many seconds from now, whatever this device's clock says.
-        val deadline = response.expiresInSeconds.takeIf { it > 0 }?.let { monotonicMs() + it * 1000 }
-        _state.value = AppState.Enroll(opened.endpoints.first(), response, adding = addingTo != null, deadlineMs = deadline)
-    }
-
-    /** Whole seconds left to finish setting up (0 once it has run out), or null when the server did not say how long it lasts. */
-    fun enrollSecondsLeft(): Long? {
-        val deadline = (_state.value as? AppState.Enroll)?.deadlineMs ?: return null
-        return maxOf(0L, (deadline - monotonicMs() + 999) / 1000)
-    }
-
-    /** The enrollment is over (its time ran out, here or on the server): close the session and start the pairing again, still adding a user if that was the aim. */
-    private fun enrollmentExpired() {
-        enrollGen++
-        session?.api?.close()
-        session = null
-        enrollmentToken = null
-        _state.value = pair(problem = Problem.EnrollmentExpired)
-    }
-
-    /** Back to the start; the one-time pairing already used is gone, so a new link or code is needed. */
-    fun startOver() {
-        enrollGen++
-        session?.api?.close()
-        session = null
-        enrollmentToken = null
-        _state.value = pair()
-    }
-
-    fun enroll(input: EnrollInput) {
-        val s = _state.value as? AppState.Enroll ?: return
-        val opened = session ?: return
-        val token = enrollmentToken ?: return
-        val username = enrolledUser ?: return
-        if (s.busy) return
-        if (enrollSecondsLeft() == 0L) return enrollmentExpired() // nothing is sent: the server would only say the same
-        val adding = addingTo?.let { a -> a.copy(users = a.users.sortedWith(compareBy({ it.rejected }, { it.username != lastUnlocked }))) } // not rejected first, then most recent first
-        // Adding a user: the device keeps its own name and mode, so the form does not ask for them.
-        val form = if (adding == null) input else EnrollInput(input.password, input.passwordRepeat, input.pin, input.pinRepeat, adding.mode, device.label)
-        validateEnroll(s.redeem, form)?.let { _state.value = s.copy(problem = it); return }
-        _state.value = s.copy(busy = true, problem = null)
-        val gen = ++enrollGen
-        scope.launch {
-            val rejected = mutableListOf<String>()
-            val accepted = mutableListOf<String>()
-            val done = guarded({
-                try {
-                    enrollTrying(opened, token, s.redeem, form, adding, rejected, accepted)
-                } finally {
-                    // The attempt is over, however it ended: the credentials the server did not recognize are tried last next time (see [markRejected]).
-                    withContext(NonCancellable) { markRejected(rejected, accepted) }
-                }
-            }) { p ->
-                if (gen != enrollGen) return@guarded // started over meanwhile: this answer is not for the screen any more
-                when (p) {
-                    Problem.EnrollmentExpired -> enrollmentExpired()
-                    // Someone set the PIN/password first: ask for the existing ones next.
-                    Problem.CredentialsChanged ->
-                        _state.value = s.copy(redeem = s.redeem.copy(hasPin = true, hasPassword = s.redeem.passwordRequired), busy = false, problem = p)
-                    else -> _state.value = s.copy(busy = false, problem = p)
-                }
-            } ?: return@launch
-            // The server enrolled, but the person started over meanwhile: nothing is saved over the new pairing.
-            if (gen != enrollGen) return@launch
-            enrollmentToken = null
-            // Only the device credential is kept. If unlocking fails below, the next start asks for the PIN.
-            // A user added to a shared device gets a credential of their own; the device and its other users stay as they were.
-            val user = StoredUser(username, done.credential)
-            // The address that just worked goes first: the device's old ones may be what no longer answers.
-            // Built and written under the save lock, from the newest [stored], and [stored] moves on before the lock is let go: a queued
-            // address save then writes this user too, and an older snapshot can never overwrite it.
-            val saved = guarded({
-                withContext(io) {
-                    saveLock.withLock {
-                        val base = if (adding != null) stored ?: adding else null
-                        val made = if (base != null) base.copy(
-                            users = base.users.filter { it.username != username } + user,
-                            endpoints = mergeEndpoints(opened.api.endpoints, base.endpoints),
-                        ) else StoredServer(opened.serverId, s.redeem.serverName, opened.pin, opened.api.endpoints, done.deviceId, listOf(user), form.mode)
-                        persist(made)
-                        stored = made
-                        persisted = made
-                        made
-                    }
-                }
-            }) { if (gen == enrollGen) _state.value = s.copy(busy = false, problem = it) }
-            if (saved == null) return@launch
-            if (gen != enrollGen) return@launch // saved safely; the screen already moved on
-            val creds = saved
-            addingTo = null
-            val secret = if (s.redeem.passwordRequired) UnlockRequest(done.deviceId, username, done.credential, password = form.password)
-            else UnlockRequest(done.deviceId, username, done.credential, pin = form.pin)
-            val locked = lockedFor(creds, username, needsPassword = s.redeem.passwordRequired)
-            if (guarded({ opened.api.unlock(secret) }) { _state.value = locked.copy(problem = it) } != null) enterUnlocked(opened, username)
-        }
-    }
-
-    /**
-     * Enrolls; when adding a user to this device, tries the device credentials of its users one by one until the server accepts one.
-     * The server answers [ErrorCode.DEVICE_NOT_RECOGNIZED] for a device credential it does not accept before it looks at the PIN, so
-     * only that moves on to the next credential. Any other error (a wrong PIN, an enrollment that ran out, too many requests) stops at once:
-     * each wrong try counts against the enrollment, which ends after 5.
-     */
-    private suspend fun enrollTrying(
-        opened: Session, token: String, r: RedeemResponse, form: EnrollInput, adding: StoredServer?,
-        /** Filled with the users whose device credential the server did not recognize. */
-        rejected: MutableList<String>,
-        /** Filled with the user whose credential the server accepted. */
-        accepted: MutableList<String>,
-    ): EnrollResponse {
-        if (adding == null) return opened.api.enroll(token, enrollRequest(r, form, device.platform))
-        var last: ClientError.Api? = null
-        for (user in adding.users) {
-            try {
-                return opened.api.enroll(token, enrollRequest(r, form, device.platform, adding.deviceId, user.credential)).also { accepted += user.username }
-            } catch (e: ClientError.Api) {
-                if (e.code != ErrorCode.DEVICE_NOT_RECOGNIZED) throw e // only "this credential is not accepted" moves on
-                rejected += user.username
-                last = e
-            }
-        }
-        throw last ?: ClientError.Api(401, ErrorCode.DEVICE_NOT_RECOGNIZED, "This device holds no credential to add a user with.")
-    }
+    // ---- refused device credentials ----
 
     /**
      * Marks the users whose credential the server answered DEVICE_NOT_RECOGNIZED for as [StoredUser.rejected], and clears the mark of [cleared]
      * (accepted or unlocked). The answer is also given for a user who is disabled or locked for a while, so nobody is ever deleted for it; the mark
-     * only moves them to the end of the order adding a user tries, so a stale one cannot use up the enrollment's wrong tries (5) before a good one.
+     * only moves them to the end of the order a login on this device tries the credentials in, so a stale one is not tried first.
      * Written under the save lock from the newest [stored]. A failed write keeps everything as it was.
      */
     private suspend fun markRejected(rejected: Collection<String>, cleared: Collection<String> = emptyList()) {
@@ -690,7 +446,6 @@ class AppFlow(
                         }
                     }
                     val next = base.copy(users = marked(base.users))
-                    addingTo = addingTo?.let { a -> a.copy(users = marked(a.users)) }
                     if (next == base) return@withLock
                     persist(next)
                     stored = next
@@ -863,28 +618,6 @@ class AppFlow(
         _state.value = AppState.Login(s.server, creds.name, adding = true)
     }
 
-    /** Shared device: pair another user onto it. The pairing screens come first, and the enroll then joins this device. Nothing leads here since [addUser] logs in. */
-    fun addUserByPairing() {
-        val s = _state.value as? AppState.Locked ?: return
-        val creds = stored ?: return
-        if (!s.shared || s.busy) return
-        addingTo = creds
-        session?.api?.close()
-        session = null
-        _state.value = pair()
-    }
-
-    /** Leaves the pairing screens for the lock screen again. */
-    fun cancelAddUser() {
-        val adding = addingTo ?: return
-        addingTo = null
-        manual = null
-        enrollmentToken = null
-        session?.api?.close()
-        // The newest credentials in memory (an address save may have moved them on since adding began); [persisted] stays what it was.
-        resume(stored ?: adding, readFromDisk = false, withoutPin = false)
-    }
-
     // ---- login ----
 
     /** Back from adding a user to the lock screen. */
@@ -944,7 +677,7 @@ class AppFlow(
                 return@launch
             }
             val user = StoredUser(name, done.credential)
-            // Built from the newest [stored] under the save lock, like an enroll: a queued address save then writes this user too.
+            // Built from the newest [stored] under the save lock: a queued address save then writes this user too.
             val saved = guarded({
                 withContext(io) {
                     saveLock.withLock {
@@ -1086,7 +819,7 @@ class AppFlow(
         val creds = stored
         endSession()
         failReauth(ClientError.Locked())
-        _state.value = if (creds == null) pair() else lockedFor(creds, username, needsPassword, problem)
+        if (creds == null) showList(problem) else _state.value = lockedFor(creds, username, needsPassword, problem)
     }
 
     /** Everything that exists only while unlocked. */
@@ -1307,8 +1040,6 @@ class AppFlow(
             session?.api?.close()
             session = null
             stored = null
-            addingTo = null
-            pairAddress = null
             showList()
         }
     }
@@ -1336,7 +1067,7 @@ class AppFlow(
 
     private fun blockOr(e: Exception, fail: (Problem) -> Unit) {
         when (e) {
-            // A server this device holds (the open session's) can be trusted again; a pairing that has no server yet just stops.
+            // A server this device holds (the open session's) can be trusted again; anything else just stops with the reason.
             is ClientError.PinMismatch -> session?.takeIf { it.serverId.isNotEmpty() }?.let { opened ->
                 block(AppState.CertChanged(opened.serverId, nameOf(opened.serverId), e.endpoint ?: opened.api.endpoints.firstOrNull() ?: opened.endpoints.first()), e)
             } ?: fail(e.toProblem())
@@ -1350,14 +1081,11 @@ class AppFlow(
 
 internal fun Exception.toProblem(): Problem = when (this) {
     is ClientError.Unreachable -> Problem.Unreachable
-    is ClientError.InvalidPairLink -> Problem.InvalidLink
     is ClientError.Locked -> Problem.SessionEnded
     is ClientError.ReauthCancelled -> Problem.ReauthCancelled
     is ClientError.Api -> when (code) {
-        ErrorCode.PAIRING_INVALID -> Problem.PairingInvalid
         ErrorCode.RATE_LIMITED -> Problem.TooManyAttempts(retryAfterSeconds)
         ErrorCode.BANNED -> Problem.Banned
-        ErrorCode.ENROLLMENT_EXPIRED -> Problem.EnrollmentExpired
         ErrorCode.DEVICE_NOT_RECOGNIZED -> Problem.DeviceRejected
         // A refusal that says why (e.g. this device is personal) is worded by its reason; one that does not is a wrong secret.
         ErrorCode.FORBIDDEN -> if (reason != null) Problem.Rejected(code, reason) else Problem.WrongCredentials
@@ -1370,16 +1098,9 @@ internal fun Exception.toProblem(): Problem = when (this) {
     else -> Problem.Unknown
 }
 
-/** `9:05` for 545 seconds: minutes, then seconds in two digits. */
-fun formatCountdown(seconds: Long): String = "${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}"
-
 /** `host:port` with a port from 1 to 65535. */
 internal fun validAddress(address: String): Boolean {
     val port = address.substringAfterLast(':', "").toIntOrNull() ?: return false
     val host = address.substringBeforeLast(':')
     return port in 1..65535 && host.isNotBlank() && host.none { it.isWhitespace() || it == '/' }
 }
-
-/** The 10 characters of a manual code, whatever case, dashes or spaces were typed; null when it cannot be one. */
-internal fun normalizeCode(typed: String): String? =
-    typed.filter { it != '-' && !it.isWhitespace() }.uppercase().takeIf { it.length == 10 && it.all(Char::isLetterOrDigit) }

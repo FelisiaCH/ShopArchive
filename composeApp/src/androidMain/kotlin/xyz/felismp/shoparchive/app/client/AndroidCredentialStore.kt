@@ -44,7 +44,7 @@ class AndroidCredentialStore(private val file: File) : CredentialStore {
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
             decodeServers(cipher.doFinal(bytes, 12, bytes.size - 12))
         } catch (_: Exception) {
-            null // key lost (e.g. restored backup) or file damaged: pair again
+            null // key lost (e.g. restored backup) or file damaged: add the server again
         }
     }
 

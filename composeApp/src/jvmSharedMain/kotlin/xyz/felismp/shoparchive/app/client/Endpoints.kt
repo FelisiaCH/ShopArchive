@@ -1,12 +1,12 @@
 package xyz.felismp.shoparchive.app.client
 
 /**
- * How many addresses a device keeps for one server. A pairing link carries two and the server announces two, so four holds the
- * newest of each and still lets an old address that stopped working fall off instead of being tried first on every connect.
+ * How many addresses a device keeps for one server. The one it was added by and the two the server announces fit, and four still
+ * lets an old address that stopped working fall off instead of being tried first on every connect.
  */
 internal const val MAX_STORED_ENDPOINTS = 4
 
-/** What a user added on an already paired device keeps: the addresses [fresh] that just worked first, then the [old] ones, no repeats, at most [MAX_STORED_ENDPOINTS] (the oldest drop), LAN first. */
+/** What a user added on a device that already holds the server keeps: the addresses [fresh] that just worked first, then the [old] ones, no repeats, at most [MAX_STORED_ENDPOINTS] (the oldest drop), LAN first. */
 internal fun mergeEndpoints(fresh: List<String>, old: List<String>): List<String> =
     orderEndpoints((fresh + old).map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(MAX_STORED_ENDPOINTS))
 

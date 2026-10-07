@@ -10,7 +10,6 @@ import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.PROTOCOL_HEADER
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.ReauthRequest
-import xyz.felismp.shoparchive.shared.RedeemRequest
 import xyz.felismp.shoparchive.shared.UnlockRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,6 +20,7 @@ import kotlin.test.assertTrue
 class ApiClientTest {
     private val unlockOk = """{"accessToken":"TOKEN-1","expiresInSeconds":900}"""
     private val unlockReq = UnlockRequest("dev", "alice", "cred", pin = "1234")
+    private val loginReq = LoginRequest("alice", "Till 1", "windows", DeviceMode.SHARED, pin = "1234")
     private fun error(code: ErrorCode, status: Int, extra: String = "") =
         json("""{"code":"${code.name}","message":"nope","protocol":1$extra}""", status)
 
@@ -60,7 +60,7 @@ class ApiClientTest {
     @Test fun theReasonKeyOfAnErrorIsKept() = runBlocking {
         TlsServer { error(ErrorCode.INVALID_REQUEST, 400, ""","reason":"pin.sequence"""") }.use { s ->
             val api = ApiClient("sid", s.pin, listOf(s.endpoint))
-            val e = assertFailsWith<ClientError.Api> { api.redeem(RedeemRequest(secret = "x")) }
+            val e = assertFailsWith<ClientError.Api> { api.login(loginReq) }
             assertEquals("pin.sequence", e.reason)
             api.close()
         }
@@ -90,7 +90,7 @@ class ApiClientTest {
     @Test fun nonJsonErrorBodyStillGivesAnApiError() = runBlocking {
         TlsServer { json("<html>", 502) }.use { s ->
             val api = ApiClient("sid", s.pin, listOf(s.endpoint))
-            val e = assertFailsWith<ClientError.Api> { api.redeem(RedeemRequest(secret = "x")) }
+            val e = assertFailsWith<ClientError.Api> { api.login(loginReq) }
             assertEquals(502, e.status)
             assertEquals(ErrorCode.INTERNAL, e.code)
             api.close()
@@ -100,7 +100,7 @@ class ApiClientTest {
     @Test fun protocolMismatchHasItsOwnError() = runBlocking {
         TlsServer { json("""{"code":"PROTOCOL_MISMATCH","message":"update","protocol":2}""", 400) }.use { s ->
             val api = ApiClient("sid", s.pin, listOf(s.endpoint))
-            val e = assertFailsWith<ClientError.ProtocolMismatch> { api.redeem(RedeemRequest(secret = "x")) }
+            val e = assertFailsWith<ClientError.ProtocolMismatch> { api.login(loginReq) }
             assertEquals(2, e.serverProtocol)
             api.close()
         }
@@ -169,10 +169,10 @@ class ApiClientTest {
     }
 
     @Test fun httpErrorDoesNotFallBack() = runBlocking {
-        TlsServer { error(ErrorCode.PAIRING_INVALID, 400) }.use { first ->
+        TlsServer { error(ErrorCode.INVALID_REQUEST, 400) }.use { first ->
             TlsServer { json("{}") }.use { second ->
                 val api = ApiClient("sid", first.pin, listOf(first.endpoint, second.endpoint))
-                assertFailsWith<ClientError.Api> { api.redeem(RedeemRequest(secret = "x")) }
+                assertFailsWith<ClientError.Api> { api.login(loginReq) }
                 assertEquals(0, second.requests.size)
                 api.close()
             }
@@ -181,7 +181,7 @@ class ApiClientTest {
 
     @Test fun allEndpointsDownIsUnreachable() = runBlocking {
         val api = ApiClient("sid", "00".repeat(32), listOf(closedEndpoint(), closedEndpoint()), connectTimeoutMs = 1_000)
-        assertFailsWith<ClientError.Unreachable> { api.redeem(RedeemRequest(secret = "x")) }
+        assertFailsWith<ClientError.Unreachable> { api.login(loginReq) }
         api.close()
     }
 
@@ -284,9 +284,9 @@ class ApiClientTest {
         }.use { s ->
             val api = ApiClient("sid", s.pin, listOf(s.endpoint))
             api.unlock(unlockReq)
-            assertEquals(listOf("one", "two"), api.runCommand("user pair noy"))
+            assertEquals(listOf("one", "two"), api.runCommand("user info noy"))
             assertEquals(listOf("status", "stop"), api.completeCommand("st"))
-            assertEquals("""{"line":"user pair noy"}""", s.requests[1].body?.utf8())
+            assertEquals("""{"line":"user info noy"}""", s.requests[1].body?.utf8())
             assertEquals("POST", s.requests[1].method)
             assertEquals("/api/v1/command/complete", s.requests[2].target)
             assertEquals("Bearer TOKEN-1", s.requests[2].headers["Authorization"])

@@ -2,13 +2,10 @@ package xyz.felismp.shoparchive.app.client
 
 import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.DeviceInfo
-import xyz.felismp.shoparchive.shared.EnrollRequest
 import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.InfoResponse
 import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.ReauthRequest
-import xyz.felismp.shoparchive.shared.RedeemRequest
-import xyz.felismp.shoparchive.shared.RedeemResponse
 import xyz.felismp.shoparchive.shared.UnlockRequest
 import xyz.felismp.shoparchive.shared.UnlockResponse
 import xyz.felismp.shoparchive.shared.UpdateFile
@@ -22,9 +19,7 @@ interface ServerApi : RecordsApi, UpdatesApi {
     /** Tries [endpoint] before the others from now on (an address found by discovery, once its server is confirmed). */
     fun useEndpoint(endpoint: String)
     suspend fun info(): InfoResponse
-    suspend fun redeem(request: RedeemRequest): RedeemResponse
-    suspend fun enroll(enrollmentToken: String, request: EnrollRequest): EnrollResponse
-    /** Puts a user on this device by name and PIN, with no pairing; answers the device id and the user's device credential. */
+    /** Puts a user on this device by name and PIN; answers the device id and the user's device credential. */
     suspend fun login(request: LoginRequest): EnrollResponse
     suspend fun unlock(request: UnlockRequest): UnlockResponse
     suspend fun config(): ConfigResponse

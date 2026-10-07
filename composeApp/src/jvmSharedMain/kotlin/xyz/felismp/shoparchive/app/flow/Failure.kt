@@ -11,7 +11,7 @@ sealed interface Failure {
     /** The server said no: its error [code] and the machine [reason] key if it gave one. The screen words both in the user's language; the server's English text is never shown. */
     data class Refused(val code: ErrorCode, val reason: String? = null) : Failure
 
-    /** Any other client-side error (a cancelled PIN prompt, an ended session, ...), worded like the same [problem] on the pairing and lock screens. */
+    /** Any other client-side error (a cancelled PIN prompt, an ended session, ...), worded like the same [problem] on the login and lock screens. */
     data class Client(val problem: Problem) : Failure
 
     /** An unexpected local exception; the screen says so in general words and never shows the exception's own (English) message. */

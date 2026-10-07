@@ -45,7 +45,6 @@ import xyz.felismp.shoparchive.shared.OpenSessionRequest
 import xyz.felismp.shoparchive.shared.OpenSessionResponse
 import xyz.felismp.shoparchive.shared.SessionDto
 import xyz.felismp.shoparchive.shared.DeviceInfo
-import xyz.felismp.shoparchive.shared.EnrollRequest
 import xyz.felismp.shoparchive.shared.EnrollResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorResponse
@@ -54,8 +53,6 @@ import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.PROTOCOL_HEADER
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.ReauthRequest
-import xyz.felismp.shoparchive.shared.RedeemRequest
-import xyz.felismp.shoparchive.shared.RedeemResponse
 import xyz.felismp.shoparchive.shared.UnlockRequest
 import xyz.felismp.shoparchive.shared.UnlockResponse
 import xyz.felismp.shoparchive.shared.UpdateFile
@@ -70,7 +67,7 @@ import java.nio.file.StandardOpenOption
 internal val clientJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
 /**
- * Talks to one server. [pin] is the certificate pin (`PairPayload.fp`), [endpoints] are `host:port`.
+ * Talks to one server. [pin] is the certificate pin (see [pinnedHttpClient]), [endpoints] are `host:port`.
  * The access token lives only in this object's memory. On a connection failure (never on an HTTP error) the
  * next endpoint is tried and the one that worked is kept first, so the token survives a change of address.
  */
@@ -102,12 +99,6 @@ class ApiClient(
 
     /** `GET /api/v1/info`: needs no token and no matching protocol, so it tells a first-time client which server it reached. */
     override suspend fun info(): InfoResponse = decode(send(HttpMethod.Get, "/api/v1/info", null, Auth.None))
-
-    override suspend fun redeem(request: RedeemRequest): RedeemResponse = post("/api/v1/pair/redeem", request, auth = Auth.None)
-
-    /** [enrollmentToken] is the one `redeem` returned. */
-    override suspend fun enroll(enrollmentToken: String, request: EnrollRequest): EnrollResponse =
-        decode(send(HttpMethod.Post, "/api/v1/enroll", clientJson.encodeToString(request), enrollmentToken))
 
     /** The name and PIN in the body are the credential: no token is sent, so a 401 is a refusal ([ClientError.Api]), never [ClientError.Locked]. */
     override suspend fun login(request: LoginRequest): EnrollResponse = post("/api/v1/login", request, auth = Auth.None)
@@ -267,9 +258,6 @@ class ApiClient(
     internal suspend fun send(method: HttpMethod, path: String, body: String?, auth: Auth): String =
         exchange(method, path, auth) { body?.let { TextContent(it, ContentType.Application.Json) } }.text
 
-    private suspend fun send(method: HttpMethod, path: String, body: String?, bearer: String?): String =
-        exchange(method, path, bearer) { body?.let { TextContent(it, ContentType.Application.Json) } }.text
-
     private suspend fun exchange(method: HttpMethod, path: String, auth: Auth, content: () -> OutgoingContent?): Reply =
         exchange(method, path, if (auth == Auth.Token) token ?: throw ClientError.Locked() else null, content)
 
@@ -310,7 +298,7 @@ class ApiClient(
         }
         if (error?.code == ErrorCode.PROTOCOL_MISMATCH) throw ClientError.ProtocolMismatch(error.protocol, error.message)
         // A 401 means the token is gone, except where it says something else: a wrong PIN on /reauth, or "enter the PIN again".
-        if (status == 401 && bearer != null && !isEnrollment(path) && path != REAUTH_PATH && error?.code != ErrorCode.REAUTH_REQUIRED) {
+        if (status == 401 && bearer != null && path != REAUTH_PATH && error?.code != ErrorCode.REAUTH_REQUIRED) {
             token = null
             throw ClientError.Locked()
         }
@@ -324,8 +312,6 @@ class ApiClient(
     private class Reply(val status: Int, val bytes: ByteArray, val disposition: String?) {
         val text: String get() = bytes.decodeToString()
     }
-
-    private fun isEnrollment(path: String) = path == "/api/v1/enroll"
 
     private companion object {
         const val REAUTH_PATH = "/api/v1/reauth"

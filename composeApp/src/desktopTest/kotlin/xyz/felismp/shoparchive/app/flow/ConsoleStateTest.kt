@@ -110,11 +110,11 @@ class ConsoleStateTest {
         console.complete()
         assertEquals("user", console.ui.value.input)
 
-        h.api.completions = listOf("pair", "perm")
+        h.api.completions = listOf("plugin", "perm")
         console.setInput("user p")
         console.complete()
         assertEquals("user p", console.ui.value.input, "nothing to add")
-        assertEquals(ConsoleLine.Out("pair  perm"), console.ui.value.lines.last(), "the choices are listed instead")
+        assertEquals(ConsoleLine.Out("plugin  perm"), console.ui.value.lines.last(), "the choices are listed instead")
     }
 
     @Test fun theOldestLinesGoWhenTheConsoleIsFull() = runTest(UnconfinedTestDispatcher()) {

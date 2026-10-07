@@ -82,5 +82,5 @@ expect fun OnAppResume(action: () -> Unit)
 @Composable
 expect fun AppLanguage(tag: String?, content: @Composable () -> Unit)
 
-/** The label and platform name this device enrolls with by default. */
+/** The label and platform name this device logs in with. */
 expect fun thisDevice(context: PlatformContext): ThisDevice

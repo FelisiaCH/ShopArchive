@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -13,29 +12,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
-import xyz.felismp.shoparchive.app.client.formatFingerprint
 import xyz.felismp.shoparchive.app.AppBuild
 import xyz.felismp.shoparchive.app.flow.AppFlow
 import xyz.felismp.shoparchive.app.flow.AppState
-import xyz.felismp.shoparchive.app.flow.EnrollInput
-import xyz.felismp.shoparchive.app.flow.PasswordHint
-import xyz.felismp.shoparchive.app.flow.PinHint
-import xyz.felismp.shoparchive.app.flow.passwordHints
-import xyz.felismp.shoparchive.app.flow.pinHints
-import xyz.felismp.shoparchive.app.flow.formatCountdown
 import xyz.felismp.shoparchive.app.flow.Problem
 import xyz.felismp.shoparchive.app.flow.ReauthPrompt
 import xyz.felismp.shoparchive.app.resources.*
-import xyz.felismp.shoparchive.shared.DeviceMode
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
-
-private enum class PairTab { LINK, CODE }
 
 @Composable
 fun AppHost(flow: AppFlow) {
@@ -47,8 +34,6 @@ fun AppHost(flow: AppFlow) {
     when (val s = flow.state.collectAsState().value) {
         AppState.Starting -> ScreenFrame(stringResource(Res.string.app_name)) { ShopText(stringResource(Res.string.starting), muted = true) }
         is AppState.Servers -> ServersScreen(s, flow)
-        is AppState.Pair -> PairScreen(s, flow)
-        is AppState.Enroll -> EnrollScreen(s, flow)
         is AppState.Login -> LoginScreen(s, flow)
         is AppState.Locked -> LockedScreen(s, flow)
         is AppState.Unlocked -> flow.workspace?.let { Shell(s, flow, it) }
@@ -114,152 +99,7 @@ private fun ServersScreen(s: AppState.Servers, flow: AppFlow) {
     }
 }
 
-@Composable
-private fun PairScreen(s: AppState.Pair, flow: AppFlow) {
-    // A server picked from the list brings its address: the manual-code form starts with it.
-    var tab by rememberSaveable(s.address) { mutableStateOf(if (s.address.isEmpty()) PairTab.LINK else PairTab.CODE) }
-    // Secrets (link, code, password, PIN) use remember, never rememberSaveable: saved state can outlive the process outside the credential store.
-    var link by remember { mutableStateOf("") }
-    var address by rememberSaveable(s.address) { mutableStateOf(s.address) }
-    var username by rememberSaveable { mutableStateOf("") }
-    var code by remember { mutableStateOf("") }
-    val clipboard = LocalClipboardManager.current
-    ScreenFrame(stringResource(if (s.adding) Res.string.add_user_title else Res.string.pair_title)) {
-        val check = s.check
-        val preview = s.preview
-        when {
-            check != null -> {
-                ShopText(stringResource(Res.string.fp_title), TextRole.Title)
-                ShopText(stringResource(Res.string.fp_body))
-                ShopText(check.address, muted = true)
-                ShopText(check.fingerprint, TextRole.Mono)
-                Status(s.busy, s.problem)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ShopButton(stringResource(Res.string.fp_confirm), flow::confirmFingerprint, enabled = !s.busy)
-                    ShopButton(stringResource(Res.string.cancel), flow::cancelFingerprint, primary = false, enabled = !s.busy)
-                }
-            }
-            preview != null -> {
-                ShopText(stringResource(Res.string.link_found))
-                ShopText(stringResource(Res.string.link_user, preview.u))
-                ShopText(stringResource(Res.string.link_addresses, preview.ep.joinToString(", ")))
-                ShopText(stringResource(Res.string.link_fingerprint), muted = true)
-                ShopText(formatFingerprint(preview.fp), TextRole.Mono)
-                Status(s.busy, s.problem)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ShopButton(stringResource(Res.string.continue_), flow::redeemLink, enabled = !s.busy)
-                    ShopButton(stringResource(Res.string.cancel), flow::cancelPreview, primary = false, enabled = !s.busy)
-                }
-            }
-            else -> {
-                ShopSegmented(
-                    listOf(PairTab.LINK to stringResource(Res.string.tab_link), PairTab.CODE to stringResource(Res.string.tab_code)),
-                    tab, { tab = it },
-                )
-                if (tab == PairTab.LINK) {
-                    ShopTextField(link, { link = it }, stringResource(Res.string.link_label), kind = FieldKind.Multiline, enabled = !s.busy)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ShopButton(stringResource(Res.string.continue_), { flow.previewLink(link) }, enabled = !s.busy && link.isNotBlank())
-                        ShopButton(stringResource(Res.string.paste), { clipboard.getText()?.text?.let { link = it } }, primary = false)
-                    }
-                } else {
-                    ShopTextField(address, { address = it }, stringResource(Res.string.address_label), enabled = !s.busy)
-                    ShopTextField(username, { username = it }, stringResource(Res.string.username_label), enabled = !s.busy)
-                    ShopTextField(code, { code = it }, stringResource(Res.string.code_label), enabled = !s.busy)
-                    ShopButton(stringResource(Res.string.continue_), { flow.submitManual(address, username, code) }, enabled = !s.busy)
-                }
-                Status(s.busy, s.problem)
-                if (s.adding) ShopButton(stringResource(Res.string.add_user_back), flow::cancelAddUser, primary = false, enabled = !s.busy)
-                else ShopButton(stringResource(Res.string.servers_back), flow::showServers, primary = false, enabled = !s.busy)
-            }
-        }
-    }
-}
-
-@Composable
-private fun EnrollScreen(s: AppState.Enroll, flow: AppFlow) {
-    val r = s.redeem
-    var password by remember { mutableStateOf("") }
-    var passwordRepeat by remember { mutableStateOf("") }
-    var pin by remember { mutableStateOf("") }
-    var pinRepeat by remember { mutableStateOf("") }
-    var mode by rememberSaveable { mutableStateOf(DeviceMode.PERSONAL) }
-    var label by rememberSaveable { mutableStateOf(flow.device.label) }
-    val digits = r.pinLength.toString()
-    // The time is counted by the flow from the server's seconds; the screen only asks again now and then to redraw it.
-    var left by remember(s.deadlineMs) { mutableStateOf(flow.enrollSecondsLeft()) }
-    LaunchedEffect(s.deadlineMs) {
-        while (true) {
-            left = flow.enrollSecondsLeft()
-            if ((left ?: 0L) == 0L) break
-            delay(250)
-        }
-    }
-    val secondsLeft = left
-    if (secondsLeft == 0L) {
-        // Out of time: nothing to fill in any more, only the way back to a new pairing.
-        ScreenFrame(stringResource(Res.string.enroll_title)) {
-            ShopBanner(stringResource(Res.string.err_enroll_expired), Tone.Error)
-            ShopButton(stringResource(Res.string.start_over), flow::startOver, enabled = !s.busy)
-        }
-        return
-    }
-    ScreenFrame(stringResource(Res.string.enroll_title)) {
-        ShopText(stringResource(Res.string.enroll_user, r.username, s.server))
-        if (secondsLeft != null) ShopText(stringResource(Res.string.enroll_time_left, formatCountdown(secondsLeft)), TextRole.Caption, muted = true)
-        if (r.passwordRequired) {
-            if (r.hasPassword) {
-                ShopTextField(password, { password = it }, stringResource(Res.string.password_enter), kind = FieldKind.Password, enabled = !s.busy)
-            } else {
-                ShopTextField(password, { password = it }, stringResource(Res.string.password_new), kind = FieldKind.Password, enabled = !s.busy)
-                ShopTextField(passwordRepeat, { passwordRepeat = it }, stringResource(Res.string.password_repeat), kind = FieldKind.Password, enabled = !s.busy)
-                // Hints only: the server takes any password, so the button below stays on.
-                passwordHints(password, r.username, r.serverName, r.suggestedPasswordMin).forEach { ShopBanner(passwordHintWords(it), Tone.Info) }
-            }
-        }
-        if (r.hasPin) {
-            ShopTextField(pin, { pin = it }, stringResource(Res.string.pin_enter, digits), kind = FieldKind.Pin, enabled = !s.busy)
-        } else {
-            ShopTextField(pin, { pin = it }, stringResource(Res.string.pin_new, digits), kind = FieldKind.Pin, enabled = !s.busy)
-            ShopTextField(pinRepeat, { pinRepeat = it }, stringResource(Res.string.pin_repeat), kind = FieldKind.Pin, enabled = !s.busy)
-            pinHints(pin, r.pinLength).forEach { ShopBanner(pinHintWords(it), Tone.Info) }
-        }
-        if (!s.adding) {
-            ShopText(stringResource(Res.string.mode_label))
-            ShopSegmented(
-                listOf(DeviceMode.PERSONAL to stringResource(Res.string.mode_personal), DeviceMode.SHARED to stringResource(Res.string.mode_shared)),
-                mode, { mode = it },
-            )
-            ShopText(stringResource(if (mode == DeviceMode.PERSONAL) Res.string.mode_personal_hint else Res.string.mode_shared_hint), TextRole.Caption, muted = true)
-            ShopTextField(label, { label = it }, stringResource(Res.string.device_label), enabled = !s.busy)
-        }
-        Status(s.busy, s.problem)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ShopButton(
-                stringResource(Res.string.enroll_submit),
-                { flow.enroll(EnrollInput(password, passwordRepeat, pin, pinRepeat, mode, label)) },
-                enabled = !s.busy,
-            )
-            ShopButton(stringResource(Res.string.start_over), flow::startOver, primary = false, enabled = !s.busy)
-        }
-    }
-}
-
-@Composable
-private fun passwordHintWords(hint: PasswordHint): String = when (hint) {
-    is PasswordHint.Short -> stringResource(Res.string.hint_password_short, hint.length.toString(), hint.suggestedMin.toString())
-    PasswordHint.Common -> stringResource(Res.string.hint_password_common)
-    is PasswordHint.HasUserName -> stringResource(Res.string.hint_password_has_username, hint.name)
-    is PasswordHint.HasServerName -> stringResource(Res.string.hint_password_has_server_name, hint.name)
-}
-
-@Composable
-private fun pinHintWords(hint: PinHint): String = when (hint) {
-    is PinHint.Repeated -> stringResource(Res.string.hint_pin_repeated, hint.digit.toString())
-    is PinHint.Run -> stringResource(Res.string.hint_pin_run, hint.first.toString(), hint.last.toString())
-}
-
-/** A user name and PIN, without pairing; a user who has no PIN yet chooses one (typed twice). */
+/** A user name and PIN; a user who has no PIN yet chooses one (typed twice). */
 @Composable
 private fun LoginScreen(s: AppState.Login, flow: AppFlow) {
     var username by rememberSaveable { mutableStateOf("") }
@@ -290,7 +130,7 @@ private fun LoginScreen(s: AppState.Login, flow: AppFlow) {
     }
 }
 
-/** Personal device: the one user. Shared device: the people paired here, then the PIN of the one picked. */
+/** Personal device: the one user. Shared device: the people who logged in here, then the PIN of the one picked. */
 @Composable
 private fun LockedScreen(s: AppState.Locked, flow: AppFlow) {
     // A new field when the server asks for the password instead, or another user is picked: what was typed is not the next secret.
@@ -391,27 +231,18 @@ private fun SettingsScreen(s: AppState.Settings, flow: AppFlow) {
 
 @Composable
 internal fun Problem.text(): String = when (this) {
-    Problem.InvalidLink -> stringResource(Res.string.err_invalid_link)
     Problem.Unreachable -> stringResource(Res.string.err_unreachable)
-    Problem.PairingInvalid -> stringResource(Res.string.err_pairing_invalid)
     is Problem.TooManyAttempts -> if (seconds != null) stringResource(Res.string.err_too_many, seconds.toString()) else stringResource(Res.string.err_too_many_later)
     Problem.Banned -> stringResource(Res.string.err_banned)
     Problem.WrongCredentials -> stringResource(Res.string.err_wrong_credentials)
     Problem.CredentialsChanged -> stringResource(Res.string.err_credentials_changed)
     Problem.BadAddress -> stringResource(Res.string.err_bad_address)
     Problem.BadUsername -> stringResource(Res.string.err_bad_username)
-    Problem.BadCode -> stringResource(Res.string.err_bad_code)
-    Problem.PasswordEmpty -> stringResource(Res.string.err_password_empty)
-    Problem.PasswordsDiffer -> stringResource(Res.string.err_passwords_differ)
-    is Problem.PinFormat -> stringResource(Res.string.err_pin_format, length.toString())
     Problem.PinsDiffer -> stringResource(Res.string.err_pins_differ)
     Problem.PinDigits -> stringResource(Res.string.err_pin_digits)
     Problem.PersonalDevice -> stringResource(Res.string.err_personal_device)
-    Problem.LabelEmpty -> stringResource(Res.string.err_label_empty)
     Problem.SessionEnded -> stringResource(Res.string.err_session_ended)
     Problem.DeviceRejected -> stringResource(Res.string.err_device_rejected)
-    Problem.EnrollmentExpired -> stringResource(Res.string.err_enroll_expired)
-    Problem.WrongServer -> stringResource(Res.string.err_wrong_server)
     Problem.ReauthCancelled -> stringResource(Res.string.err_reauth_cancelled)
     is Problem.Rejected -> stringResource(refusalWords(code, reason))
     Problem.PinMismatch -> stringResource(Res.string.pinmm_body)

@@ -51,7 +51,7 @@ class DesktopCredentialStore(private val dir: Path, private val protector: Prote
         return try {
             decodeServers(protector.unprotect(Files.readAllBytes(file)))
         } catch (_: Exception) {
-            null // unreadable (other user, damaged): the device has to be paired again
+            null // unreadable (other user, damaged): the server has to be added again
         }
     }
 

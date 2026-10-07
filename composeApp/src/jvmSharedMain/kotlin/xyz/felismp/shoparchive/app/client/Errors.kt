@@ -4,13 +4,8 @@ import xyz.felismp.shoparchive.shared.ErrorCode
 
 /** Everything the client core can fail with; the UI picks its wording from the subclass. */
 sealed class ClientError(message: String, cause: Throwable? = null) : Exception(message, cause) {
-    /** The pasted text is not a pairing link. */
-    class InvalidPairLink(val reason: Reason) : ClientError("Not a valid pairing link: $reason") {
-        enum class Reason { NOT_A_PAIR_LINK, BAD_PAYLOAD, UNSUPPORTED_VERSION }
-    }
-
     /** The server answered with a certificate other than the pinned one: block and warn, never fall back. [endpoint] is the address that showed it, when known. */
-    class PinMismatch(cause: Throwable? = null, val endpoint: String? = null) : ClientError("The server's certificate is not the one this device was paired with", cause)
+    class PinMismatch(cause: Throwable? = null, val endpoint: String? = null) : ClientError("The server's certificate is not the one this device trusts", cause)
 
     /** No endpoint could be reached. */
     class Unreachable(cause: Throwable? = null) : ClientError("The server could not be reached", cause)

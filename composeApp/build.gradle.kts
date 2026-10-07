@@ -72,7 +72,6 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.ktor.client.websockets)
             implementation(libs.okhttp)
-            implementation(libs.zxing.core)
           }
         }
         commonMain.dependencies {

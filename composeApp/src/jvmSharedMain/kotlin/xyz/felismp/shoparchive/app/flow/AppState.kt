@@ -5,38 +5,25 @@ import xyz.felismp.shoparchive.app.client.ConnectionStatus
 import xyz.felismp.shoparchive.app.client.FoundServer
 import xyz.felismp.shoparchive.shared.DeviceInfo
 import xyz.felismp.shoparchive.shared.ErrorCode
-import xyz.felismp.shoparchive.shared.PairPayload
-import xyz.felismp.shoparchive.shared.RedeemResponse
 
 /** What went wrong, in terms the screen words itself (the text lives in strings.xml). */
 sealed interface Problem {
-    data object InvalidLink : Problem
     data object Unreachable : Problem
-    data object PairingInvalid : Problem
     data class TooManyAttempts(val seconds: Int?) : Problem
     data object Banned : Problem
     data object WrongCredentials : Problem
     data object CredentialsChanged : Problem
     data object BadAddress : Problem
     data object BadUsername : Problem
-    data object BadCode : Problem
-    data object PasswordEmpty : Problem
-    data object PasswordsDiffer : Problem
-    data class PinFormat(val length: Int) : Problem
     data object PinsDiffer : Problem
     /** A PIN typed at login is not 4 to 12 digits (the server's own length is not known before login; it refuses a wrong one). */
     data object PinDigits : Problem
     /** Adding a user: this device was set up as personal, so it holds one user; it has to be removed and the server added again. */
     data object PersonalDevice : Problem
-    data object LabelEmpty : Problem
     /** The access token is gone (the server ended the session): unlock again. */
     data object SessionEnded : Problem
-    /** The pairing is for another server than the one this device is already paired with. */
-    data object WrongServer : Problem
     /** Adding a user: the server accepted none of the device credentials this device holds (the device was removed from the server). */
     data object DeviceRejected : Problem
-    /** The time to finish setting up ran out: the pairing must be done again with a new link or code. */
-    data object EnrollmentExpired : Problem
     /** The PIN-or-password prompt was dismissed, so the action was not done. */
     data object ReauthCancelled : Problem
     /** The server said no: its error [code] and the machine [reason] key if it gave one, worded by the screen. */
@@ -54,9 +41,6 @@ sealed interface Problem {
 /** A server saved on this device, as the server list shows it: [endpoint] is the address tried first. */
 data class ServerRow(val serverId: String, val name: String, val endpoint: String, val userCount: Int)
 
-/** The fingerprint the user must compare with the server console before the manual-code pairing goes on. */
-data class FingerprintCheck(val address: String, val fingerprint: String)
-
 sealed interface AppState {
     data object Starting : AppState
 
@@ -72,31 +56,8 @@ sealed interface AppState {
         val busy: Boolean = false,
     ) : AppState
 
-    /** Both pairing tabs. [preview] is a parsed link waiting for Continue, [check] a fingerprint waiting for Confirm. */
-    data class Pair(
-        val preview: PairPayload? = null,
-        val check: FingerprintCheck? = null,
-        val busy: Boolean = false,
-        val problem: Problem? = null,
-        /** Pairing another user onto this shared device: the screen offers a way back to the lock screen. */
-        val adding: Boolean = false,
-        /** The server's address when it is already known (picked from the server list): the manual-code form starts with it. */
-        val address: String = "",
-    ) : AppState
-
-    data class Enroll(
-        val server: String,
-        val redeem: RedeemResponse,
-        val busy: Boolean = false,
-        val problem: Problem? = null,
-        /** Adding a user to this shared device: its name and mode are kept, so the form leaves them out. */
-        val adding: Boolean = false,
-        /** When the enrollment runs out, in [AppFlow]'s monotonic milliseconds (see [AppFlow.enrollSecondsLeft]); null when the server did not say. */
-        val deadlineMs: Long? = null,
-    ) : AppState
-
     /**
-     * Logging in on [server] (called [serverName]) with a user name and PIN, without pairing. [needsNewPin] once the server said the user
+     * Logging in on [server] (called [serverName]) with a user name and PIN. [needsNewPin] once the server said the user
      * has no PIN yet: the form then asks for a new one twice. [adding] when another user joins this device from the lock screen, which the screen offers a way back to.
      */
     data class Login(
@@ -109,7 +70,7 @@ sealed interface AppState {
     ) : AppState
 
     /**
-     * Stored credentials exist. [users] are the people paired on this device. On a [shared] device [username] is null until
+     * Stored credentials exist. [users] are the people who logged in on this device. On a [shared] device [username] is null until
      * one is picked; on a personal device it is the one user. [needsPassword] turns on after the server asks for it.
      */
     data class Locked(
