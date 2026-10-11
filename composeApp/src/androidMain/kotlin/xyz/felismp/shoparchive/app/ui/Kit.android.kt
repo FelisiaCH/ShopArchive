@@ -222,6 +222,14 @@ actual fun ShopChoice(text: String, selected: Boolean, onClick: () -> Unit, modi
     androidx.compose.material3.FilterChip(selected, onClick, label = { Text(text, style = MaterialTheme.typography.labelLarge) }, modifier = modifier)
 }
 
+actual val navigationPaneFrom = 900.dp
+
+actual val navigationBottomBar = true
+
+actual val shellInset = 16.dp
+
+actual fun Modifier.fillWidthOnPhone(): Modifier = fillMaxWidth()
+
 @Composable
 actual fun <T> ShopNavigation(items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T, onSelect: (T) -> Unit, wide: Boolean, content: @Composable () -> Unit) {
     val colors = ShopTheme.colors

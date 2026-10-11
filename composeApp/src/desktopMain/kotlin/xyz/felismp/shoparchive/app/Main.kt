@@ -25,7 +25,7 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = stringResource(Res.string.app_name), // "ShopArchive"
-        state = rememberWindowState(size = DpSize(900.dp, 700.dp)),
+        state = rememberWindowState(size = DpSize(1200.dp, 800.dp)),
     ) {
         SideEffect { window.minimumSize = Dimension(480, 560) }
         LaunchedEffect(Unit) { window.iconImages = windowIcons }

@@ -3,6 +3,7 @@ package xyz.felismp.shoparchive.app.ui
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import xyz.felismp.shoparchive.app.flow.ThisDevice
 import xyz.felismp.shoparchive.app.client.PlatformContext
 
@@ -55,7 +56,7 @@ expect fun ShopChip(text: String, tone: Tone, modifier: Modifier = Modifier)
 @Composable
 expect fun <T> ShopSegmented(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, modifier: Modifier = Modifier)
 
-/** A scrollable column for one screen inside the shell (the shell has the window background and insets): [title] on top, content centered up to a readable width. */
+/** A scrollable column for one screen inside the shell (the shell has the window background and insets): [title] on top, content up to a readable width (centered on Android, at the left on Windows). */
 @Composable
 expect fun ShopPage(title: String, content: @Composable ColumnScope.() -> Unit)
 
@@ -67,7 +68,22 @@ expect fun ShopCard(modifier: Modifier = Modifier, content: @Composable ColumnSc
 @Composable
 expect fun ShopChoice(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier)
 
-/** The app's navigation: a bottom bar when not [wide], a pane on the left when [wide]; each item shows [icon] with its label. [content] fills the rest. */
+/** The width from which the navigation is a full pane on the left (icons and labels). */
+expect val navigationPaneFrom: Dp
+
+/** True when the navigation is a bottom bar under [navigationPaneFrom] (Reports then sits under More); false when it stays a pane on the left, narrowed to icons. */
+expect val navigationBottomBar: Boolean
+
+/** The space at each side of the banners and the branch choice above the screens, so they line up with the page. */
+expect val shellInset: Dp
+
+/** Full width on Android, where a button fills its column; on Windows a button is as wide as its label. */
+expect fun Modifier.fillWidthOnPhone(): Modifier
+
+/**
+ * The app's navigation. [wide]: a pane on the left, each item with [icon] and label. Not [wide]: a bottom bar on Android, a narrow strip of icons
+ * on Windows (the label shows when the pointer rests on one). [content] fills the rest.
+ */
 @Composable
 expect fun <T> ShopNavigation(items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T, onSelect: (T) -> Unit, wide: Boolean, content: @Composable () -> Unit)
 

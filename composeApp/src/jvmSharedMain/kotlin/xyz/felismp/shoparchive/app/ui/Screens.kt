@@ -90,12 +90,12 @@ private fun ServersScreen(s: AppState.Servers, flow: AppFlow) {
             s.found.isEmpty() -> ShopText(stringResource(Res.string.servers_found_none), muted = true)
         }
         s.found.forEach { found ->
-            ShopButton("${found.name} · ${found.endpoint}", { flow.openFound(found) }, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
+            ShopButton("${found.name} · ${found.endpoint}", { flow.openFound(found) }, Modifier.fillWidthOnPhone(), primary = false, enabled = !s.busy)
         }
 
         ShopTextField(address, { address = it }, stringResource(Res.string.servers_add_label), enabled = !s.busy)
         Status(s.busy, s.problem)
-        ShopButton(stringResource(Res.string.servers_add), { flow.addServer(address) }, Modifier.fillMaxWidth(), enabled = !s.busy && address.isNotBlank())
+        ShopButton(stringResource(Res.string.servers_add), { flow.addServer(address) }, Modifier.fillWidthOnPhone(), enabled = !s.busy && address.isNotBlank())
     }
 }
 
@@ -123,10 +123,10 @@ private fun LoginScreen(s: AppState.Login, flow: AppFlow) {
         ShopButton(
             stringResource(Res.string.login_submit),
             { flow.login(username, pin, newPin.takeIf { s.needsNewPin }, newPinRepeat.takeIf { s.needsNewPin }) },
-            Modifier.fillMaxWidth(), enabled = !s.busy,
+            Modifier.fillWidthOnPhone(), enabled = !s.busy,
         )
-        if (s.adding) ShopButton(stringResource(Res.string.add_user_back), flow::cancelLogin, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
-        ShopButton(stringResource(Res.string.servers_back), flow::showServers, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
+        if (s.adding) ShopButton(stringResource(Res.string.add_user_back), flow::cancelLogin, Modifier.fillWidthOnPhone(), primary = false, enabled = !s.busy)
+        ShopButton(stringResource(Res.string.servers_back), flow::showServers, Modifier.fillWidthOnPhone(), primary = false, enabled = !s.busy)
     }
 }
 
@@ -139,9 +139,9 @@ private fun LockedScreen(s: AppState.Locked, flow: AppFlow) {
         val username = s.username
         if (username == null) {
             ShopText(stringResource(Res.string.lock_pick_user))
-            s.users.forEach { name -> ShopButton(name, { flow.selectUser(name) }, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy) }
+            s.users.forEach { name -> ShopButton(name, { flow.selectUser(name) }, Modifier.fillWidthOnPhone(), primary = false, enabled = !s.busy) }
             Status(s.busy, s.problem)
-            ShopButton(stringResource(Res.string.lock_add_user), flow::addUser, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
+            ShopButton(stringResource(Res.string.lock_add_user), flow::addUser, Modifier.fillWidthOnPhone(), primary = false, enabled = !s.busy)
         } else {
             ShopText(stringResource(Res.string.locked_body, username, s.server))
             ShopTextField(
@@ -152,13 +152,13 @@ private fun LockedScreen(s: AppState.Locked, flow: AppFlow) {
             Status(s.busy, s.problem)
             ShopButton(
                 stringResource(if (s.needsPassword) Res.string.unlock_password else Res.string.unlock_pin),
-                { flow.unlock(secret) }, Modifier.fillMaxWidth(), enabled = !s.busy,
+                { flow.unlock(secret) }, Modifier.fillWidthOnPhone(), enabled = !s.busy,
             )
-            if (s.shared) ShopButton(stringResource(Res.string.lock_other_user), { flow.selectUser(null) }, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
+            if (s.shared) ShopButton(stringResource(Res.string.lock_other_user), { flow.selectUser(null) }, Modifier.fillWidthOnPhone(), primary = false, enabled = !s.busy)
             // A personal device has no list of users to pick from: adding one starts here (an old personal device is told what to do).
-            else ShopButton(stringResource(Res.string.lock_add_user), flow::addUser, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
+            else ShopButton(stringResource(Res.string.lock_add_user), flow::addUser, Modifier.fillWidthOnPhone(), primary = false, enabled = !s.busy)
         }
-        ShopButton(stringResource(Res.string.servers_back), flow::showServers, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
+        ShopButton(stringResource(Res.string.servers_back), flow::showServers, Modifier.fillWidthOnPhone(), primary = false, enabled = !s.busy)
     }
 }
 
@@ -220,7 +220,7 @@ private fun SettingsScreen(s: AppState.Settings, flow: AppFlow) {
                 ShopButton(stringResource(Res.string.cancel), { confirmRemove = false }, primary = false, enabled = !s.busy)
             }
         } else {
-            ShopButton(stringResource(Res.string.remove_server), { confirmRemove = true }, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
+            ShopButton(stringResource(Res.string.remove_server), { confirmRemove = true }, Modifier.fillWidthOnPhone(), primary = false, enabled = !s.busy)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ShopButton(stringResource(Res.string.lock_now), { flow.lockNow() }, icon = ShopIcon.LockNow)

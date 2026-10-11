@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -206,5 +205,5 @@ private fun ExportSection(ws: Workspace) {
         ExportPhase.Idle -> Unit
     }
     if (ui.blocked) ShopText(stringResource(Res.string.needs_connection), TextRole.Caption, muted = true)
-    ShopButton(stringResource(Res.string.export_make), x::export, Modifier.fillMaxWidth(), enabled = ui.canExport)
+    ShopButton(stringResource(Res.string.export_make), x::export, Modifier.fillWidthOnPhone(), enabled = ui.canExport)
 }

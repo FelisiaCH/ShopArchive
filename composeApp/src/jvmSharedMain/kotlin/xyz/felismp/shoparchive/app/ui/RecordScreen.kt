@@ -89,7 +89,7 @@ fun RecordScreen(ws: Workspace) {
         PhaseNotice(ui, ws)
         ui.issues.firstOrNull()?.let { if (ui.phase !is SavePhase.Saved) ShopText(it.text(), TextRole.Caption, muted = true) }
         if (ui.block == SaveBlock.OFFLINE) ShopText(stringResource(Res.string.needs_connection), TextRole.Caption, muted = true)
-        ShopButton(stringResource(Res.string.record_save), record::save, Modifier.fillMaxWidth(), enabled = ui.canSave, icon = ShopIcon.Save)
+        ShopButton(stringResource(Res.string.record_save), record::save, Modifier.fillWidthOnPhone(), enabled = ui.canSave, icon = ShopIcon.Save)
     }
 }
 

@@ -1,7 +1,10 @@
 package xyz.felismp.shoparchive.app.fluent
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -44,6 +47,7 @@ import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import xyz.felismp.shoparchive.app.theme.FluentShapes
 import xyz.felismp.shoparchive.app.theme.FluentTheme
@@ -188,9 +192,36 @@ fun <T> FluentSelectorBar(
     }
 }
 
-/** Left navigation pane item: 36 high, radius 4, a 3x16 accent bar at the left edge when selected. */
+/**
+ * Left navigation pane item: 36 high, radius 4, a 3x16 accent bar at the left edge when selected. [compact] shows the icon alone, centered
+ * (the 48 wide strip), with the label in a tooltip.
+ */
 @Composable
-fun FluentNavigationItem(label: String, icon: ImageVector?, selected: Boolean, onClick: () -> Unit) {
+fun FluentNavigationItem(label: String, icon: ImageVector?, selected: Boolean, compact: Boolean = false, onClick: () -> Unit) {
+    if (compact) FluentTooltip(label) { NavigationItemBox(label, icon, selected, true, onClick) }
+    else NavigationItemBox(label, icon, selected, false, onClick)
+}
+
+/** A small label that shows to the right of [content] when the pointer rests on it. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FluentTooltip(text: String, content: @Composable () -> Unit) {
+    val c = FluentTheme.colors
+    TooltipArea(
+        tooltip = {
+            FluentText(
+                text, Modifier.clip(FluentShapes.control).background(c.card).border(1.dp, c.cardStroke, FluentShapes.control).padding(horizontal = 8.dp, vertical = 4.dp),
+                style = FluentTheme.typography.caption,
+            )
+        },
+        delayMillis = 500,
+        tooltipPlacement = TooltipPlacement.ComponentRect(Alignment.CenterEnd, Alignment.CenterEnd, DpOffset(8.dp, 0.dp)),
+        content = content,
+    )
+}
+
+@Composable
+private fun NavigationItemBox(label: String, icon: ImageVector?, selected: Boolean, compact: Boolean, onClick: () -> Unit) {
     val c = FluentTheme.colors
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
@@ -206,17 +237,21 @@ fun FluentNavigationItem(label: String, icon: ImageVector?, selected: Boolean, o
             .then(if (focused) Modifier.border(2.dp, c.shop.text, FluentShapes.control) else Modifier)
             .hoverable(source)
             .selectable(selected, source, indication = null, role = Role.Tab, onClick = onClick),
-        contentAlignment = Alignment.CenterStart,
+        contentAlignment = if (compact) Alignment.Center else Alignment.CenterStart,
     ) {
         if (selected) {
             Box(
-                Modifier.padding(start = 0.dp).size(width = 3.dp, height = 16.dp).clip(RoundedCornerShape(1.5.dp))
+                Modifier.align(Alignment.CenterStart).size(width = 3.dp, height = 16.dp).clip(RoundedCornerShape(1.5.dp))
                     .background(c.shop.accent),
             )
         }
-        Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (icon != null) Image(rememberVectorPainter(icon), contentDescription = null, Modifier.size(16.dp), colorFilter = ColorFilter.tint(c.shop.text))
-            FluentText(label, style = FluentTheme.typography.body)
+        if (compact) {
+            if (icon != null) Image(rememberVectorPainter(icon), contentDescription = label, Modifier.size(16.dp), colorFilter = ColorFilter.tint(c.shop.text))
+        } else {
+            Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (icon != null) Image(rememberVectorPainter(icon), contentDescription = null, Modifier.size(16.dp), colorFilter = ColorFilter.tint(c.shop.text))
+                FluentText(label, style = FluentTheme.typography.body)
+            }
         }
     }
 }

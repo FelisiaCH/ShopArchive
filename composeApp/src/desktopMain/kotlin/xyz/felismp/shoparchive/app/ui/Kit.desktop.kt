@@ -37,6 +37,10 @@ import xyz.felismp.shoparchive.app.theme.FluentTheme
 import xyz.felismp.shoparchive.app.theme.ThemeMode
 import java.util.Locale
 
+private val PAGE_MARGIN = 36.dp
+private val PAGE_MAX_WIDTH = 1000.dp
+private val FIELD_MAX_WIDTH = 520.dp
+
 @Composable
 actual fun ShopSkin(content: @Composable () -> Unit) = FluentTheme(ThemeMode.System, content)
 
@@ -77,7 +81,7 @@ actual fun ShopButton(text: String, onClick: () -> Unit, modifier: Modifier, pri
 @Composable
 actual fun ShopTextField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier, kind: FieldKind, enabled: Boolean) {
     FluentTextBox(
-        value, onValueChange, label, modifier,
+        value, onValueChange, label, modifier.widthIn(max = FIELD_MAX_WIDTH),
         singleLine = kind != FieldKind.Multiline,
         password = kind == FieldKind.Password || kind == FieldKind.Pin,
         enabled = enabled,
@@ -112,12 +116,13 @@ actual fun <T> ShopSegmented(options: List<Pair<T, String>>, selected: T, onSele
 
 @Composable
 actual fun ShopPage(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+    // As in a WinUI page: the title at the top left under the page margin, the content at most 1000 dp wide; the wheel scrolls anywhere in the window.
+    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Column(
-            Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
+            Modifier.widthIn(max = PAGE_MAX_WIDTH + PAGE_MARGIN * 2).fillMaxWidth().padding(horizontal = PAGE_MARGIN, vertical = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            FluentText(title, style = FluentTheme.typography.subtitle)
+            if (title.isNotEmpty()) FluentText(title, style = FluentTheme.typography.title)
             content()
         }
     }
@@ -130,21 +135,22 @@ actual fun ShopCard(modifier: Modifier, content: @Composable ColumnScope.() -> U
 actual fun ShopChoice(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier) =
     FluentButton(text, onClick, modifier, accent = selected)
 
+actual val navigationPaneFrom = 1008.dp // where WinUI's NavigationView goes from compact to expanded
+
+actual val navigationBottomBar = false
+
+actual val shellInset = PAGE_MARGIN
+
+actual fun Modifier.fillWidthOnPhone(): Modifier = this
+
 @Composable
 actual fun <T> ShopNavigation(items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T, onSelect: (T) -> Unit, wide: Boolean, content: @Composable () -> Unit) {
-    val layer = FluentTheme.colors.layer
-    if (wide) {
-        Row(Modifier.fillMaxSize().background(layer)) {
-            Column(Modifier.width(220.dp).fillMaxHeight().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                items.forEach { (value, label) -> FluentNavigationItem(label, icon(value).fluent(), value == selected) { onSelect(value) } }
-            }
-            Box(Modifier.weight(1f).fillMaxHeight()) { content() }
+    // The pane on the left is the 280 dp one with labels when [wide], else the 48 dp strip of icons; never a bottom bar.
+    Row(Modifier.fillMaxSize().background(FluentTheme.colors.layer)) {
+        Column(Modifier.width(if (wide) 280.dp else 48.dp).fillMaxHeight().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            items.forEach { (value, label) -> FluentNavigationItem(label, icon(value).fluent(), value == selected, compact = !wide) { onSelect(value) } }
         }
-    } else {
-        Column(Modifier.fillMaxSize().background(layer)) {
-            Box(Modifier.weight(1f).fillMaxWidth()) { content() }
-            FluentSelectorBar(items, selected, onSelect, Modifier.fillMaxWidth().padding(8.dp), icon = { icon(it).fluent() })
-        }
+        Box(Modifier.weight(1f).fillMaxHeight()) { content() }
     }
 }
 

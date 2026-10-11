@@ -23,7 +23,7 @@ import xyz.felismp.shoparchive.app.flow.Destination
 import xyz.felismp.shoparchive.app.flow.Workspace
 import xyz.felismp.shoparchive.app.resources.*
 
-/** The app after unlock: navigation (bottom bar under 900 dp wide, a left pane from 900), the connection banner and the branch choice over the current screen. */
+/** The app after unlock: navigation (see [navigationPaneFrom]), the connection banner and the branch choice over the current screen. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace) {
@@ -38,30 +38,31 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace) {
     val reports = stringResource(Res.string.nav_reports)
     val more = stringResource(Res.string.nav_more)
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth >= 900.dp
-        // Reports sit under More on a narrow screen and in the left pane from 900 dp. Before the config has loaded (or when it failed) only More
+        val wide = maxWidth >= navigationPaneFrom
+        // Reports sit under More when the navigation is a bottom bar and in the pane or strip on the left otherwise. Before the config has loaded (or when it failed) only More
         // is offered, so no entry is there that the workspace would ignore; the screen itself says it is loading, or offers a retry.
+        val folded = navigationBottomBar && !wide
         val items = listOf(Destination.TODAY to today, Destination.RECORD to record, Destination.HISTORY to history, Destination.REPORTS to reports)
-            .filter { (d, _) -> config is ConfigState.Ready && can.allows(d) && (d != Destination.REPORTS || wide) } + (Destination.MORE to more)
+            .filter { (d, _) -> config is ConfigState.Ready && can.allows(d) && (d != Destination.REPORTS || !folded) } + (Destination.MORE to more)
         val selected = when {
             destination == Destination.OPEN_DAY -> Destination.TODAY
-            destination == Destination.REPORTS && !wide -> Destination.MORE
+            destination == Destination.REPORTS && folded -> Destination.MORE
             destination == Destination.CONSOLE -> Destination.MORE
             else -> destination
         }
         ShopNavigation(items, Destination::icon, selected, ws::go, wide = wide) {
             Column(Modifier.fillMaxSize()) {
                 // Only when the server has a newer app for this platform (or a download is going on): never a button without an update.
-                ws.updates?.let { UpdatePanel(it, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) }
+                ws.updates?.let { UpdatePanel(it, modifier = Modifier.padding(horizontal = shellInset, vertical = 4.dp)) }
                 when (status) {
                     ConnectionStatus.CONNECTED -> Unit
-                    ConnectionStatus.CONNECTING -> ShopBanner(stringResource(Res.string.status_connecting), Tone.Info, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-                    ConnectionStatus.OFFLINE -> ShopBanner(stringResource(Res.string.offline_banner), Tone.Error, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    ConnectionStatus.CONNECTING -> ShopBanner(stringResource(Res.string.status_connecting), Tone.Info, Modifier.padding(horizontal = shellInset, vertical = 8.dp))
+                    ConnectionStatus.OFFLINE -> ShopBanner(stringResource(Res.string.offline_banner), Tone.Error, Modifier.padding(horizontal = shellInset, vertical = 8.dp))
                 }
                 val branches = ws.branches
                 if (branches.size > 1) {
                     FlowRow(
-                        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        Modifier.fillMaxWidth().padding(horizontal = shellInset, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         branches.forEach { b -> ShopChoice(b.displayName, b.key == branch, { ws.selectBranch(b.key) }) }
@@ -103,10 +104,10 @@ private fun MoreScreen(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, can: 
         ShopText(stringResource(Res.string.more_signed_in, s.username), muted = true)
         ShopText(s.server, TextRole.Caption, muted = true)
         can.reportsTabs.firstOrNull()?.let { first ->
-            ShopButton(stringResource(Res.string.nav_reports), { ws.openReports(first) }, Modifier.fillMaxWidth(), primary = false, icon = ShopIcon.Reports)
+            ShopButton(stringResource(Res.string.nav_reports), { ws.openReports(first) }, Modifier.fillWidthOnPhone(), primary = false, icon = ShopIcon.Reports)
         }
-        if (can.console) ShopButton(stringResource(Res.string.nav_console), { ws.go(Destination.CONSOLE) }, Modifier.fillMaxWidth(), primary = false, icon = ShopIcon.Console)
-        ShopButton(stringResource(Res.string.nav_settings), flow::openSettings, Modifier.fillMaxWidth(), primary = false, icon = ShopIcon.Settings)
-        ShopButton(stringResource(Res.string.lock_now), { flow.lockNow() }, Modifier.fillMaxWidth(), icon = ShopIcon.LockNow)
+        if (can.console) ShopButton(stringResource(Res.string.nav_console), { ws.go(Destination.CONSOLE) }, Modifier.fillWidthOnPhone(), primary = false, icon = ShopIcon.Console)
+        ShopButton(stringResource(Res.string.nav_settings), flow::openSettings, Modifier.fillWidthOnPhone(), primary = false, icon = ShopIcon.Settings)
+        ShopButton(stringResource(Res.string.lock_now), { flow.lockNow() }, Modifier.fillWidthOnPhone(), icon = ShopIcon.LockNow)
     }
 }
