@@ -37,20 +37,30 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace) {
     val history = stringResource(Res.string.nav_history)
     val reports = stringResource(Res.string.nav_reports)
     val more = stringResource(Res.string.nav_more)
+    val console = stringResource(Res.string.nav_console)
+    val settings = stringResource(Res.string.nav_settings)
+    val lockNow = stringResource(Res.string.lock_now)
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= navigationPaneFrom
         // Reports sit under More when the navigation is a bottom bar and in the pane or strip on the left otherwise. Before the config has loaded (or when it failed) only More
         // is offered, so no entry is there that the workspace would ignore; the screen itself says it is loading, or offers a retry.
         val folded = navigationBottomBar && !wide
         val items = listOf(Destination.TODAY to today, Destination.RECORD to record, Destination.HISTORY to history, Destination.REPORTS to reports)
-            .filter { (d, _) -> config is ConfigState.Ready && can.allows(d) && (d != Destination.REPORTS || !folded) } + (Destination.MORE to more)
+            .filter { (d, _) -> config is ConfigState.Ready && can.allows(d) && (d != Destination.REPORTS || !folded) }
+            .let { if (navigationBottomBar) it + (Destination.MORE to more) else it }
+        // Windows has no More: the console, Settings and Lock now sit at the foot of the pane.
+        val footer = if (navigationBottomBar) emptyList() else listOfNotNull(
+            if (can.console) NavAction(console, ShopIcon.Console, destination == Destination.CONSOLE) { ws.go(Destination.CONSOLE) } else null,
+            NavAction(settings, ShopIcon.Settings) { flow.openSettings() },
+        )
+        val account = if (navigationBottomBar) null else NavAccount(s.username, s.server, NavAction(lockNow, ShopIcon.LockNow) { flow.lockNow() })
         val selected = when {
             destination == Destination.OPEN_DAY -> Destination.TODAY
             destination == Destination.REPORTS && folded -> Destination.MORE
             destination == Destination.CONSOLE -> Destination.MORE
             else -> destination
         }
-        ShopNavigation(items, Destination::icon, selected, ws::go, wide = wide) {
+        ShopNavigation(items, Destination::icon, selected, ws::go, wide = wide, footer = footer, account = account) {
             Column(Modifier.fillMaxSize()) {
                 // Only when the server has a newer app for this platform (or a download is going on): never a button without an update.
                 ws.updates?.let { UpdatePanel(it, modifier = Modifier.padding(horizontal = shellInset, vertical = 4.dp)) }

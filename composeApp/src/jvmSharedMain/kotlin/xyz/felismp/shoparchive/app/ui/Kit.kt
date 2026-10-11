@@ -80,12 +80,35 @@ expect val shellInset: Dp
 /** Full width on Android, where a button fills its column; on Windows a button is as wide as its label. */
 expect fun Modifier.fillWidthOnPhone(): Modifier
 
+/** An entry of the navigation that is not one of its destinations (Console, Settings, Lock now). */
+class NavAction(val label: String, val icon: ShopIcon, val selected: Boolean = false, val onClick: () -> Unit)
+
+/** Who is signed in, with the action that locks the app. */
+class NavAccount(val name: String, val server: String, val lock: NavAction)
+
 /**
  * The app's navigation. [wide]: a pane on the left, each item with [icon] and label. Not [wide]: a bottom bar on Android, a narrow strip of icons
- * on Windows (the label shows when the pointer rests on one). [content] fills the rest.
+ * on Windows (the label shows when the pointer rests on one). Only Windows shows [footer] and [account], at the foot of the pane apart from the
+ * items; Android ignores them. [content] fills the rest.
  */
 @Composable
-expect fun <T> ShopNavigation(items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T, onSelect: (T) -> Unit, wide: Boolean, content: @Composable () -> Unit)
+expect fun <T> ShopNavigation(
+    items: List<Pair<T, String>>,
+    icon: (T) -> ShopIcon,
+    selected: T,
+    onSelect: (T) -> Unit,
+    wide: Boolean,
+    footer: List<NavAction> = emptyList(),
+    account: NavAccount? = null,
+    content: @Composable () -> Unit,
+)
+
+/**
+ * A screen that fills the window instead of scrolling, headed by [title]: the log of the console is one. Android centers a column of at most 720 dp;
+ * Windows puts it at the top left under the page margin, as [ShopPage] does.
+ */
+@Composable
+expect fun ShopFixedPage(title: String, content: @Composable ColumnScope.() -> Unit)
 
 /** Wraps the app: on Android 17+ asks for local network access first, elsewhere shows [content] straight away. */
 @Composable

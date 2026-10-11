@@ -15,6 +15,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -144,13 +153,53 @@ actual val shellInset = PAGE_MARGIN
 actual fun Modifier.fillWidthOnPhone(): Modifier = this
 
 @Composable
-actual fun <T> ShopNavigation(items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T, onSelect: (T) -> Unit, wide: Boolean, content: @Composable () -> Unit) {
-    // The pane on the left is the 280 dp one with labels when [wide], else the 48 dp strip of icons; never a bottom bar.
-    Row(Modifier.fillMaxSize().background(FluentTheme.colors.layer)) {
+actual fun ShopFixedPage(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxSize().padding(horizontal = PAGE_MARGIN, vertical = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        FluentText(title, style = FluentTheme.typography.title)
+        content()
+    }
+}
+
+@Composable
+actual fun <T> ShopNavigation(
+    items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T, onSelect: (T) -> Unit, wide: Boolean,
+    footer: List<NavAction>, account: NavAccount?, content: @Composable () -> Unit,
+) {
+    // The pane on the left is the 280 dp one with labels when [wide], else the 48 dp strip of icons; never a bottom bar. It sits on the window
+    // background, the page on a layer of its own: Fluent layer color, a 1 dp stroke along the top and left, the top left corner rounded by 8.
+    val colors = FluentTheme.colors
+    Row(Modifier.fillMaxSize().background(colors.backdrop)) {
         Column(Modifier.width(if (wide) 280.dp else 48.dp).fillMaxHeight().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             items.forEach { (value, label) -> FluentNavigationItem(label, icon(value).fluent(), value == selected, compact = !wide) { onSelect(value) } }
+            Spacer(Modifier.weight(1f))
+            footer.forEach { FluentNavigationItem(it.label, it.icon.fluent(), it.selected, compact = !wide, onClick = it.onClick) }
+            if (account != null) {
+                Box(Modifier.padding(horizontal = 4.dp, vertical = 4.dp).fillMaxWidth().height(1.dp).background(colors.cardStroke))
+                if (wide) {
+                    Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp)) {
+                        FluentText(account.name, style = FluentTheme.typography.bodyStrong, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        FluentText(account.server, style = FluentTheme.typography.caption, color = colors.shop.textSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                val lock = account.lock
+                FluentNavigationItem(lock.label, lock.icon.fluent(), false, compact = !wide, tooltip = "${account.name} · ${account.server} · ${lock.label}", onClick = lock.onClick)
+            }
         }
-        Box(Modifier.weight(1f).fillMaxHeight()) { content() }
+        val corner = 8.dp
+        Box(
+            Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(topStart = corner)).background(colors.layer).drawBehind {
+                val r = corner.toPx()
+                val stroke = 1.dp.toPx()
+                val o = stroke / 2
+                val edge = Path().apply {
+                    moveTo(o, size.height)
+                    lineTo(o, r)
+                    arcTo(Rect(o, o, 2 * r - o, 2 * r - o), 180f, 90f, false)
+                    lineTo(size.width, o)
+                }
+                drawPath(edge, colors.cardStroke, style = Stroke(stroke))
+            },
+        ) { content() }
     }
 }
 

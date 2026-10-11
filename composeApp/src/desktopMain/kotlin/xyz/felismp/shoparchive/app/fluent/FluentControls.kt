@@ -194,11 +194,11 @@ fun <T> FluentSelectorBar(
 
 /**
  * Left navigation pane item: 36 high, radius 4, a 3x16 accent bar at the left edge when selected. [compact] shows the icon alone, centered
- * (the 48 wide strip), with the label in a tooltip.
+ * (the 48 wide strip), with [tooltip] shown when the pointer rests on it.
  */
 @Composable
-fun FluentNavigationItem(label: String, icon: ImageVector?, selected: Boolean, compact: Boolean = false, onClick: () -> Unit) {
-    if (compact) FluentTooltip(label) { NavigationItemBox(label, icon, selected, true, onClick) }
+fun FluentNavigationItem(label: String, icon: ImageVector?, selected: Boolean, compact: Boolean = false, tooltip: String = label, onClick: () -> Unit) {
+    if (compact) FluentTooltip(tooltip) { NavigationItemBox(label, icon, selected, true, onClick) }
     else NavigationItemBox(label, icon, selected, false, onClick)
 }
 

@@ -231,7 +231,20 @@ actual val shellInset = 16.dp
 actual fun Modifier.fillWidthOnPhone(): Modifier = fillMaxWidth()
 
 @Composable
-actual fun <T> ShopNavigation(items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T, onSelect: (T) -> Unit, wide: Boolean, content: @Composable () -> Unit) {
+actual fun ShopFixedPage(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
+        Column(Modifier.widthIn(max = 720.dp).fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ShopText(title, TextRole.Title)
+            content()
+        }
+    }
+}
+
+@Composable
+actual fun <T> ShopNavigation(
+    items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T, onSelect: (T) -> Unit, wide: Boolean,
+    footer: List<NavAction>, account: NavAccount?, content: @Composable () -> Unit,
+) {
     val colors = ShopTheme.colors
     // As in the Material navigation components: the icon over the label in the bottom bar, beside it in the pane.
     @Composable
