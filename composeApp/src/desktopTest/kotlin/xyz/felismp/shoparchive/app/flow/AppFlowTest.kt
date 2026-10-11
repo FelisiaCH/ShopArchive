@@ -577,6 +577,21 @@ class AppFlowTest {
         assertIs<AppState.Unlocked>(f.state.value)
     }
 
+    @Test fun aPinLengthRefusalReplacesTheLengthTheServerSaidBefore() {
+        api.noPinYet += "alice"
+        api.pinLengthSaid = 6
+        val f = loginFlow()
+        f.login("alice", "")
+        api.failLogin = ClientError.Api(400, ErrorCode.INVALID_REQUEST, "The PIN must be exactly 8 digits.", reason = ErrorReasons.PIN_LENGTH, pinLength = 8)
+        f.login("alice", "", newPin = "483926", newPinRepeat = "483926")
+        val s = assertIs<AppState.Login>(f.state.value)
+        assertEquals(8, s.pinLength)
+        assertEquals(Problem.PinExactly(8), s.problem)
+        api.failLogin = null
+        f.login("alice", "", newPin = "48392615", newPinRepeat = "48392615")
+        assertIs<AppState.Unlocked>(f.state.value)
+    }
+
     @Test fun aServerThatDoesNotSayHowManyDigitsStillTakesFourToTwelve() {
         api.noPinYet += "alice"
         val f = loginFlow()

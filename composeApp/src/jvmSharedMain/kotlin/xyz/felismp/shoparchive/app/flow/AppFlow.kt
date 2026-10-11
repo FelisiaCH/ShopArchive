@@ -673,6 +673,8 @@ class AppFlow(
                 when (reason) {
                     ErrorReasons.PIN_NOT_SET -> _state.value = s.copy(needsNewPin = true, pinLength = e.pinLength, busy = false, problem = null)
                     ErrorReasons.DEVICE_PERSONAL -> _state.value = s.copy(busy = false, problem = Problem.PersonalDevice)
+                    // The server's length may have changed (config reload) since it said pin.not-set: keep the one it gives now.
+                    ErrorReasons.PIN_LENGTH -> _state.value = s.copy(pinLength = e.pinLength ?: s.pinLength, busy = false, problem = e.toProblem())
                     else -> blockOr(e) { _state.value = s.copy(busy = false, problem = it) }
                 }
                 return@launch
