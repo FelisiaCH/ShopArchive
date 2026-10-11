@@ -33,11 +33,17 @@ private fun parseBool(word: String): Boolean = when (word) {
 /** Starts an account over (no devices, no password, no PIN); the user sets a new PIN at their next login. */
 internal typealias ResetUser = (CommandSender, String) -> Unit
 
-/** `user`, `perm`, `role`, `op` and `deop`, registered like any plugin command. Without [reset] there is no `user reset`; [disable] also revokes the grants of the account (same type as [reset]). */
-internal fun registerUserCommands(commands: CommandRegistry, users: UserStore, reset: ResetUser? = null, disable: ResetUser? = null) {
+/** `user`, `perm`, `role`, `op` and `deop`, registered like any plugin command. Without [reset] there is no `user reset`; [disable] also revokes the grants of the account (same type as [reset]). [activeBranches] are the keys of the branches not archived: a `user add` without `--branch` joins the only one. */
+internal fun registerUserCommands(
+    commands: CommandRegistry,
+    users: UserStore,
+    reset: ResetUser? = null,
+    disable: ResetUser? = null,
+    activeBranches: () -> List<String> = { emptyList() },
+) {
     val bools = listOf("true", "false")
 
-    commands.register(UserCommand("user", "Manage users: add, list, info, enable, disable, unlock, reset, rename, role, branch", { sender, args -> userCommand(users, sender, args, reset, disable) }) { args ->
+    commands.register(UserCommand("user", "Manage users: add, list, info, enable, disable, unlock, reset, rename, role, branch", { sender, args -> userCommand(users, sender, args, reset, disable, activeBranches) }) { args ->
         val sub = args.first()
         when {
             args.size == 1 -> listOf("add", "list", "info", "enable", "disable", "unlock", "reset", "rename", "role", "branch")
@@ -87,17 +93,21 @@ private fun addCompletion(users: UserStore, args: List<String>): List<String> {
     }
 }
 
-private fun userCommand(users: UserStore, sender: CommandSender, args: List<String>, reset: ResetUser?, disable: ResetUser?) {
+private fun userCommand(users: UserStore, sender: CommandSender, args: List<String>, reset: ResetUser?, disable: ResetUser?, activeBranches: () -> List<String>) {
     val rest = args.drop(1)
     when (args.firstOrNull()) {
         "add" -> {
             if (rest.isEmpty()) usage("user add <name> [--role <role>] [--branch <branch>...]")
-            val (role, branches) = parseAddFlags(rest.drop(1))
+            val (role, given) = parseAddFlags(rest.drop(1))
+            // Without --branch a new user would have nowhere to work; with exactly one branch there is no choice to make.
+            val active = if (given.isEmpty()) activeBranches() else emptyList()
+            val branches = given.ifEmpty { active.takeIf { it.size == 1 }.orEmpty() }
             users.addUser(rest[0], role, branches)
             sender.sendMessage(
                 "User '${rest[0]}' created" + (if (role != NO_ROLE) ", role $role" else "") + (if (branches.isNotEmpty()) ", branches ${branches.joinToString()}" else "") +
                     ". They open the app, type the name '${rest[0]}' and set their own PIN.",
             )
+            if (given.isEmpty() && active.size > 1) sender.sendMessage("No branch yet: user branch ${rest[0]} add <branch>")
         }
         "list" -> {
             if (users.userNames().isEmpty()) sender.sendMessage("No users yet. Create one with: user add <name>")

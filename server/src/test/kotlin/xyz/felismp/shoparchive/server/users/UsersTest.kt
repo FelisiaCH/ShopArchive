@@ -47,6 +47,8 @@ class UsersTest {
     private val sender = RecordingSender()
     private val commands = Commands()
     private lateinit var store: UserStore
+    /** The keys of the branches that are not archived, as the server reads them from `data/branches.yml`. */
+    private var activeBranches = emptyList<String>()
 
     @BeforeTest
     fun setUp() {
@@ -57,7 +59,7 @@ class UsersTest {
         store = UserStore(root, nodes, config, log, FIXED_CLOCK)
         store.load()
         registerCoreCommands(commands, config, mapOf("users" to store::load))
-        registerUserCommands(commands, store)
+        registerUserCommands(commands, store) { activeBranches }
     }
 
     /** Runs [line] and returns what the console printed for it. */
@@ -136,6 +138,47 @@ class UsersTest {
 
         assertTrue("branches: [market, shop2, extra]" in root.text("user/lek.yml"), root.text("user/lek.yml"))
         assertEquals(listOf("User 'lek' has no branch 'main'"), run("user branch lek remove main"))
+    }
+
+    @Test
+    fun userAddWithoutABranchJoinsTheOnlyActiveBranch() {
+        activeBranches = listOf("main")
+
+        val reply = run("user add noy")
+
+        assertEquals(listOf("User 'noy' created, branches main. They open the app, type the name 'noy' and set their own PIN."), reply)
+        assertTrue("branches: [main]" in root.text("user/noy.yml"), root.text("user/noy.yml"))
+    }
+
+    @Test
+    fun userAddWithoutABranchAmongSeveralLeavesNoneAndSaysHowToAddOne() {
+        activeBranches = listOf("main", "market")
+
+        val reply = run("user add noy")
+
+        assertEquals(
+            listOf("User 'noy' created. They open the app, type the name 'noy' and set their own PIN.", "No branch yet: user branch noy add <branch>"),
+            reply,
+        )
+        assertTrue("branches: []" in root.text("user/noy.yml"), root.text("user/noy.yml"))
+    }
+
+    @Test
+    fun userAddWithAnExplicitBranchIgnoresTheActiveBranches() {
+        activeBranches = listOf("main")
+
+        val reply = run("user add noy --branch market")
+
+        assertEquals(listOf("User 'noy' created, branches market. They open the app, type the name 'noy' and set their own PIN."), reply)
+        assertTrue("branches: [market]" in root.text("user/noy.yml"), root.text("user/noy.yml"))
+    }
+
+    @Test
+    fun userAddWithoutAnyActiveBranchLeavesNoneAndSaysNothingMore() {
+        val reply = run("user add noy")
+
+        assertEquals(listOf("User 'noy' created. They open the app, type the name 'noy' and set their own PIN."), reply)
+        assertTrue("branches: []" in root.text("user/noy.yml"), root.text("user/noy.yml"))
     }
 
     @Test

@@ -184,7 +184,7 @@ internal class AuthEnv(
             alsoOnReload = setOf("devices"),
         )
         val accounts = AccountConsole(users, auth.devices, auth.sessions, auth.audit, barrier)
-        registerUserCommands(commands, users, accounts::reset, accounts::disable)
+        registerUserCommands(commands, users, accounts::reset, accounts::disable) { records?.branches?.activeKeys().orEmpty() }
         accounts.register(commands)
         registerSayCommand(commands, services)
         if (records != null) registerRecordCommands(commands, records)

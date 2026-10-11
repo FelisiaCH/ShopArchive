@@ -57,6 +57,20 @@ class BranchesCategoriesTest {
     }
 
     @Test
+    fun aNewUserJoinsTheOnlyActiveBranchAndArchivedBranchesDoNotCount() = env().run {
+        console("branch add main Main")
+        console("branch add market Market")
+        console("branch archive market")
+
+        assertEquals("User 'a1x' created, branches main. They open the app, type the name 'a1x' and set their own PIN.", console("user add a1x").single())
+
+        console("branch unarchive market")
+        assertEquals(listOf("main", "market"), records!!.branches.activeKeys())
+        assertEquals("No branch yet: user branch b2x add <branch>", console("user add b2x").last())
+        assertEquals(emptyList(), users.user("b2x").branches)
+    }
+
+    @Test
     fun branchCommandsRefuseWhatIsWrongWithAMessageNotACrash() = env().run {
         console("branch add main Main")
 

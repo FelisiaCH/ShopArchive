@@ -68,6 +68,9 @@ internal class BranchStore(private val files: DataFileStore<List<Branch>>) {
 
     fun all(): List<Branch> = files.value
 
+    /** The keys of the branches that are not archived. */
+    fun activeKeys(): List<String> = all().filter { !it.archived }.map { it.key }
+
     fun find(key: String): Branch? = all().firstOrNull { it.key == key }
 
     fun add(key: String, displayName: String): Branch {
