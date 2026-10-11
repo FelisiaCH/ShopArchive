@@ -51,10 +51,11 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
             ws.go(to)
         }
         // Reports sit under More when the navigation is a bottom bar and in the pane or strip on the left otherwise. Before the config has loaded (or when it failed) only More
-        // is offered, so no entry is there that the workspace would ignore; the screen itself says it is loading, or offers a retry.
+        // is offered, so no entry is there that the workspace would ignore; the screen itself says it is loading, or offers a retry. Windows has no More: Today stays,
+        // so there is always a way out of Settings back to that screen.
         val folded = navigationBottomBar && !wide
         val items = listOf(Destination.TODAY to today, Destination.RECORD to record, Destination.HISTORY to history, Destination.REPORTS to reports)
-            .filter { (d, _) -> config is ConfigState.Ready && can.allows(d) && (d != Destination.REPORTS || !folded) }
+            .filter { (d, _) -> (config is ConfigState.Ready || (d == Destination.TODAY && !navigationBottomBar)) && can.allows(d) && (d != Destination.REPORTS || !folded) }
             .let { if (navigationBottomBar) it + (Destination.MORE to more) else it }
         // Windows has no More: the console, Settings and Lock now sit at the foot of the pane.
         val footer = if (navigationBottomBar) emptyList() else listOfNotNull(
