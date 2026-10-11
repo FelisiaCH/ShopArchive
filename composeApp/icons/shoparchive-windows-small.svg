@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Windows app icon, 16 to 24 px: the same page and coin with heavier strokes, two lines instead of three and a filled coin, so it stays readable. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="70 48 410 410" fill="none">
+  <g stroke="#245A5A" stroke-width="44" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M112 68H300L392 160V420H112V68Z" fill="white"/>
+    <path d="M300 68V160H392"/>
+    <path d="M178 236H300"/>
+    <path d="M178 318H250"/>
+  </g>
+  <circle cx="358" cy="358" r="110" fill="white"/>
+  <circle cx="358" cy="358" r="92" fill="#245A5A"/>
+  <g stroke="white" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M358 300V416"/>
+    <path d="M396 322C386 308 372 302 354 302C332 302 316 314 316 332C316 351 331 359 358 364C385 369 400 378 400 396C400 416 383 428 358 428C336 428 318 420 308 404"/>
+  </g>
+</svg>

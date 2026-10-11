@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Themed icon (Android 13+): ic_launcher_foreground in one colour the system tints. With no white to hide them, the page's right
+  and bottom edges stop, round caps included, where the coin's white ring was (r = 94 around 358,358) instead of running under the coin.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.124"
+        android:scaleY="0.124"
+        android:translateX="19.9"
+        android:translateY="22.63">
+        <path
+            android:pathData="M392,256.4V160L300,68H112V420H273.35 M300,68V160H392 M164,224H314 M164,286H283 M164,348H250"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="28"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M276,358a82,82 0,1 0,164 0a82,82 0,1 0,-164 0Z"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="24" />
+        <path
+            android:pathData="M358,306V410 M392,324C383,310 370,304 354,304C333,304 318,316 318,333C318,351 332,359 358,364C383,369 398,378 398,395C398,414 382,426 358,426C337,426 320,418 310,402"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="20"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>
