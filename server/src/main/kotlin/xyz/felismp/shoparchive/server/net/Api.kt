@@ -102,8 +102,8 @@ private fun gate(services: ServiceRegistry) = createApplicationPlugin("ShopArchi
     }
 }
 
-private suspend fun ApplicationCall.respondError(status: HttpStatusCode, code: ErrorCode, message: String, passwordRequired: Boolean = false, reason: String? = null) =
-    respond(status, ErrorResponse(code, message, PROTOCOL_VERSION, passwordRequired, reason))
+private suspend fun ApplicationCall.respondError(status: HttpStatusCode, code: ErrorCode, message: String, passwordRequired: Boolean = false, reason: String? = null, pinLength: Int? = null) =
+    respond(status, ErrorResponse(code, message, PROTOCOL_VERSION, passwordRequired, reason, pinLength))
 
 internal val PrincipalKey = AttributeKey<Principal>("ShopArchivePrincipal")
 
@@ -204,7 +204,7 @@ internal fun Application.apiModule(
         exception<ApiException> { call, e -> call.respondError(e.status, e.code, e.message ?: e.code.name, reason = e.reason) }
         exception<ApiError> { call, e ->
             e.retryAfterSeconds?.let { call.response.header(HttpHeaders.RetryAfter, it.toString()) }
-            call.respondError(HttpStatusCode.fromValue(e.status), e.code, e.message ?: e.code.name, e.passwordRequired, e.reason)
+            call.respondError(HttpStatusCode.fromValue(e.status), e.code, e.message ?: e.code.name, e.passwordRequired, e.reason, e.pinLength)
         }
         exception<BadRequestException> { call, _ ->
             call.respondError(HttpStatusCode.BadRequest, ErrorCode.INVALID_REQUEST, "The request body is missing or is not the JSON this endpoint takes.")

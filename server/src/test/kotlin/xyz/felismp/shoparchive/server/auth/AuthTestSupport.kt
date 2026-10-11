@@ -244,6 +244,8 @@ internal suspend fun HttpResponse.errorCode(): ErrorCode = parsed(ErrorResponse.
 
 internal suspend fun HttpResponse.errorReason(): String? = parsed(ErrorResponse.serializer()).reason
 
+internal suspend fun HttpResponse.errorPinLength(): Int? = parsed(ErrorResponse.serializer()).pinLength
+
 /** Runs [block] against the real API module on the env's services. */
 internal fun AuthEnv.api(rateLimitPerMinute: Int = 1000, block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
     application { apiModule(services, 1024 * 1024, rateLimitPerMinute = rateLimitPerMinute, entryBodyBytes = { settings.records.entryBodyBytes(1024 * 1024) }) }

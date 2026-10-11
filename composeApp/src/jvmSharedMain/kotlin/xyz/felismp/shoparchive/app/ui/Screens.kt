@@ -113,8 +113,8 @@ private fun LoginScreen(s: AppState.Login, flow: AppFlow) {
         ShopTextField(username, { username = it }, stringResource(Res.string.username_label), enabled = !s.busy)
         if (s.needsNewPin) {
             ShopText(stringResource(Res.string.login_set_pin))
-            // The server's PIN length is not known before login: 4 to 12 digits, and the server refuses a wrong length in words.
-            ShopTextField(newPin, { newPin = it }, stringResource(Res.string.pin_new, "4–12"), kind = FieldKind.Pin, enabled = !s.busy)
+            // An old server does not say how many digits: then 4 to 12, and the server refuses a wrong length in words.
+            ShopTextField(newPin, { newPin = it }, stringResource(Res.string.pin_new, s.pinLength?.toString() ?: "4–12"), kind = FieldKind.Pin, enabled = !s.busy)
             ShopTextField(newPinRepeat, { newPinRepeat = it }, stringResource(Res.string.pin_repeat), kind = FieldKind.Pin, enabled = !s.busy)
         } else {
             ShopTextField(pin, { pin = it }, stringResource(Res.string.pin_field), kind = FieldKind.Pin, enabled = !s.busy)
@@ -240,6 +240,7 @@ internal fun Problem.text(): String = when (this) {
     Problem.BadUsername -> stringResource(Res.string.err_bad_username)
     Problem.PinsDiffer -> stringResource(Res.string.err_pins_differ)
     Problem.PinDigits -> stringResource(Res.string.err_pin_digits)
+    is Problem.PinExactly -> stringResource(Res.string.err_pin_exact, length)
     Problem.PersonalDevice -> stringResource(Res.string.err_personal_device)
     Problem.SessionEnded -> stringResource(Res.string.err_session_ended)
     Problem.DeviceRejected -> stringResource(Res.string.err_device_rejected)

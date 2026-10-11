@@ -126,6 +126,8 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
     var failLogin: Exception? = null
     /** Users the fake server knows who have no PIN yet: a login without a new PIN is told `pin.not-set`. */
     val noPinYet = mutableSetOf<String>()
+    /** What the fake server says a PIN needs when it tells `pin.not-set`; null like an old server. */
+    var pinLengthSaid: Int? = null
     val logins = mutableListOf<LoginRequest>()
     var failUnlock: Exception? = null
     var protocol = PROTOCOL_VERSION
@@ -139,7 +141,7 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
     override suspend fun login(request: LoginRequest): LoginResponse {
         reach(); logins += request; failLogin?.let { throw it }
         if (request.deviceCredential in badDeviceCredentials) throw ClientError.Api(401, ErrorCode.DEVICE_NOT_RECOGNIZED, "This device is not recognized for that user.")
-        if (request.username in noPinYet && request.newPin == null) throw ClientError.Api(401, ErrorCode.UNAUTHORIZED, "Set a PIN.", reason = ErrorReasons.PIN_NOT_SET)
+        if (request.username in noPinYet && request.newPin == null) throw ClientError.Api(401, ErrorCode.UNAUTHORIZED, "Set a PIN.", reason = ErrorReasons.PIN_NOT_SET, pinLength = pinLengthSaid)
         if (WRONG_PIN in listOf(request.pin, request.newPin)) throw ClientError.Api(401, ErrorCode.UNAUTHORIZED, "Login failed.")
         return LoginResponse(request.deviceId ?: "dev-new", "cred-${request.username}")
     }
@@ -557,6 +559,38 @@ class AppFlowTest {
         f.login(" ", "483926")
         assertEquals(Problem.BadUsername, assertIs<AppState.Login>(f.state.value).problem)
         assertEquals(1, api.logins.size, "only the first try was sent")
+    }
+
+    @Test fun aNewPinMustHaveExactlyTheDigitsTheServerSaid() {
+        api.noPinYet += "alice"
+        api.pinLengthSaid = 6
+        val f = loginFlow()
+        f.login("alice", "")
+        assertEquals(6, assertIs<AppState.Login>(f.state.value).pinLength)
+        f.login("alice", "", newPin = "4839", newPinRepeat = "4839")
+        assertEquals(Problem.PinExactly(6), assertIs<AppState.Login>(f.state.value).problem)
+        f.login("alice", "", newPin = "4839261", newPinRepeat = "4839261")
+        assertEquals(Problem.PinExactly(6), assertIs<AppState.Login>(f.state.value).problem)
+        assertEquals(1, api.logins.size, "only the first try was sent")
+        f.login("alice", "", newPin = "483926", newPinRepeat = "483926")
+        assertEquals(LoginRequest("alice", "Test PC", "windows", DeviceMode.SHARED, newPin = "483926"), api.logins.last())
+        assertIs<AppState.Unlocked>(f.state.value)
+    }
+
+    @Test fun aServerThatDoesNotSayHowManyDigitsStillTakesFourToTwelve() {
+        api.noPinYet += "alice"
+        val f = loginFlow()
+        f.login("alice", "")
+        assertNull(assertIs<AppState.Login>(f.state.value).pinLength)
+        f.login("alice", "", newPin = "4839", newPinRepeat = "4839")
+        assertIs<AppState.Unlocked>(f.state.value)
+    }
+
+    @Test fun aPinLengthRefusalSaysTheNumberWhenTheServerGaveIt() {
+        val refused = ClientError.Api(400, ErrorCode.INVALID_REQUEST, "The PIN must be exactly 6 digits.", reason = ErrorReasons.PIN_LENGTH, pinLength = 6)
+        assertEquals(Problem.PinExactly(6), refused.toProblem())
+        val oldServer = ClientError.Api(400, ErrorCode.INVALID_REQUEST, "The PIN must be exactly 6 digits.", reason = ErrorReasons.PIN_LENGTH)
+        assertEquals(Problem.Rejected(ErrorCode.INVALID_REQUEST, ErrorReasons.PIN_LENGTH), oldServer.toProblem())
     }
 
     @Test fun aWrongPinSaysSoAndSavesNothing() {

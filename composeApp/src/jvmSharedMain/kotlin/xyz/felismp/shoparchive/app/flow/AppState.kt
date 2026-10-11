@@ -18,6 +18,8 @@ sealed interface Problem {
     data object PinsDiffer : Problem
     /** A PIN typed at login is not 4 to 12 digits (the server's own length is not known before login; it refuses a wrong one). */
     data object PinDigits : Problem
+    /** A new PIN is not exactly [length] digits, the number the server said it needs. */
+    data class PinExactly(val length: Int) : Problem
     /** Adding a user: this device was set up as personal, so it holds one user; it has to be removed and the server added again. */
     data object PersonalDevice : Problem
     /** The access token is gone (the server ended the session): unlock again. */
@@ -58,12 +60,13 @@ sealed interface AppState {
 
     /**
      * Logging in on [server] (called [serverName]) with a user name and PIN. [needsNewPin] once the server said the user
-     * has no PIN yet: the form then asks for a new one twice. [adding] when another user joins this device from the lock screen, which the screen offers a way back to.
+     * has no PIN yet: the form then asks for a new one twice, of [pinLength] digits when the server said how many. [adding] when another user joins this device from the lock screen, which the screen offers a way back to.
      */
     data class Login(
         val server: String,
         val serverName: String,
         val needsNewPin: Boolean = false,
+        val pinLength: Int? = null,
         val busy: Boolean = false,
         val problem: Problem? = null,
         val adding: Boolean = false,

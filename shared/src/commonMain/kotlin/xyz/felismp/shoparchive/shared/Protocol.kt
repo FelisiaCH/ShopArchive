@@ -135,6 +135,8 @@ class Refusal(val reason: String, val message: String)
  * on [ErrorCode.REAUTH_REQUIRED] from `/unlock` when the PIN is not enough and the app must ask for the password.
  * [reason] is a stable machine key from [ErrorReasons] (null when the [code] says enough); the app words it in the user's
  * language. [message] stays English, for logs, the console and curl, and the app does not show it.
+ * [pinLength] is the digits a PIN needs (`auth.pin.length`) on [ErrorReasons.PIN_NOT_SET] and [ErrorReasons.PIN_LENGTH], null otherwise
+ * and from a server that does not send it; the app has no [ConfigResponse] to read it from before the first login.
  */
 @Serializable
 data class ErrorResponse(
@@ -143,6 +145,7 @@ data class ErrorResponse(
     val protocol: Int,
     val passwordRequired: Boolean = false,
     val reason: String? = null,
+    val pinLength: Int? = null,
 )
 
 @Serializable

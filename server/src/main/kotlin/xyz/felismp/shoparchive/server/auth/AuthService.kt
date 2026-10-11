@@ -75,7 +75,7 @@ internal class DefaultAuthService(
             proveExisting(username, user, request, ip)
             // This tells whoever asks that the name exists and has no PIN; the app needs it to ask for a new PIN.
             if (!isUsableCredential(user.pin) && request.newPin == null) {
-                throw ApiError(401, ErrorCode.UNAUTHORIZED, "Set a PIN.", reason = ErrorReasons.PIN_NOT_SET)
+                throw ApiError(401, ErrorCode.UNAUTHORIZED, "Set a PIN.", reason = ErrorReasons.PIN_NOT_SET, pinLength = config.auth.pinLength)
             }
             // Already on the device (logging in again there): nothing new for the owner to hear about.
             val wasOn = existing?.second?.users?.get(username)?.userId == user.id
@@ -338,7 +338,10 @@ internal class DefaultAuthService(
 
     private fun unauthorized(message: String) = ApiError(401, ErrorCode.UNAUTHORIZED, message)
 
-    private fun invalid(refusal: Refusal) = ApiError(400, ErrorCode.INVALID_REQUEST, refusal.message, reason = refusal.reason)
+    private fun invalid(refusal: Refusal) = ApiError(
+        400, ErrorCode.INVALID_REQUEST, refusal.message, reason = refusal.reason,
+        pinLength = config.auth.pinLength.takeIf { refusal.reason == ErrorReasons.PIN_LENGTH },
+    )
 
     /** [text] on one line, trimmed, at most [max] characters; [fallback] if nothing is left. */
     private fun clean(text: String, max: Int, fallback: String): String =

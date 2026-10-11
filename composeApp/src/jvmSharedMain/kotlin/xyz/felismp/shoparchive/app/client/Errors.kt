@@ -21,7 +21,7 @@ sealed class ClientError(message: String, cause: Throwable? = null) : Exception(
 
     /**
      * Any other error answer; [code] is INTERNAL when the body was not the shared error JSON. [reason] is the server's
-     * machine key for why ([xyz.felismp.shoparchive.shared.ErrorReasons]); [message] is the server's English text, for logs only and never shown.
+     * machine key for why ([xyz.felismp.shoparchive.shared.ErrorReasons]); [pinLength] the digits a PIN needs when the server said so; [message] is the server's English text, for logs only and never shown.
      */
     class Api(
         val status: Int,
@@ -30,5 +30,6 @@ sealed class ClientError(message: String, cause: Throwable? = null) : Exception(
         val passwordRequired: Boolean = false,
         val retryAfterSeconds: Int? = null,
         val reason: String? = null,
+        val pinLength: Int? = null,
     ) : ClientError(message)
 }

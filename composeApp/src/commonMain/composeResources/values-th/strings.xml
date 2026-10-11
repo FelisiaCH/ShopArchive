@@ -343,6 +343,7 @@
     <string name="login_submit">เข้าสู่ระบบ</string>
     <string name="login_set_pin">บัญชีนี้ยังไม่มี PIN ให้ตั้ง PIN ใหม่</string>
     <string name="err_pin_digits">PIN ต้องเป็นตัวเลข 4 ถึง 12 หลัก</string>
+    <string name="err_pin_exact">PIN ต้องเป็นตัวเลข %1$d หลักพอดี</string>
     <string name="err_personal_device">อุปกรณ์นี้ตั้งไว้สำหรับคนเดียว จึงเพิ่มผู้ใช้ไม่ได้ ให้ลบเซิร์ฟเวอร์นี้ออกจากเครื่อง (ในตั้งค่าหลังปลดล็อก) แล้วเพิ่มเซิร์ฟเวอร์ใหม่</string>
     <plurals name="server_users">
         <item quantity="other">ผู้ใช้ %1$d คน</item>

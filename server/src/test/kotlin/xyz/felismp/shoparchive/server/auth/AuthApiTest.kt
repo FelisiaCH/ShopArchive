@@ -195,6 +195,24 @@ class AuthApiTest {
         }
     }
 
+    @Test
+    fun theRefusalsAboutAPinSayHowManyDigitsItNeeds() = env().run {
+        reconfigure("config-version: 1\nauth:\n  pin:\n    length: 8\n  backoff:\n    start-seconds: 0\n")
+        addUser("mali")
+        api {
+            val notSet = login(loginRequest("mali"))
+            assertEquals(ErrorReasons.PIN_NOT_SET, notSet.errorReason())
+            assertEquals(8, notSet.errorPinLength())
+
+            val tooShort = login(loginRequest("mali", newPin = "123456"))
+            assertEquals(ErrorReasons.PIN_LENGTH, tooShort.errorReason())
+            assertEquals(8, tooShort.errorPinLength())
+
+            val noUser = login(loginRequest("ghost", pin = "12345678"))
+            assertEquals(null, noUser.errorPinLength())
+        }
+    }
+
     // --- existing users ---
 
     @Test

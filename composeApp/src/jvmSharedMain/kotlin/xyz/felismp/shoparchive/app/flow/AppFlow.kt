@@ -643,6 +643,7 @@ class AppFlow(
         val problem = when {
             name.isEmpty() -> Problem.BadUsername
             // An empty PIN is sent as none: a user who has no PIN yet does not know one, and the server then asks for a new one.
+            s.needsNewPin && s.pinLength != null && (secret.length != s.pinLength || !secret.all { it in '0'..'9' }) -> Problem.PinExactly(s.pinLength)
             (s.needsNewPin || secret.isNotEmpty()) && (secret.length !in 4..12 || !secret.all { it in '0'..'9' }) -> Problem.PinDigits
             s.needsNewPin && newPin != newPinRepeat -> Problem.PinsDiffer
             else -> null
@@ -670,7 +671,7 @@ class AppFlow(
             } catch (e: Exception) {
                 val reason = (e as? ClientError.Api)?.reason
                 when (reason) {
-                    ErrorReasons.PIN_NOT_SET -> _state.value = s.copy(needsNewPin = true, busy = false, problem = null)
+                    ErrorReasons.PIN_NOT_SET -> _state.value = s.copy(needsNewPin = true, pinLength = e.pinLength, busy = false, problem = null)
                     ErrorReasons.DEVICE_PERSONAL -> _state.value = s.copy(busy = false, problem = Problem.PersonalDevice)
                     else -> blockOr(e) { _state.value = s.copy(busy = false, problem = it) }
                 }
@@ -1091,6 +1092,7 @@ internal fun Exception.toProblem(): Problem = when (this) {
         ErrorCode.FORBIDDEN -> if (reason != null) Problem.Rejected(code, reason) else Problem.WrongCredentials
         ErrorCode.UNAUTHORIZED, ErrorCode.REAUTH_REQUIRED -> Problem.WrongCredentials
         ErrorCode.CREDENTIALS_CHANGED -> Problem.CredentialsChanged
+        ErrorCode.INVALID_REQUEST -> if (reason == ErrorReasons.PIN_LENGTH && pinLength != null) Problem.PinExactly(pinLength) else Problem.Rejected(code, reason)
         else -> Problem.Rejected(code, reason)
     }
     is ClientError.PinMismatch -> Problem.PinMismatch

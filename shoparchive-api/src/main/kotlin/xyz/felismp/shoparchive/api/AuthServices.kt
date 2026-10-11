@@ -15,6 +15,7 @@ import xyz.felismp.shoparchive.shared.WsMessage
  * How a service refuses a request: the HTTP [status] and the [code] of the shared error envelope. [message] is shown to the caller, so it must not hold a secret.
  * [retryAfterSeconds] becomes the `Retry-After` header; [passwordRequired] tells the app that a PIN will not do.
  * [reason] is a key from [xyz.felismp.shoparchive.shared.ErrorReasons] that the app words in the user's language; leave it null when the [code] says enough.
+ * [pinLength] goes to [xyz.felismp.shoparchive.shared.ErrorResponse.pinLength].
  */
 class ApiError(
     val status: Int,
@@ -23,6 +24,7 @@ class ApiError(
     val retryAfterSeconds: Int? = null,
     val passwordRequired: Boolean = false,
     val reason: String? = null,
+    val pinLength: Int? = null,
 ) : Exception(message)
 
 /**

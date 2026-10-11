@@ -343,6 +343,7 @@
     <string name="login_submit">ເຂົ້າສູ່ລະບົບ</string>
     <string name="login_set_pin">ບັນຊີນີ້ຍັງບໍ່ມີ PIN. ໃຫ້ຕັ້ງ PIN ໃໝ່.</string>
     <string name="err_pin_digits">PIN ຕ້ອງເປັນຕົວເລກ 4 ຫາ 12 ຫຼັກ.</string>
+    <string name="err_pin_exact">PIN ຕ້ອງເປັນຕົວເລກ %1$d ຫຼັກພໍດີ</string>
     <string name="err_personal_device">ອຸປະກອນນີ້ຕັ້ງໄວ້ສຳລັບຄົນດຽວ ຈຶ່ງເພີ່ມຜູ້ໃຊ້ບໍ່ໄດ້. ໃຫ້ລຶບເຊີບເວີນີ້ອອກຈາກເຄື່ອງ (ໃນຕັ້ງຄ່າຫຼັງປົດລັອກ) ແລ້ວເພີ່ມເຊີບເວີໃໝ່.</string>
     <plurals name="server_users">
         <item quantity="other">ຜູ້ໃຊ້ %1$d ຄົນ</item>

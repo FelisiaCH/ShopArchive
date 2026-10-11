@@ -304,7 +304,7 @@ class ApiClient(
         }
         throw ClientError.Api(
             status, error?.code ?: ErrorCode.INTERNAL, error?.message ?: "HTTP $status",
-            error?.passwordRequired ?: false, retryAfter?.toIntOrNull(), error?.reason,
+            error?.passwordRequired ?: false, retryAfter?.toIntOrNull(), error?.reason, error?.pinLength,
         )
     }
 

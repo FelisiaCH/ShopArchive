@@ -343,6 +343,7 @@
     <string name="login_submit">Log in</string>
     <string name="login_set_pin">This account has no PIN yet. Choose one for it.</string>
     <string name="err_pin_digits">The PIN is 4 to 12 digits.</string>
+    <string name="err_pin_exact">The PIN is exactly %1$d digits.</string>
     <string name="err_personal_device">This device was set up for one person, so no user can be added to it. Remove this server from this device (in Settings after unlocking), then add the server again.</string>
     <plurals name="server_users">
         <item quantity="one">%1$d user</item>
