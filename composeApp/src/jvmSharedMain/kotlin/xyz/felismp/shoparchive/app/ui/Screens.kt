@@ -223,7 +223,7 @@ private fun SettingsScreen(s: AppState.Settings, flow: AppFlow) {
             ShopButton(stringResource(Res.string.remove_server), { confirmRemove = true }, Modifier.fillMaxWidth(), primary = false, enabled = !s.busy)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ShopButton(stringResource(Res.string.lock_now), { flow.lockNow() })
+            ShopButton(stringResource(Res.string.lock_now), { flow.lockNow() }, icon = ShopIcon.LockNow)
             ShopButton(stringResource(Res.string.back), flow::closeSettings, primary = false)
         }
     }

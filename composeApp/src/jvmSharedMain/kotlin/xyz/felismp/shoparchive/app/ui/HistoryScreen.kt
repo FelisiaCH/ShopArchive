@@ -270,7 +270,7 @@ private fun EditForm(ws: Workspace, state: EntryDetailState, ui: DetailUi, edit:
     ShopTextField(f.note, state::setNote, stringResource(Res.string.note_label), kind = FieldKind.Multiline, enabled = !busy)
     ShopText(stringResource(Res.string.tenders_title), TextRole.Title)
     f.tenders.forEach { EditTender(it, state, edit, busy) }
-    ShopButton(stringResource(Res.string.tender_add), state::addTender, primary = false, enabled = !busy)
+    ShopButton(stringResource(Res.string.tender_add), state::addTender, primary = false, enabled = !busy, icon = ShopIcon.AddPayment)
 
     if (edit.online || f.keep.isNotEmpty() || f.added.isNotEmpty()) {
         ShopText(stringResource(Res.string.slips_title), TextRole.Title)
@@ -312,7 +312,7 @@ private fun EditForm(ws: Workspace, state: EntryDetailState, ui: DetailUi, edit:
     }
     if (!ui.canWrite) ShopText(stringResource(Res.string.needs_connection), TextRole.Caption, muted = true)
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ShopButton(stringResource(Res.string.record_save), state::saveEdit, enabled = edit.issues.isEmpty() && !edit.compressing && !edit.stale && !busy && ui.canWrite)
+        ShopButton(stringResource(Res.string.record_save), state::saveEdit, enabled = edit.issues.isEmpty() && !edit.compressing && !edit.stale && !busy && ui.canWrite, icon = ShopIcon.Save)
         ShopButton(stringResource(Res.string.cancel), state::cancelEdit, primary = false, enabled = !busy)
     }
 }
