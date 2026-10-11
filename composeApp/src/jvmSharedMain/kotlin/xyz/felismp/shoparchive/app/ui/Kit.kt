@@ -89,13 +89,13 @@ class NavAccount(val name: String, val server: String, val lock: NavAction)
 /**
  * The app's navigation. [wide]: a pane on the left, each item with [icon] and label. Not [wide]: a bottom bar on Android, a narrow strip of icons
  * on Windows (the label shows when the pointer rests on one). Only Windows shows [footer] and [account], at the foot of the pane apart from the
- * items; Android ignores them. [content] fills the rest.
+ * items; Android ignores them. [selected] is null when none of the items is the current page (Settings on Windows). [content] fills the rest.
  */
 @Composable
 expect fun <T> ShopNavigation(
     items: List<Pair<T, String>>,
     icon: (T) -> ShopIcon,
-    selected: T,
+    selected: T?,
     onSelect: (T) -> Unit,
     wide: Boolean,
     footer: List<NavAction> = emptyList(),

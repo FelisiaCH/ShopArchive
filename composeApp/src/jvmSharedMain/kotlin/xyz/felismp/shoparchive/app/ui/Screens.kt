@@ -1,6 +1,7 @@
 package xyz.felismp.shoparchive.app.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Alignment
@@ -37,7 +38,8 @@ fun AppHost(flow: AppFlow) {
         is AppState.Login -> LoginScreen(s, flow)
         is AppState.Locked -> LockedScreen(s, flow)
         is AppState.Unlocked -> flow.workspace?.let { Shell(s, flow, it) }
-        is AppState.Settings -> SettingsScreen(s, flow)
+        // Windows keeps the navigation pane and shows Settings as a page in it; Android shows Settings over the whole window.
+        is AppState.Settings -> flow.workspace?.takeIf { !navigationBottomBar }?.let { Shell(AppState.Unlocked(s.username, s.server, s.connection), flow, it, s) } ?: SettingsScreen(s, flow)
         is AppState.CertChanged -> CertChangedScreen(s, flow)
         is AppState.ProtocolMismatch -> ScreenFrame(stringResource(Res.string.proto_title)) {
             ShopBanner(stringResource(Res.string.proto_body), Tone.Error)
@@ -187,45 +189,56 @@ private val LANGUAGES = listOf<Pair<String?, StringResource>>(
 
 @Composable
 private fun SettingsScreen(s: AppState.Settings, flow: AppFlow) {
-    val language by flow.language.collectAsState()
-    var confirmRemove by remember { mutableStateOf(false) }
     ScreenFrame(stringResource(Res.string.nav_settings)) {
-        ShopText(stringResource(Res.string.language_label), TextRole.Title)
-        ShopSegmented(LANGUAGES.map { (tag, name) -> tag to stringResource(name) }, language, flow::setLanguage)
-
-        ShopText(stringResource(Res.string.devices_title), TextRole.Title)
-        val devices = s.devices
-        if (devices == null) {
-            if (s.problem == null) ShopText(stringResource(Res.string.working), muted = true)
-        } else {
-            devices.forEach { d ->
-                ShopText(stringResource(Res.string.device_info, d.label, d.platform, d.lastUsed) + if (d.current) " · " + stringResource(Res.string.device_this) else "")
-                if (!d.current) ShopButton(stringResource(Res.string.device_revoke), { flow.revokeDevice(d.id) }, primary = false, enabled = !s.busy)
-            }
-        }
-        Status(s.busy, s.problem)
-
-        // Only on a platform that can install an update; the version is the one this app was built as.
-        flow.workspace?.updates?.let { update ->
-            ShopText(stringResource(Res.string.update_title), TextRole.Title)
-            ShopText(stringResource(Res.string.update_current, AppBuild.version.toString()), muted = true)
-            UpdatePanel(update, asked = true)
-            ShopButton(stringResource(Res.string.update_check), { update.check() }, primary = false)
-        }
-
-        if (confirmRemove) {
-            ShopBanner(stringResource(Res.string.remove_confirm_body), Tone.Error)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ShopButton(stringResource(Res.string.remove_confirm), flow::removeServer, enabled = !s.busy)
-                ShopButton(stringResource(Res.string.cancel), { confirmRemove = false }, primary = false, enabled = !s.busy)
-            }
-        } else {
-            ShopButton(stringResource(Res.string.remove_server), { confirmRemove = true }, Modifier.fillWidthOnPhone(), primary = false, enabled = !s.busy)
-        }
+        SettingsBody(s, flow)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ShopButton(stringResource(Res.string.lock_now), { flow.lockNow() }, icon = ShopIcon.LockNow)
             ShopButton(stringResource(Res.string.back), flow::closeSettings, primary = false)
         }
+    }
+}
+
+/** Settings as a page of the shell: the pane has Lock now, and its destinations replace Back. */
+@Composable
+internal fun SettingsPage(s: AppState.Settings, flow: AppFlow) {
+    ShopPage(stringResource(Res.string.nav_settings)) { SettingsBody(s, flow) }
+}
+
+@Composable
+private fun ColumnScope.SettingsBody(s: AppState.Settings, flow: AppFlow) {
+    val language by flow.language.collectAsState()
+    var confirmRemove by remember { mutableStateOf(false) }
+    ShopText(stringResource(Res.string.language_label), TextRole.Title)
+    ShopSegmented(LANGUAGES.map { (tag, name) -> tag to stringResource(name) }, language, flow::setLanguage)
+
+    ShopText(stringResource(Res.string.devices_title), TextRole.Title)
+    val devices = s.devices
+    if (devices == null) {
+        if (s.problem == null) ShopText(stringResource(Res.string.working), muted = true)
+    } else {
+        devices.forEach { d ->
+            ShopText(stringResource(Res.string.device_info, d.label, d.platform, d.lastUsed) + if (d.current) " · " + stringResource(Res.string.device_this) else "")
+            if (!d.current) ShopButton(stringResource(Res.string.device_revoke), { flow.revokeDevice(d.id) }, primary = false, enabled = !s.busy)
+        }
+    }
+    Status(s.busy, s.problem)
+
+    // Only on a platform that can install an update; the version is the one this app was built as.
+    flow.workspace?.updates?.let { update ->
+        ShopText(stringResource(Res.string.update_title), TextRole.Title)
+        ShopText(stringResource(Res.string.update_current, AppBuild.version.toString()), muted = true)
+        UpdatePanel(update, asked = true)
+        ShopButton(stringResource(Res.string.update_check), { update.check() }, primary = false)
+    }
+
+    if (confirmRemove) {
+        ShopBanner(stringResource(Res.string.remove_confirm_body), Tone.Error)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ShopButton(stringResource(Res.string.remove_confirm), flow::removeServer, enabled = !s.busy)
+            ShopButton(stringResource(Res.string.cancel), { confirmRemove = false }, primary = false, enabled = !s.busy)
+        }
+    } else {
+        ShopButton(stringResource(Res.string.remove_server), { confirmRemove = true }, Modifier.fillWidthOnPhone(), primary = false, enabled = !s.busy)
     }
 }
 

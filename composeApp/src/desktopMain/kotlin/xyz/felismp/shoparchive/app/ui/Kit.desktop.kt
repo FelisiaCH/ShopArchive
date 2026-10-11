@@ -162,7 +162,7 @@ actual fun ShopFixedPage(title: String, content: @Composable ColumnScope.() -> U
 
 @Composable
 actual fun <T> ShopNavigation(
-    items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T, onSelect: (T) -> Unit, wide: Boolean,
+    items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T?, onSelect: (T) -> Unit, wide: Boolean,
     footer: List<NavAction>, account: NavAccount?, content: @Composable () -> Unit,
 ) {
     // The pane on the left is the 280 dp one with labels when [wide], else the 48 dp strip of icons; never a bottom bar. It sits on the window

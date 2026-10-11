@@ -242,7 +242,7 @@ actual fun ShopFixedPage(title: String, content: @Composable ColumnScope.() -> U
 
 @Composable
 actual fun <T> ShopNavigation(
-    items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T, onSelect: (T) -> Unit, wide: Boolean,
+    items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T?, onSelect: (T) -> Unit, wide: Boolean,
     footer: List<NavAction>, account: NavAccount?, content: @Composable () -> Unit,
 ) {
     val colors = ShopTheme.colors

@@ -23,10 +23,13 @@ import xyz.felismp.shoparchive.app.flow.Destination
 import xyz.felismp.shoparchive.app.flow.Workspace
 import xyz.felismp.shoparchive.app.resources.*
 
-/** The app after unlock: navigation (see [navigationPaneFrom]), the connection banner and the branch choice over the current screen. */
+/**
+ * The app after unlock: navigation (see [navigationPaneFrom]), the connection banner and the branch choice over the current screen.
+ * With [settings] (Windows only) the page is Settings, shown selected in the pane and without the update panel and the branch choice, which it does not use.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace) {
+fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState.Settings? = null) {
     val destination by ws.destination.collectAsState()
     val config by ws.config.collectAsState()
     val branch by ws.branch.collectAsState()
@@ -38,10 +41,15 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace) {
     val reports = stringResource(Res.string.nav_reports)
     val more = stringResource(Res.string.nav_more)
     val console = stringResource(Res.string.nav_console)
-    val settings = stringResource(Res.string.nav_settings)
+    val settingsLabel = stringResource(Res.string.nav_settings)
     val lockNow = stringResource(Res.string.lock_now)
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= navigationPaneFrom
+        // Leaving Settings by a destination of the pane: Settings closes first, so the page the pane names is the one shown.
+        fun open(to: Destination) {
+            if (settings != null) flow.closeSettings()
+            ws.go(to)
+        }
         // Reports sit under More when the navigation is a bottom bar and in the pane or strip on the left otherwise. Before the config has loaded (or when it failed) only More
         // is offered, so no entry is there that the workspace would ignore; the screen itself says it is loading, or offers a retry.
         val folded = navigationBottomBar && !wide
@@ -50,27 +58,28 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace) {
             .let { if (navigationBottomBar) it + (Destination.MORE to more) else it }
         // Windows has no More: the console, Settings and Lock now sit at the foot of the pane.
         val footer = if (navigationBottomBar) emptyList() else listOfNotNull(
-            if (can.console) NavAction(console, ShopIcon.Console, destination == Destination.CONSOLE) { ws.go(Destination.CONSOLE) } else null,
-            NavAction(settings, ShopIcon.Settings) { flow.openSettings() },
+            if (can.console) NavAction(console, ShopIcon.Console, settings == null && destination == Destination.CONSOLE) { open(Destination.CONSOLE) } else null,
+            NavAction(settingsLabel, ShopIcon.Settings, settings != null) { if (settings == null) flow.openSettings() },
         )
         val account = if (navigationBottomBar) null else NavAccount(s.username, s.server, NavAction(lockNow, ShopIcon.LockNow) { flow.lockNow() })
         val selected = when {
+            settings != null -> null
             destination == Destination.OPEN_DAY -> Destination.TODAY
             destination == Destination.REPORTS && folded -> Destination.MORE
             destination == Destination.CONSOLE -> Destination.MORE
             else -> destination
         }
-        ShopNavigation(items, Destination::icon, selected, ws::go, wide = wide, footer = footer, account = account) {
+        ShopNavigation(items, Destination::icon, selected, ::open, wide = wide, footer = footer, account = account) {
             Column(Modifier.fillMaxSize()) {
                 // Only when the server has a newer app for this platform (or a download is going on): never a button without an update.
-                ws.updates?.let { UpdatePanel(it, modifier = Modifier.padding(horizontal = shellInset, vertical = 4.dp)) }
+                if (settings == null) ws.updates?.let { UpdatePanel(it, modifier = Modifier.padding(horizontal = shellInset, vertical = 4.dp)) }
                 when (status) {
                     ConnectionStatus.CONNECTED -> Unit
                     ConnectionStatus.CONNECTING -> ShopBanner(stringResource(Res.string.status_connecting), Tone.Info, Modifier.padding(horizontal = shellInset, vertical = 8.dp))
                     ConnectionStatus.OFFLINE -> ShopBanner(stringResource(Res.string.offline_banner), Tone.Error, Modifier.padding(horizontal = shellInset, vertical = 8.dp))
                 }
                 val branches = ws.branches
-                if (branches.size > 1) {
+                if (settings == null && branches.size > 1) {
                     FlowRow(
                         Modifier.fillMaxWidth().padding(horizontal = shellInset, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -79,6 +88,7 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace) {
                     }
                 }
                 when {
+                    settings != null -> SettingsPage(settings, flow)
                     destination == Destination.MORE -> MoreScreen(s, flow, ws, can)
                     destination == Destination.CONSOLE -> ConsoleScreen(ws)
                     config is ConfigState.Loading -> ShopPage("") { ShopText(stringResource(Res.string.working), muted = true) }

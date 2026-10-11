@@ -41,6 +41,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 private val PIN_HEX = "AB".repeat(32)
@@ -1217,6 +1218,14 @@ class AppFlowTest {
         f.unlock("483926"); f.openSettings(); f.lockNow()
         assertIs<AppState.Locked>(f.state.value)
         assertEquals(2, api.locks)
+    }
+
+    @Test fun settingsCarriesTheConnectionOfTheUnlockedStateItWasOpenedFrom() {
+        val f = lockedFlow()
+        f.unlock("483926")
+        val unlocked = assertIs<AppState.Unlocked>(f.state.value)
+        f.openSettings()
+        assertSame(unlocked.connection, assertIs<AppState.Settings>(f.state.value).connection)
     }
 
     @Test fun anAuthorizedCallThatFindsTheTokenGoneLocksWithTheReason() {

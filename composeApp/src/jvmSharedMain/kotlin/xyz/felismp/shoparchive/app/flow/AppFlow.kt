@@ -952,7 +952,7 @@ class AppFlow(
 
     fun openSettings() {
         val u = unlocked ?: return
-        _state.value = AppState.Settings(u.username, u.server)
+        _state.value = AppState.Settings(u.username, u.server, u.connection)
         loadDevices()
     }
 

@@ -88,10 +88,11 @@ sealed interface AppState {
 
     data class Unlocked(val username: String, val server: String, val connection: StateFlow<ConnectionStatus>) : AppState
 
-    /** [devices] is null until the list has loaded. [busy] while a device is being taken off. */
+    /** [devices] is null until the list has loaded. [busy] while a device is being taken off. [connection] is the one of the Unlocked state it was opened from, for the banner of the shell around it. */
     data class Settings(
         val username: String,
         val server: String,
+        val connection: StateFlow<ConnectionStatus>,
         val devices: List<DeviceInfo>? = null,
         val busy: Boolean = false,
         val problem: Problem? = null,
