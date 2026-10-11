@@ -1,6 +1,8 @@
 package xyz.felismp.shoparchive.app
 
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -12,11 +14,18 @@ import xyz.felismp.shoparchive.app.resources.Res
 import xyz.felismp.shoparchive.app.resources.app_name
 import xyz.felismp.shoparchive.app.ui.ShopApp
 import java.awt.Dimension
+import javax.imageio.ImageIO
+
+/** The window and taskbar icon; the installer's own is `icons/shoparchive.ico`. */
+private val windowIcon = BitmapPainter(
+    ImageIO.read(object {}.javaClass.getResource("/shoparchive-icon.png")).toComposeImageBitmap(),
+)
 
 fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = stringResource(Res.string.app_name), // "ShopArchive"
+        icon = windowIcon,
         state = rememberWindowState(size = DpSize(900.dp, 700.dp)),
     ) {
         SideEffect { window.minimumSize = Dimension(480, 560) }

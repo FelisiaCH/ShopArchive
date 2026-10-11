@@ -144,6 +144,7 @@ compose.desktop {
             targetFormats(TargetFormat.Msi)
             packageName = "ShopArchive"
             packageVersion = msiVersion
+            windows { iconFile.set(project.file("icons/shoparchive.ico")) }
         }
     }
 }

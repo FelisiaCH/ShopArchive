@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <g stroke="#245A5A" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <!-- document outline -->
+    <path d="M112 68H300L392 160V420H112V68Z"/>
+    <!-- folded corner -->
+    <path d="M300 68V160H392"/>
+    <!-- document lines -->
+    <path d="M164 224H314"/>
+    <path d="M164 286H286"/>
+    <path d="M164 348H250"/>
+  </g>
+
+  <!-- coin badge -->
+  <circle cx="358" cy="358" r="94" fill="white"/>
+  <circle cx="358" cy="358" r="82" stroke="#245A5A" stroke-width="24"/>
+
+  <!-- money symbol, drawn as vector paths -->
+  <g stroke="#245A5A" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M358 306V410"/>
+    <path d="M392 324C383 310 370 304 354 304C333 304 318 316 318 333C318 351 332 359 358 364C383 369 398 378 398 395C398 414 382 426 358 426C337 426 320 418 310 402"/>
+  </g>
+</svg>
