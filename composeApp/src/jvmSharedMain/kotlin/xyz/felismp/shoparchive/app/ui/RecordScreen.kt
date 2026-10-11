@@ -38,7 +38,7 @@ fun RecordScreen(ws: Workspace) {
     ShopPage(stringResource(Res.string.record_title)) {
         if (ui.block == SaveBlock.NO_DAY) {
             ShopBanner(stringResource(if (can.openDay) Res.string.block_no_day else Res.string.block_no_day_other), Tone.Info)
-            if (can.openDay) ShopButton(stringResource(Res.string.openday_btn), { ws.go(Destination.OPEN_DAY) }, primary = false)
+            if (can.openDay) ShopButton(stringResource(Res.string.openday_btn), { ws.go(Destination.OPEN_DAY) }, primary = false, icon = ShopIcon.OpenDay)
         }
         ShopSegmented(
             listOf(EntryType.INCOME to stringResource(Res.string.type_income), EntryType.EXPENSE to stringResource(Res.string.type_expense)),
@@ -61,7 +61,7 @@ fun RecordScreen(ws: Workspace) {
 
         ShopText(stringResource(Res.string.tenders_title), TextRole.Title)
         d.tenders.forEach { TenderCard(it, ui, ws, editable) }
-        ShopButton(stringResource(Res.string.tender_add), record::addTender, primary = false, enabled = editable)
+        ShopButton(stringResource(Res.string.tender_add), record::addTender, primary = false, enabled = editable, icon = ShopIcon.AddPayment)
 
         if (ui.online || d.slips.isNotEmpty()) {
             ShopText(stringResource(Res.string.slips_title), TextRole.Title)
@@ -89,7 +89,7 @@ fun RecordScreen(ws: Workspace) {
         PhaseNotice(ui, ws)
         ui.issues.firstOrNull()?.let { if (ui.phase !is SavePhase.Saved) ShopText(it.text(), TextRole.Caption, muted = true) }
         if (ui.block == SaveBlock.OFFLINE) ShopText(stringResource(Res.string.needs_connection), TextRole.Caption, muted = true)
-        ShopButton(stringResource(Res.string.record_save), record::save, Modifier.fillMaxWidth(), enabled = ui.canSave)
+        ShopButton(stringResource(Res.string.record_save), record::save, Modifier.fillMaxWidth(), enabled = ui.canSave, icon = ShopIcon.Save)
     }
 }
 

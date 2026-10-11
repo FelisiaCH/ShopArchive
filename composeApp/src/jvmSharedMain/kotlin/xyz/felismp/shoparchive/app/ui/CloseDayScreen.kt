@@ -50,7 +50,7 @@ private fun CloseForm(ws: Workspace, ui: CloseUi) {
     (ui.phase as? ClosePhase.Failed)?.let { ShopBanner(stringResource(Res.string.closeday_failed) + " " + it.failure.text(), Tone.Error) }
     if (saving) ShopBanner(stringResource(Res.string.working), Tone.Info)
     if (ui.blocked == CloseBlock.OFFLINE) ShopText(stringResource(Res.string.needs_connection), TextRole.Caption, muted = true)
-    ShopButton(stringResource(Res.string.closeday_confirm), ws.closeDay::confirm, Modifier.fillMaxWidth(), enabled = ui.canClose)
+    ShopButton(stringResource(Res.string.closeday_confirm), ws.closeDay::confirm, Modifier.fillMaxWidth(), enabled = ui.canClose, icon = ShopIcon.CloseDay)
 }
 
 @Composable

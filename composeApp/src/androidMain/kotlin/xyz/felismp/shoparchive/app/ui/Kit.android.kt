@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -26,8 +29,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
@@ -114,9 +119,16 @@ actual fun ShopText(text: String, role: TextRole, muted: Boolean, modifier: Modi
 }
 
 @Composable
-actual fun ShopButton(text: String, onClick: () -> Unit, modifier: Modifier, primary: Boolean, enabled: Boolean) {
+actual fun ShopButton(text: String, onClick: () -> Unit, modifier: Modifier, primary: Boolean, enabled: Boolean, icon: ShopIcon?) {
     val m = modifier.heightIn(min = MinTarget)
-    if (primary) Button(onClick, m, enabled) { Text(text) } else FilledTonalButton(onClick, m, enabled) { Text(text) }
+    val content: @Composable RowScope.() -> Unit = {
+        if (icon != null) {
+            Icon(icon.material(), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+        }
+        Text(text)
+    }
+    if (primary) Button(onClick, m, enabled, content = content) else FilledTonalButton(onClick, m, enabled, content = content)
 }
 
 @Composable
@@ -211,20 +223,36 @@ actual fun ShopChoice(text: String, selected: Boolean, onClick: () -> Unit, modi
 }
 
 @Composable
-actual fun <T> ShopNavigation(items: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, wide: Boolean, content: @Composable () -> Unit) {
+actual fun <T> ShopNavigation(items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T, onSelect: (T) -> Unit, wide: Boolean, content: @Composable () -> Unit) {
     val colors = ShopTheme.colors
+    // As in the Material navigation components: the icon over the label in the bottom bar, beside it in the pane.
     @Composable
     fun Item(value: T, label: String, modifier: Modifier) {
         val on = value == selected
+        val tint = if (on) colors.text else colors.textMuted
+        val pill = if (on) colors.surfaceSelected else androidx.compose.ui.graphics.Color.Transparent
         Box(
             modifier.heightIn(min = 56.dp).selectable(on, role = androidx.compose.ui.semantics.Role.Tab) { onSelect(value) }.padding(ShopTheme.spacing.x4),
             contentAlignment = androidx.compose.ui.Alignment.Center,
         ) {
-            Surface(shape = CircleShape, color = if (on) colors.surfaceSelected else androidx.compose.ui.graphics.Color.Transparent) {
-                Text(
-                    label, Modifier.padding(horizontal = ShopTheme.spacing.x16, vertical = ShopTheme.spacing.x12),
-                    style = MaterialTheme.typography.labelLarge, maxLines = 1, color = if (on) colors.text else colors.textMuted,
-                )
+            if (wide) {
+                Surface(shape = CircleShape, color = pill) {
+                    Row(
+                        Modifier.padding(horizontal = ShopTheme.spacing.x16, vertical = ShopTheme.spacing.x12),
+                        horizontalArrangement = Arrangement.spacedBy(ShopTheme.spacing.x12),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        Icon(icon(value).material(), contentDescription = null, Modifier.size(24.dp), tint = tint)
+                        Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, color = tint)
+                    }
+                }
+            } else {
+                Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                    Surface(shape = CircleShape, color = pill) {
+                        Icon(icon(value).material(), contentDescription = null, Modifier.padding(horizontal = 20.dp, vertical = ShopTheme.spacing.x4).size(24.dp), tint = tint)
+                    }
+                    Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, color = tint)
+                }
             }
         }
     }

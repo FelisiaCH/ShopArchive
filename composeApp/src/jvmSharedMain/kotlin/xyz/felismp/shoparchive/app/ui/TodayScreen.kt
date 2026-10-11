@@ -52,7 +52,7 @@ private fun TodayContent(data: TodayData, canWrite: Boolean, can: Capabilities, 
             if (can.openDay) {
                 ShopText(stringResource(Res.string.openday_card_body), muted = true)
                 if (!canWrite) ShopText(stringResource(Res.string.needs_connection), TextRole.Caption, muted = true)
-                ShopButton(stringResource(Res.string.openday_btn), openDay, enabled = canWrite)
+                ShopButton(stringResource(Res.string.openday_btn), openDay, enabled = canWrite, icon = ShopIcon.OpenDay)
             } else {
                 ShopText(stringResource(Res.string.openday_card_body_other), muted = true)
             }
@@ -60,7 +60,7 @@ private fun TodayContent(data: TodayData, canWrite: Boolean, can: Capabilities, 
         is DayStatus.Open -> {
             ShopChip(stringResource(Res.string.day_open_by, clockTime(status.session.openedAt), status.session.openedBy.name), Tone.Success)
             data.staleFrom?.let { ShopBanner(stringResource(if (can.closeDay) Res.string.day_stale else Res.string.day_stale_other, it), Tone.Error) }
-            if (can.closeDay) ShopButton(stringResource(Res.string.closeday_btn), closeDay, primary = data.staleFrom != null)
+            if (can.closeDay) ShopButton(stringResource(Res.string.closeday_btn), closeDay, primary = data.staleFrom != null, icon = ShopIcon.CloseDay)
         }
         is DayStatus.Closed -> ShopChip(stringResource(Res.string.day_closed), Tone.Info)
     }

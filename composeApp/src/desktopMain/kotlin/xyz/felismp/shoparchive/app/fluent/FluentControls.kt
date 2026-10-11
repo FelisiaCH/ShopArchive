@@ -88,9 +88,9 @@ private fun focusRingVisible(source: MutableInteractionSource): Boolean {
 private fun Modifier.controlBorder(focused: Boolean, stroke: Color, textColor: Color, shape: androidx.compose.ui.graphics.Shape) =
     if (focused) border(2.dp, textColor, shape) else border(1.dp, stroke, shape)
 
-/** Standard (subtle) button, or the accent button when [accent] is set. Height 32, radius 4. */
+/** Standard (subtle) button, or the accent button when [accent] is set. Height 32, radius 4. [icon] is 16 and goes before the text. */
 @Composable
-fun FluentButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, accent: Boolean = false) {
+fun FluentButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, accent: Boolean = false, icon: ImageVector? = null) {
     val c = FluentTheme.colors
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
@@ -111,7 +111,11 @@ fun FluentButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifie
             .padding(horizontal = 12.dp, vertical = 5.dp),
         contentAlignment = Alignment.Center,
     ) {
-        FluentText(text, style = FluentTheme.typography.body, color = if (accent) c.shop.onAccent else c.shop.text)
+        val content = if (accent) c.shop.onAccent else c.shop.text
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (icon != null) Image(rememberVectorPainter(icon), contentDescription = null, Modifier.size(16.dp), colorFilter = ColorFilter.tint(content))
+            FluentText(text, style = FluentTheme.typography.body, color = content)
+        }
     }
 }
 
@@ -144,13 +148,14 @@ fun FluentToggleSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, mod
     }
 }
 
-/** SelectorBar: text items in a row, the selected one in the primary color with a short accent bar under it. */
+/** SelectorBar: text items in a row, the selected one in the primary color with a short accent bar under it. [icon] is 16 and goes before the text. */
 @Composable
 fun <T> FluentSelectorBar(
     options: List<Pair<T, String>>,
     selected: T,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
+    icon: (T) -> ImageVector? = { null },
 ) {
     val c = FluentTheme.colors
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -169,11 +174,11 @@ fun <T> FluentSelectorBar(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                FluentText(
-                    label,
-                    style = FluentTheme.typography.body,
-                    color = if (isSelected) c.shop.text else c.shop.textSecondary,
-                )
+                val content = if (isSelected) c.shop.text else c.shop.textSecondary
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    icon(value)?.let { Image(rememberVectorPainter(it), contentDescription = null, Modifier.size(16.dp), colorFilter = ColorFilter.tint(content)) }
+                    FluentText(label, style = FluentTheme.typography.body, color = content)
+                }
                 Box(
                     Modifier.size(width = 16.dp, height = 3.dp).clip(RoundedCornerShape(1.5.dp))
                         .background(if (isSelected) c.shop.accent else Color.Transparent),

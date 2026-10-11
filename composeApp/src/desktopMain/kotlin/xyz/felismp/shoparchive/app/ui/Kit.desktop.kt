@@ -69,9 +69,9 @@ actual fun ShopText(text: String, role: TextRole, muted: Boolean, modifier: Modi
 }
 
 @Composable
-actual fun ShopButton(text: String, onClick: () -> Unit, modifier: Modifier, primary: Boolean, enabled: Boolean) {
+actual fun ShopButton(text: String, onClick: () -> Unit, modifier: Modifier, primary: Boolean, enabled: Boolean, icon: ShopIcon?) {
     // A disabled Fluent button simply ignores the click and looks dimmed.
-    FluentButton(text, { if (enabled) onClick() }, if (enabled) modifier else modifier.alpha(0.5f), accent = primary)
+    FluentButton(text, { if (enabled) onClick() }, if (enabled) modifier else modifier.alpha(0.5f), accent = primary, icon = icon?.fluent())
 }
 
 @Composable
@@ -131,19 +131,19 @@ actual fun ShopChoice(text: String, selected: Boolean, onClick: () -> Unit, modi
     FluentButton(text, onClick, modifier, accent = selected)
 
 @Composable
-actual fun <T> ShopNavigation(items: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, wide: Boolean, content: @Composable () -> Unit) {
+actual fun <T> ShopNavigation(items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T, onSelect: (T) -> Unit, wide: Boolean, content: @Composable () -> Unit) {
     val layer = FluentTheme.colors.layer
     if (wide) {
         Row(Modifier.fillMaxSize().background(layer)) {
             Column(Modifier.width(220.dp).fillMaxHeight().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                items.forEach { (value, label) -> FluentNavigationItem(label, null, value == selected) { onSelect(value) } }
+                items.forEach { (value, label) -> FluentNavigationItem(label, icon(value).fluent(), value == selected) { onSelect(value) } }
             }
             Box(Modifier.weight(1f).fillMaxHeight()) { content() }
         }
     } else {
         Column(Modifier.fillMaxSize().background(layer)) {
             Box(Modifier.weight(1f).fillMaxWidth()) { content() }
-            FluentSelectorBar(items, selected, onSelect, Modifier.fillMaxWidth().padding(8.dp))
+            FluentSelectorBar(items, selected, onSelect, Modifier.fillMaxWidth().padding(8.dp), icon = { icon(it).fluent() })
         }
     }
 }

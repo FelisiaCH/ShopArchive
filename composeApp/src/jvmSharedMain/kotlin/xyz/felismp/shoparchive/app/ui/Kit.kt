@@ -29,8 +29,9 @@ expect fun ScreenFrame(title: String, content: @Composable ColumnScope.() -> Uni
 @Composable
 expect fun ShopText(text: String, role: TextRole = TextRole.Body, muted: Boolean = false, modifier: Modifier = Modifier)
 
+/** A button; [icon], when given, goes before the text. */
 @Composable
-expect fun ShopButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = true, enabled: Boolean = true)
+expect fun ShopButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = true, enabled: Boolean = true, icon: ShopIcon? = null)
 
 @Composable
 expect fun ShopTextField(
@@ -66,9 +67,9 @@ expect fun ShopCard(modifier: Modifier = Modifier, content: @Composable ColumnSc
 @Composable
 expect fun ShopChoice(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier)
 
-/** The app's navigation: a bottom bar when not [wide], a pane on the left when [wide]. [content] fills the rest. */
+/** The app's navigation: a bottom bar when not [wide], a pane on the left when [wide]; each item shows [icon] with its label. [content] fills the rest. */
 @Composable
-expect fun <T> ShopNavigation(items: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, wide: Boolean, content: @Composable () -> Unit)
+expect fun <T> ShopNavigation(items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T, onSelect: (T) -> Unit, wide: Boolean, content: @Composable () -> Unit)
 
 /** Wraps the app: on Android 17+ asks for local network access first, elsewhere shows [content] straight away. */
 @Composable

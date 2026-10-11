@@ -54,14 +54,14 @@ fun OpenDayScreen(ws: Workspace) {
             }
             is OpenDayPhase.PreviousOpen -> {
                 ShopBanner(stringResource(Res.string.openday_previous, phase.session.businessDate, phase.session.openedBy.name), Tone.Error)
-                if (can.closeDay) ShopButton(stringResource(Res.string.closeday_btn), { ws.openDay.reset(); ws.openReports(ReportsTab.CLOSE_DAY) })
+                if (can.closeDay) ShopButton(stringResource(Res.string.closeday_btn), { ws.openDay.reset(); ws.openReports(ReportsTab.CLOSE_DAY) }, icon = ShopIcon.CloseDay)
             }
             is OpenDayPhase.Failed -> ShopBanner(phase.failure.text(), Tone.Error)
             else -> Unit
         }
         if (ui.blocked == OpenDayBlock.OFFLINE) ShopText(stringResource(Res.string.needs_connection), TextRole.Caption, muted = true)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ShopButton(stringResource(Res.string.openday_btn), ws.openDay::confirm, enabled = ui.blocked == null && !saving)
+            ShopButton(stringResource(Res.string.openday_btn), ws.openDay::confirm, enabled = ui.blocked == null && !saving, icon = ShopIcon.OpenDay)
             ShopButton(stringResource(Res.string.cancel), { ws.openDay.reset(); ws.go(Destination.TODAY) }, primary = false)
         }
     }
