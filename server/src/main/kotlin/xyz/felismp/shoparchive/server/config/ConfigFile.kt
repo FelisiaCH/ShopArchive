@@ -167,7 +167,9 @@ internal fun renderYamlKeys(keys: List<Key<*>>, values: Values): String {
         val indent = "  ".repeat(keySections.size)
         key.commentLines().forEach { out.append(indent).append("# ").append(it).append('\n') }
         // Only safe plain scalars reach here (zone ids, language tags, numbers, word lists). A free-text key needs quoting first.
-        out.append(indent).append(parts.last()).append(": ").append(key.renderValue(values)).append('\n')
+        val example = key.commentedExample(values)
+        if (example != null) out.append(indent).append("# ").append(parts.last()).append(": ").append(example).append('\n')
+        else out.append(indent).append(parts.last()).append(": ").append(key.renderValue(values)).append('\n')
     }
     return out.toString()
 }

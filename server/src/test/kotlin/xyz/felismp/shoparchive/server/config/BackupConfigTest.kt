@@ -24,7 +24,7 @@ class BackupConfigTest {
     }
 
     @Test
-    fun theDefaultsAreOnAtThreeKeepFourteenAndNoCopyAndAreWrittenUnderBackup() {
+    fun theDefaultsAreOffAtThreeKeepFourteenAndNoCopyAndAreWrittenUnderBackup() {
         val backup = loaded().backup
 
         assertFalse(backup.enabled)
@@ -36,7 +36,7 @@ class BackupConfigTest {
 
         val text = root.text("config/shoparchive.yml")
         val tail = text.substring(text.indexOf("\nbackup:\n"))
-        for (line in listOf("backup:\n", "  enabled: false\n", "  time: 03:00\n", "  keep: 14\n", "  copy-to: \"\"\n", "# Allowed: integer from 1 to 3650. Default: 14", "# Allowed: a time of day as HH:mm, e.g. 03:00. Default: 03:00")) {
+        for (line in listOf("backup:\n", "  enabled: false\n", "  time: 03:00\n", "  keep: 14\n", "  # copy-to: \"", "# Allowed: integer from 1 to 3650. Default: 14", "# Allowed: a time of day as HH:mm, e.g. 03:00. Default: 03:00")) {
             assertTrue(line in tail, "missing ${line.trim()} in:\n$tail")
         }
     }
@@ -81,6 +81,18 @@ class BackupConfigTest {
         assertFalse(again.enabled)
         assertEquals(LocalTime.of(22, 45), again.time)
         assertEquals("E:\\Backups # one", again.copyTo)
+        assertEquals(emptyList(), log.warnings)
+    }
+
+    @Test
+    fun anEmptyCopyToIsAnExampleWithAHashAndRemovingTheHashTurnsItOn() {
+        loaded()
+        val example = root.text("config/shoparchive.yml").lines().single { it.startsWith("  # copy-to: ") }
+        root.write("config/shoparchive.yml", root.text("config/shoparchive.yml").replace(example, example.replaceFirst("# ", "")))
+
+        val on = ConfigService(root, log = log, clock = FIXED_CLOCK).also { it.load() }.backup
+        assertEquals(example.substringAfter(": ").removeSurrounding("\"").replace("\\\\", "\\"), on.copyTo)
+        assertTrue(root.text("config/shoparchive.yml").lines().none { it.startsWith("  # copy-to: ") }, "the example goes once a folder is set")
         assertEquals(emptyList(), log.warnings)
     }
 

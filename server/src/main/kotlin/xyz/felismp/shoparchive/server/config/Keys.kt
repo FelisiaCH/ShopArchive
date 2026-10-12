@@ -47,6 +47,9 @@ internal abstract class Key<T : Any>(val path: String, val default: T, val comme
 
     fun renderValue(values: Values): String = render(values[this])
 
+    /** A value the template shows commented out in place of the key's line, or null to show the key as it is. */
+    open fun commentedExample(values: Values): String? = null
+
     /** The template lines for this key, without the comment marker. */
     fun commentLines(): List<String> =
         comment.lines() + "Allowed: $allowed. Default: ${shown(default)}"
@@ -175,11 +178,15 @@ internal class TimeKey(path: String, default: LocalTime, comment: String) : Key<
     }
 }
 
-/** A folder path written between double quotes in the YAML, so any path (`E:\\backup`, one with a `#` or `: `) stays text. Blank means none. */
-internal class PathKey(path: String, comment: String) : Key<String>(path, "", comment) {
+/**
+ * A folder path written between double quotes in the YAML, so any path (`E:\\backup`, one with a `#` or `: `) stays text. Blank means none.
+ * While it is blank the template shows the key commented out with [example] as its value, so turning it on is removing the `#`.
+ */
+internal class PathKey(path: String, comment: String, private val example: String? = null) : Key<String>(path, "", comment) {
     override val allowed get() = "a folder path, or empty for none"
     override fun parse(raw: String) = raw
     override fun render(value: String) = quoted(value)
+    override fun commentedExample(values: Values): String? = example?.takeIf { values[this].isEmpty() }?.let(::quoted)
 }
 
 /** Resolved value of every key of one file. Immutable, so a whole set can be swapped in one assignment. */

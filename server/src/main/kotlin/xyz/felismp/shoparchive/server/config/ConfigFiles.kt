@@ -218,7 +218,8 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
     )
     val backupCopyTo = PathKey(
         "backup.copy-to",
-        "A second folder that gets every backup zip and slip image too, e.g. a USB drive or another disk: \"D:\\\\Backups\" on Windows, \"/home/backups\" on Linux. The folder must already exist: if it is missing (drive unplugged) or cannot be written, a warning is logged and the next backup tries again. A relative path is taken from the server root. Empty = no copy.",
+        "A second folder that gets every backup zip and slip image too, e.g. a USB drive or another disk. To use one, remove the # below and put your folder. The folder must already exist: if it is missing (drive unplugged) or cannot be written, a warning is logged and the next backup tries again. A relative path is taken from the server root. Empty = no copy.",
+        example = if (System.getProperty("os.name").startsWith("Windows")) "D:\\Backups" else "/home/backups",
     )
 
     val backupPauseTimeoutSeconds = IntKey(

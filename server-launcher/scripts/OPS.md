@@ -152,7 +152,7 @@ backup:
   time: 03:00       # server time zone; also: a start with no backup in 24 hours makes one a minute later
   keep: 14          # zips kept in backups/ and in copy-to (only this server's own)
   pause-timeout-seconds: 30  # how long a backup waits for running changes (users, devices) before it gives up
-  copy-to: ""       # e.g. "E:\\ShopArchiveBackups" or "/mnt/usb/shoparchive"
+  # copy-to: "D:\\Backups"   # remove the # and put your folder, e.g. "E:\\ShopArchiveBackups" or "/mnt/usb/shoparchive"
 ```
 
 `status` shows the last backup (time, ok or the reason it failed, size) and the result of the copy.
