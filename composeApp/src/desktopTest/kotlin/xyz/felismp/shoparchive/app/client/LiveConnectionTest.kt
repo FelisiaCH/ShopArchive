@@ -79,6 +79,50 @@ class LiveConnectionTest {
         assertEquals(ConnectionStatus.OFFLINE, live.status.value)
     }
 
+    @Test fun retryNowSkipsTheBackoffWaitAndRestartsTheBackoff() = runTest {
+        val script = Script(mutableListOf())
+        val live = live(script) // every attempt fails
+        live.start()
+        advanceTimeBy(15_500) // attempts at 0, 1, 3, 7, 15 s: now waiting 16 s
+        runCurrent()
+        assertEquals(5, script.attemptTimes.size)
+        live.retryNow()
+        runCurrent()
+        assertEquals(listOf(0L, 1_000, 3_000, 7_000, 15_000, 15_500), script.attemptTimes) // no wait
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(15_500L + 1_000, script.attemptTimes.last()) // back to the one second wait
+        live.stop()
+    }
+
+    @Test fun retryNowOpensNoSecondSocketWhileConnected() = runTest {
+        val script = Script(mutableListOf({ open, _ -> open(); CompletableDeferred<Unit>().await() }))
+        val live = live(script)
+        live.start()
+        runCurrent()
+        assertEquals(ConnectionStatus.CONNECTED, live.status.value)
+        live.retryNow()
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(1, script.attemptTimes.size)
+        live.stop()
+    }
+
+    @Test fun retryNowDoesNotStartAStoppedLoop() = runTest {
+        val script = Script(mutableListOf())
+        val live = live(script)
+        live.retryNow()
+        runCurrent()
+        assertEquals(0, script.attemptTimes.size)
+        live.start()
+        runCurrent()
+        live.stop()
+        live.retryNow()
+        advanceTimeBy(60_000)
+        runCurrent()
+        assertEquals(1, script.attemptTimes.size)
+    }
+
     private fun TestScope.backgroundScopeCollect(live: LiveConnection, f: (WsMessage) -> Unit) =
         backgroundScope.launchCollect(live.messages, f)
 

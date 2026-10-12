@@ -4,7 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.SerializationException
 import xyz.felismp.shoparchive.shared.WsMessage
 
@@ -40,12 +41,19 @@ class LiveConnection(
     val refetch: SharedFlow<Unit> = _refetch.asSharedFlow()
 
     private var job: Job? = null
+    private val retry = Channel<Unit>(Channel.CONFLATED) // wakes the backoff wait
 
     /** Starts (or keeps) the loop; call it after unlocking. It ends by itself when the token is gone. */
     @Synchronized
     fun start() {
         if (job?.isActive == true) return
         job = scope.launch { run() }
+    }
+
+    /** Cuts a backoff wait short and restarts the backoff, e.g. when the app comes back after the phone slept; does nothing while connecting or connected. */
+    @Synchronized
+    fun retryNow() {
+        if (job?.isActive == true && _status.value == ConnectionStatus.OFFLINE) retry.trySend(Unit)
     }
 
     @Synchronized
@@ -78,8 +86,8 @@ class LiveConnection(
                 attempt++
                 if (!hasToken()) break
                 _status.value = ConnectionStatus.OFFLINE
-                delay(wait)
-                wait = minOf(wait * 2, MAX_DELAY_MS)
+                val woken = withTimeoutOrNull(wait) { retry.receive() } != null
+                wait = if (woken) FIRST_DELAY_MS else minOf(wait * 2, MAX_DELAY_MS)
             }
         } finally {
             _status.value = ConnectionStatus.OFFLINE

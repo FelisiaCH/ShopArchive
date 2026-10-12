@@ -799,8 +799,11 @@ class AppFlow(
         lastActivity = now()
     }
 
-    /** The app came back to the front: time spent away counts as idle. */
-    fun appResumed() = checkIdle()
+    /** The app came back to the front: time spent away counts as idle, and a socket that gave up while the phone slept tries again now instead of after its backoff. */
+    fun appResumed() {
+        checkIdle()
+        if (unlocked != null) live?.retryNow()
+    }
 
     /**
      * Locks when there has been no interaction for the auto-lock time. Called by a timer, and on resume. One user who needs no PIN is
