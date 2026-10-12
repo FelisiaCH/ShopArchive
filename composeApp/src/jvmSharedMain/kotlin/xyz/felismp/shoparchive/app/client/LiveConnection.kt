@@ -41,7 +41,8 @@ class LiveConnection(
     val refetch: SharedFlow<Unit> = _refetch.asSharedFlow()
 
     private var job: Job? = null
-    private val retry = Channel<Unit>(Channel.CONFLATED) // wakes the backoff wait
+    // Wakes the backoff wait. Rendezvous: a signal only arrives while the loop waits, so none is left over to skip a later wait.
+    private val retry = Channel<Unit>(Channel.RENDEZVOUS)
 
     /** Starts (or keeps) the loop; call it after unlocking. It ends by itself when the token is gone. */
     @Synchronized
