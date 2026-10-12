@@ -300,7 +300,7 @@ class NotifyApiTest {
             val (sessionId, expense) = closedDay(this@run, manager)
             notify!!.outbox.processDue()
             val first = notify.outbox.items().single { it.notification.event == "day.closed" }.notification.fields
-            assertEquals("LAK 20000", first["expense"])
+            assertEquals("LAK 20.000", first["expense"])
             assertEquals(HttpStatusCode.OK, deletePath("/api/v1/entries/${expense.date}/${expense.id}", manager).status)
 
             val again = postRaw("/api/v1/sessions/main/$sessionId/notify", "", manager).parsed(NotificationDto.serializer())
@@ -339,7 +339,7 @@ class NotifyApiTest {
             assertEquals(HttpStatusCode.Created, again.status)
             val fields = notify!!.outbox.items().last { it.notification.event == "day.closed" }.notification.fields
             assertEquals("true", fields["recomputed"])
-            assertEquals("LAK 150000", fields["income"])
+            assertEquals("LAK 150.000", fields["income"])
             assertTrue("added up from the entries as they are now" in again.parsed(NotificationDto.serializer()).text)
         }
     }

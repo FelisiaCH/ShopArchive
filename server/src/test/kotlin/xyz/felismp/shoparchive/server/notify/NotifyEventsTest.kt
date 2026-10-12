@@ -23,6 +23,7 @@ import xyz.felismp.shoparchive.server.records.openDay
 import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.NotificationState
 import java.nio.file.Path
+import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -223,15 +224,38 @@ class NotifyEventsTest {
             val message = notify!!.outbox.items().last { it.notification.event == "day.closed" }.notification
             assertEquals("noy", message.user)
             assertEquals("main", message.branch)
-            assertEquals("LAK 150000; THB 20.50", message.fields["income"])
-            assertEquals("LAK -1000; THB 0.00", message.fields["variance"])
-            assertEquals("LAK 50000; THB 0.00", message.fields["kept"])
-            assertEquals("LAK 129000; THB 0.00", message.fields["handover"])
+            assertEquals("LAK 150.000; THB 20,50", message.fields["income"])
+            assertEquals("LAK -1.000; THB 0,00", message.fields["variance"])
+            assertEquals("LAK 50.000; THB 0,00", message.fields["kept"])
+            assertEquals("LAK 129.000; THB 0,00", message.fields["handover"])
             assertEquals("3", message.fields["entries"])
             assertEquals("1", message.fields["slips"])
             assertEquals("gave change twice", message.fields["note"])
             assertTrue(Regex("20261003-[0-9A-F]{5}").matches(message.code))
         }
+    }
+
+    @Test
+    fun aCurrencyThatStayedAtZeroAllDayIsLeftOutOfTheSummary() = env().run {
+        val noy = login("noy", grant = listOf("shoparchive.day.close"))
+        api {
+            val session = openDay(noy, float = mapOf("LAK" to "50000", "THB" to "0"))
+            createEntry(noy, newEntry(tenders = listOf(cash("LAK", "150000"))))
+            assertEquals(HttpStatusCode.OK, closeDay(noy, session, mapOf("LAK" to "200000", "THB" to "0")).status)
+
+            val fields = notify!!.outbox.items().last { it.notification.event == "day.closed" }.notification.fields
+            assertEquals("LAK", fields["currency"])
+            assertEquals("LAK 150.000", fields["income"])
+            assertEquals("LAK 200.000", fields["counted"])
+        }
+    }
+
+    @Test
+    fun amountsAreGroupedAsTheAppShowsThemInTheMessageLanguage() {
+        assertEquals("1,500,000.50", groupThousands("1500000.50", Locale.forLanguageTag("th")))
+        assertEquals("1.500.000,50", groupThousands("1500000.50", Locale.forLanguageTag("lo")))
+        assertEquals("-1,000", groupThousands("-1000", Locale.ENGLISH))
+        assertEquals("950", groupThousands("950", Locale.ENGLISH))
     }
 
     @Test
