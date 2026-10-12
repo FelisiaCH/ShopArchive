@@ -82,16 +82,16 @@
     <!-- Standard required root -->
     <Directory Id="TARGETDIR" Name="SourceDir"/>
 
-    <!-- ShopArchive: "Uninstall ShopArchive" next to the app in its Start menu folder (made when the Start menu shortcut is). -->
+    <!--
+      ShopArchive: "Uninstall ShopArchive" next to the app in its Start menu folder (made when the Start menu shortcut is), with the
+      red icon icons/shoparchive-uninstall.ico. jpackage does not pass the build's paths on, so the msi task gives it as SHOPARCHIVE_UNINSTALL_ICON.
+    -->
+    <Icon Id="SaUninstallIcon.ico" SourceFile="$(env.SHOPARCHIVE_UNINSTALL_ICON)"/>
     <DirectoryRef Id="ProgramMenuFolder">
       <Directory Id="SaMenuDir" Name="ShopArchive">
         <Component Id="SaUninstallShortcut" Guid="{46FD7645-5261-445C-BE28-FD633BDD8C56}">
           <Condition>JP_INSTALL_STARTMENU_SHORTCUT</Condition>
-          <?ifdef JpIcon ?>
-          <Shortcut Id="SaUninstallShortcut" Name="Uninstall ShopArchive" Target="[System64Folder]msiexec.exe" Arguments="/x [ProductCode]" Icon="JpARPPRODUCTICON"/>
-          <?else?>
-          <Shortcut Id="SaUninstallShortcut" Name="Uninstall ShopArchive" Target="[System64Folder]msiexec.exe" Arguments="/x [ProductCode]"/>
-          <?endif?>
+          <Shortcut Id="SaUninstallShortcut" Name="Uninstall ShopArchive" Target="[System64Folder]msiexec.exe" Arguments="/x [ProductCode]" Icon="SaUninstallIcon.ico"/>
           <RemoveFolder Id="SaMenuDirRemove" On="uninstall"/>
           <RegistryValue Root="HKCU" Key="Software\$(var.JpAppVendor)\$(var.JpAppName)\$(var.JpAppVersion)" Name="UninstallShortcut" Type="integer" Value="1" KeyPath="yes"/>
         </Component>

@@ -144,6 +144,9 @@ val msi = tasks.register<Exec>("msi") {
         "--win-dir-chooser", "--win-shortcut", "--win-shortcut-prompt", "--win-menu", "--win-menu-group", "ShopArchive", "--dest", msiDir.get().asFile.path,
     )
     environment("PATH", wixDir.get().asFile.path + File.pathSeparator + System.getenv("PATH"))
+    val uninstallIcon = project.file("icons/shoparchive-uninstall.ico")
+    inputs.file(uninstallIcon)
+    environment("SHOPARCHIVE_UNINSTALL_ICON", uninstallIcon.path) // read by main.wxs
     val out = msiDir.get().asFile
     doFirst { out.deleteRecursively() } // jpackage refuses to overwrite
 }
