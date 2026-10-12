@@ -8,6 +8,8 @@ import xyz.felismp.shoparchive.api.Notification
 import xyz.felismp.shoparchive.api.ShopEvent
 import xyz.felismp.shoparchive.api.ShopEventTypes
 import xyz.felismp.shoparchive.shared.wire
+import java.math.BigDecimal
+import java.text.DecimalFormatSymbols
 import java.util.Locale
 
 /**
@@ -16,7 +18,7 @@ import java.util.Locale
  */
 internal fun notificationFields(event: ShopEvent, locale: Locale): Map<String, String>? = when (event) {
     is EntryCreatedEvent -> entryFields(event, locale)
-    is DayClosedEvent -> dayFields(event)
+    is DayClosedEvent -> dayFields(event, locale)
     is NewDeviceEvent -> linkedMapOf("user" to event.username, "device" to event.deviceLabel, "platform" to event.platform, "deviceId" to event.deviceId)
     else -> null
 }
@@ -46,15 +48,17 @@ private fun entryFields(event: EntryCreatedEvent, locale: Locale): Map<String, S
     )
 }
 
-private fun dayFields(event: DayClosedEvent): Map<String, String> {
+private fun dayFields(event: DayClosedEvent, locale: Locale): Map<String, String> {
     val close = event.session.close
-    fun each(value: (CurrencyDay) -> String) = event.currencies.joinToString("; ") { "${it.currency} ${value(it)}" }
+    // A currency that stayed at 0 all day says nothing; when every one did, the first still shows the day's 0.
+    val shown = event.currencies.filterNot { it.allZero() }.ifEmpty { event.currencies.take(1) }
+    fun each(value: (CurrencyDay) -> String) = shown.joinToString("; ") { "${it.currency} ${groupThousands(value(it), locale)}" }
     val fields = linkedMapOf(
         "type" to ShopEventTypes.DAY_CLOSED,
         "category" to "",
         "item" to "",
         "amount" to each { it.net },
-        "currency" to event.currencies.joinToString(", ") { it.currency },
+        "currency" to shown.joinToString(", ") { it.currency },
         "branch" to event.branchName,
         "user" to (close?.closedBy?.name ?: ""),
         "time" to event.at,
@@ -80,6 +84,19 @@ private fun dayFields(event: DayClosedEvent): Map<String, String> {
     // Only said when true; the figures of such a day were added up from the entries as they are now.
     if (event.recomputed) fields["recomputed"] = "true"
     return fields
+}
+
+private fun CurrencyDay.allZero() =
+    listOf(income, expense, cashIn, cashOut, onlineIn, onlineOut, float, counted, expected, variance, kept, handover).all { BigDecimal(it).signum() == 0 }
+
+/** `1500000.50` with the separators of [locale], as the app shows money: `1,500,000.50` in Thai and English, `1.500.000,50` in Lao. */
+internal fun groupThousands(amount: String, locale: Locale): String {
+    val symbols = DecimalFormatSymbols.getInstance(locale)
+    val negative = amount.startsWith("-")
+    val body = amount.removePrefix("-")
+    val whole = body.substringBefore('.').reversed().chunked(3).joinToString(symbols.groupingSeparator.toString()).reversed()
+    val fraction = if ('.' in body) symbols.decimalSeparator + body.substringAfter('.') else ""
+    return (if (negative) "-" else "") + whole + fraction
 }
 
 /** The short code a message carries: the business date and the last five characters of the entry's, the day's or the device's id, so it names one subject and a repeat has the same one. */
