@@ -95,6 +95,8 @@
     <string name="today_cash">ເງິນສົດ ເຂົ້າ-ອອກ</string>
     <string name="today_online">ອອນລາຍ ເຂົ້າ / ອອກ</string>
     <string name="today_latest">ລາຍການຫຼ້າສຸດ</string>
+    <string name="today_mine">ລາຍການຂອງທ່ານມື້ນີ້</string>
+    <string name="today_mine_failed">ບໍ່ສະແດງລາຍການຂອງທ່ານ</string>
     <string name="today_empty">ຍັງບໍ່ມີການບັນທຶກ.</string>
     <string name="today_failed">ໂຫຼດຂໍ້ມູນມື້ນີ້ບໍ່ໄດ້.</string>
     <string name="today_stats_failed">ບໍ່ສະແດງຍອດລວມ.</string>

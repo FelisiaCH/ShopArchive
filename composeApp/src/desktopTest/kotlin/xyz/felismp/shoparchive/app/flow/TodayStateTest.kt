@@ -4,6 +4,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import xyz.felismp.shoparchive.app.client.ClientError
+import xyz.felismp.shoparchive.app.client.EntryFilter
 import xyz.felismp.shoparchive.shared.DashboardCurrency
 import xyz.felismp.shoparchive.shared.DashboardDto
 import xyz.felismp.shoparchive.shared.DashboardTotals
@@ -12,8 +13,10 @@ import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.EntryCreatedMessage
 import xyz.felismp.shoparchive.shared.EntryDeletedMessage
 import xyz.felismp.shoparchive.shared.EntryUpdatedMessage
+import xyz.felismp.shoparchive.shared.PermissionNodes
 import xyz.felismp.shoparchive.shared.SayMessage
 import xyz.felismp.shoparchive.shared.SessionStatus
+import xyz.felismp.shoparchive.shared.UserRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -141,5 +144,56 @@ class TodayStateTest {
         assertTrue(back.showStats)
         assertEquals(1, back.currencies!!.size)
         assertEquals(asked + 1, h.api.dashboardCalls.size)
+    }
+
+    private fun staff(scope: kotlinx.coroutines.CoroutineScope) =
+        Harness(scope, ConfigState.Ready(testConfig(permissions = ALL_NODES - PermissionNodes.DASHBOARD_VIEW)))
+
+    @Test fun withoutTheDashboardTheirOwnEntriesOfTodayAreShownNewestFirst() = runTest(UnconfinedTestDispatcher()) {
+        val h = staff(backgroundScope)
+        val bob = UserRef("u2", "bob")
+        h.api.listed = listOf(
+            testEntry("a", createdAt = "2026-10-04T09:00:00+07:00"),
+            testEntry("b", createdAt = "2026-10-04T10:00:00+07:00").copy(createdBy = bob),
+            testEntry("c", createdAt = "2026-10-04T11:00:00+07:00"),
+            testEntry("d", createdAt = "2026-10-04T11:00:00+07:00"),
+        )
+        val data = TodayState(h.env).ui.value.data!!
+        assertFalse(data.showStats)
+        assertNull(data.currencies)
+        assertEquals(listOf("d", "c", "a"), data.mine!!.map { it.id })
+        assertEquals(listOf(EntryFilter("2026-10-04", "2026-10-04", "main")), h.api.entryFilters)
+        assertTrue(h.api.dashboardCalls.isEmpty(), "the dashboard is not asked for")
+    }
+
+    @Test fun withoutTheDashboardAndNothingRecordedTheListIsEmptyNotMissing() = runTest(UnconfinedTestDispatcher()) {
+        val h = staff(backgroundScope)
+        assertEquals(emptyList(), TodayState(h.env).ui.value.data!!.mine)
+    }
+
+    @Test fun withoutTheDashboardOrTheRightToViewEntriesNothingIsAsked() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(backgroundScope, ConfigState.Ready(testConfig(permissions = listOf(PermissionNodes.DAY_OPEN))))
+        assertNull(TodayState(h.env).ui.value.data!!.mine)
+        assertTrue(h.api.entryFilters.isEmpty())
+        assertTrue(h.api.dashboardCalls.isEmpty())
+    }
+
+    @Test fun anEntriesFailureStillLeavesTheDayStatus() = runTest(UnconfinedTestDispatcher()) {
+        val h = staff(backgroundScope)
+        h.api.current = h.api.session("s1")
+        h.api.listError = ClientError.Unreachable()
+        val data = TodayState(h.env).ui.value.data!!
+        assertIs<DayStatus.Open>(data.status)
+        assertNull(data.mine)
+        assertEquals(Failure.Unreachable, data.statsFailure)
+    }
+
+    @Test fun withTheDashboardTheEntriesAreNotAsked() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(backgroundScope)
+        h.api.listed = listOf(testEntry())
+        val data = TodayState(h.env).ui.value.data!!
+        assertTrue(data.showStats)
+        assertNull(data.mine)
+        assertTrue(h.api.entryFilters.isEmpty())
     }
 }

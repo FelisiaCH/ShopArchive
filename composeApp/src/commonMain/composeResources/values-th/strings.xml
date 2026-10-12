@@ -95,6 +95,8 @@
     <string name="today_cash">เงินสด เข้า-ออก</string>
     <string name="today_online">ออนไลน์ เข้า / ออก</string>
     <string name="today_latest">รายการล่าสุด</string>
+    <string name="today_mine">รายการของคุณวันนี้</string>
+    <string name="today_mine_failed">ไม่แสดงรายการของคุณ</string>
     <string name="today_empty">ยังไม่มีการบันทึก</string>
     <string name="today_failed">โหลดข้อมูลวันนี้ไม่ได้</string>
     <string name="today_stats_failed">ไม่แสดงยอดรวม</string>

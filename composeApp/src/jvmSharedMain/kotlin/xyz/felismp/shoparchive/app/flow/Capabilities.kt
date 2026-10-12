@@ -9,7 +9,7 @@ import java.time.LocalDate
  * server would refuse instead of showing it disabled or failing on it. A person whose rights change gets the new set at the
  * next config load (the next unlock). Before the config has loaded nothing is allowed.
  */
-class Capabilities(private val held: Set<String>, private val editWindowDays: Int = 0, private val userId: String = "") {
+class Capabilities(private val held: Set<String>, private val editWindowDays: Int = 0, val userId: String = "") {
     val recordEntries: Boolean get() = PermissionNodes.ENTRY_CREATE in held
     val viewEntries: Boolean get() = PermissionNodes.ENTRY_VIEW_OWN in held || PermissionNodes.ENTRY_VIEW_ALL in held
     val openDay: Boolean get() = PermissionNodes.DAY_OPEN in held

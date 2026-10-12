@@ -95,6 +95,8 @@
     <string name="today_cash">Cash in - out</string>
     <string name="today_online">Online in / out</string>
     <string name="today_latest">Latest lines</string>
+    <string name="today_mine">Your entries today</string>
+    <string name="today_mine_failed">Your entries could not be shown.</string>
     <string name="today_empty">Nothing recorded yet.</string>
     <string name="today_failed">Today could not be loaded.</string>
     <string name="today_stats_failed">The totals are not shown.</string>

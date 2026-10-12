@@ -64,7 +64,14 @@ private fun TodayContent(data: TodayData, canWrite: Boolean, can: Capabilities, 
         }
         is DayStatus.Closed -> ShopChip(stringResource(Res.string.day_closed), Tone.Info)
     }
-    if (!data.showStats) return
+    if (!data.showStats) {
+        data.statsFailure?.let { ShopBanner(stringResource(Res.string.today_mine_failed) + " " + it.text(), Tone.Error) }
+        data.mine?.let { mine ->
+            ShopText(stringResource(Res.string.today_mine), TextRole.Title)
+            if (mine.isEmpty()) ShopText(stringResource(Res.string.today_empty), muted = true) else ShopCard { mine.forEach { RecentLine(it) } }
+        }
+        return
+    }
     data.statsFailure?.let { ShopBanner(stringResource(Res.string.today_stats_failed) + " " + it.text(), Tone.Error) }
     data.currencies?.filter { it.totals.count > 0 }?.forEach { CurrencyCard(it) }
     if (data.recent.isEmpty()) {

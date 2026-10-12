@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import xyz.felismp.shoparchive.app.client.ClientError
+import xyz.felismp.shoparchive.app.client.EntryFilter
 import xyz.felismp.shoparchive.shared.DashboardCurrency
 import xyz.felismp.shoparchive.shared.DashboardDto
 import xyz.felismp.shoparchive.shared.EntryDto
@@ -38,15 +39,18 @@ data class TodayData(
     val staleFrom: String?,
     val currencies: List<DashboardCurrency>?,
     val recent: List<EntryDto>,
+    /** Set when the totals, or without [showStats] the person's own lines, could not be read. */
     val statsFailure: Failure?,
     /** False when the person may not see the dashboard: no totals or latest lines are asked for or shown. */
     val showStats: Boolean = true,
+    /** Without [showStats]: what the person recorded on [date], newest first; null when they may not view entries or the read failed. */
+    val mine: List<EntryDto>? = null,
 )
 
 /** [loading] only before the first answer; a reload keeps showing the last [data]. [failure] is set when the day itself could not be read. */
 data class TodayUi(val loading: Boolean = true, val data: TodayData? = null, val failure: Failure? = null)
 
-/** Today: the day's status, the money and the latest lines of the chosen branch. Reloads on a branch change, a reconnect and live entry or day messages for the branch. */
+/** Today: the day's status, the money and the latest lines of the chosen branch (for a person without the dashboard, the lines they recorded). Reloads on a branch change, a reconnect and live entry or day messages for the branch. */
 class TodayState(private val env: Env) {
     private val _ui = MutableStateFlow(TodayUi())
     val ui: StateFlow<TodayUi> = _ui.asStateFlow()
@@ -83,10 +87,18 @@ class TodayState(private val env: Env) {
             val open = (status as? DayStatus.Open)?.session
             val date = open?.businessDate ?: today
             var stats: DashboardDto? = null
+            var mine: List<EntryDto>? = null
             var statsFailure: Failure? = null
-            val showStats = env.can.dashboard
+            val can = env.can
+            val showStats = can.dashboard
             try {
                 if (showStats) stats = env.calls.run { env.api.dashboard(date, date, branch) }
+                else if (can.viewEntries) {
+                    // Someone with entry.view.all but no dashboard still sees only their own lines here.
+                    mine = env.calls.run { env.api.entries(EntryFilter(date, date, branch)) }
+                        .filter { it.createdBy.id == can.userId }
+                        .sortedWith(compareByDescending<EntryDto> { it.createdAt }.thenByDescending { it.id })
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -96,7 +108,7 @@ class TodayState(private val env: Env) {
                 loading = false,
                 data = TodayData(
                     branch, date, status, staleFrom = open?.businessDate?.takeIf { it != today },
-                    currencies = stats?.currencies, recent = stats?.recent.orEmpty(), statsFailure = statsFailure, showStats = showStats,
+                    currencies = stats?.currencies, recent = stats?.recent.orEmpty(), statsFailure = statsFailure, showStats = showStats, mine = mine,
                 ),
             )
         } catch (e: CancellationException) {
