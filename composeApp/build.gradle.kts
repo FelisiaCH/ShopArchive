@@ -13,9 +13,6 @@ abstract class GenerateAppBuild : DefaultTask() {
     @get:Input
     abstract val version: Property<String>
 
-    @get:Input
-    abstract val buildNumber: Property<Int>
-
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
 
@@ -26,11 +23,10 @@ abstract class GenerateAppBuild : DefaultTask() {
         dir.resolve("AppBuild.kt").writeText(
             "package xyz.felismp.shoparchive.app\n\n" +
                 "import xyz.felismp.shoparchive.shared.AppVersion\n\n" +
-                "/** Generated from gradle.properties: the version and build number this app was built as. */\n" +
+                "/** Generated from gradle.properties: the version this app was built as. */\n" +
                 "object AppBuild {\n" +
                 "    const val VERSION = \"${version.get()}\"\n" +
-                "    const val NUMBER = ${buildNumber.get()}\n" +
-                "    val version: AppVersion = checkNotNull(AppVersion.parse(\"\$VERSION-\$NUMBER\")) { \"version \$VERSION is not x.y.z\" }\n" +
+                "    val version: AppVersion = checkNotNull(AppVersion.parse(VERSION)) { \"version \$VERSION is not x.y.z or x.y.z-betaNNN\" }\n" +
                 "}\n",
         )
     }
@@ -38,7 +34,6 @@ abstract class GenerateAppBuild : DefaultTask() {
 
 val generateAppBuild = tasks.register<GenerateAppBuild>("generateAppBuild") {
     version.set(project.version.toString())
-    buildNumber.set(providers.gradleProperty("buildNumber").map { it.toInt() })
     outputDir.set(layout.buildDirectory.dir("generated/appBuild"))
 }
 
@@ -106,22 +101,13 @@ kotlin {
 }
 
 // Windows Installer only upgrades (jpackage's major upgrade) when the first three version fields grow, and it ignores a fourth, so the
-// MSI is `<major>.<minor>.<buildNumber>`: buildNumber only grows over every release, which makes a new version and a same-version
-// rebuild both an upgrade. This is internal to Windows Installer; the app itself compares `version` + `buildNumber`.
-val msiVersion: String = run {
-    val parts = project.version.toString().substringBefore('-').split('.')
-    val major = parts.getOrNull(0)?.toIntOrNull()
-    val minor = parts.getOrNull(1)?.toIntOrNull()
-    val build = providers.gradleProperty("buildNumber").orNull?.toIntOrNull()
-    check(parts.size == 3 && major != null && minor != null) { "version ${project.version} in gradle.properties is not x.y.z" }
-    check(major in 0..255 && minor in 0..255) { "MSI major and minor must be 0..255 (Windows Installer), got ${project.version}" }
-    check(build != null && build in 1..65535) { "buildNumber in gradle.properties must be 1..65535 (Windows Installer), got ${providers.gradleProperty("buildNumber").orNull}" }
-    "$major.$minor.$build"
-}
+// MSI is `<x>.<y>.<z*1000 + beta>` (beta 999 for a final), worked out in the root build.gradle.kts: every release and every beta is an upgrade.
+// This is internal to Windows Installer; the app itself compares `version`.
+val msiVersion = rootProject.extra["msiVersion"] as String
 
-// The name an installer must have in the server's `downloads/` folder: `ShopArchive-<x.y.z>-<buildNumber>`, always with the build
-// (the grammar of `parseUpdateFileName` in shared). androidApp's `releaseApk` builds the same name.
-val releaseFileName = "ShopArchive-${project.version.toString().substringBefore('-')}-${providers.gradleProperty("buildNumber").get()}.msi"
+// The name an installer must have in the server's `downloads/` folder: `ShopArchive-<version>` (the grammar of `parseUpdateFileName`
+// in shared). androidApp's `releaseApk` builds the same name.
+val releaseFileName = "ShopArchive-${project.version}.msi"
 
 // The MSI that is handed out. jpackage packs the app image `createDistributable` made, with `packaging/windows` as its resource
 // directory: its main.wxs (jpackage's own from JDK 21, plus an uninstall that also removes the app's data) replaces jpackage's.
@@ -154,7 +140,7 @@ val msi = tasks.register<Exec>("msi") {
     doFirst { out.deleteRecursively() } // jpackage refuses to overwrite
 }
 
-// `build/release/ShopArchive-<version>-<build>.msi`: the MSI from `msi`, named for `downloads/`; copy it there unchanged.
+// `build/release/ShopArchive-<version>.msi`: the MSI from `msi`, named for `downloads/`; copy it there unchanged.
 tasks.register<Sync>("releaseMsi") {
     from(msi) { include("*.msi") }
     rename(".*", releaseFileName)
@@ -165,7 +151,6 @@ tasks.withType<Test>().configureEach {
     systemProperty("shoparchive.releaseFileName", releaseFileName)
     systemProperty("shoparchive.msiVersion", msiVersion)
     systemProperty("shoparchive.version", project.version.toString())
-    systemProperty("shoparchive.buildNumber", providers.gradleProperty("buildNumber").get())
 }
 
 compose.desktop {

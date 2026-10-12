@@ -56,7 +56,7 @@ class UpdatesApiTest {
     @Test
     fun listsOnlyNamedInstallersWithPlatformVersionBuildSizeAndHash() = env().run {
         download("ShopArchive-1.0.1.apk", "apk-bytes")
-        download("ShopArchive-1.2.0-2.msi", "msi-bytes!")
+        download("ShopArchive-1.2.0-beta002.msi", "msi-bytes!")
         download("ShopArchive-1.2.0.MSI", "upper")
         download("notes.txt", "ignored")
         download("ShopArchive-1.0.1.zip", "ignored")
@@ -68,8 +68,8 @@ class UpdatesApiTest {
             val files = getPath("/api/v1/updates", token).parsed(ListSerializer(UpdateFile.serializer()))
             assertEquals(
                 listOf(
-                    UpdateFile("ShopArchive-1.2.0-2.msi", UpdatePlatform.WINDOWS, "1.2.0", 2, 10, sha256("msi-bytes!")),
                     UpdateFile("ShopArchive-1.2.0.MSI", UpdatePlatform.WINDOWS, "1.2.0", 0, 5, sha256("upper")),
+                    UpdateFile("ShopArchive-1.2.0-beta002.msi", UpdatePlatform.WINDOWS, "1.2.0", 2, 10, sha256("msi-bytes!")),
                     UpdateFile("ShopArchive-1.0.1.apk", UpdatePlatform.ANDROID, "1.0.1", 0, 9, sha256("apk-bytes")),
                 ),
                 files,

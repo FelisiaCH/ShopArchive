@@ -25,7 +25,7 @@ a plugin (`plugins/template`) is the right tool for everything else.
    server does not start (`--ignore-hotfix <ID>` starts it without that fix). The template's own `PatchesKt` would collide if two
    copies kept the package.
 2. `plugin.yml`: `name`, `fixes` (the IDs), `severity` (`security` or `bug`) and `target-build` (the core build it is for: `status` shows
-   it, it is `buildNumber` in `gradle.properties`). No `main`, no `api-version`.
+   it, it is derived from `version` in `gradle.properties`, 101001 for 0.1.1-beta001). No `main`, no `api-version`.
 3. Write a `public static` method with the same parameters and return type as the target (an instance method gets the object as first
    parameter) and put `@HotfixPatch(targetClass, method, descriptor, classSha256)` on it. In Kotlin: a top-level function. See `Patches.kt`.
    Get `descriptor` from `javap -p -cp <core jar> <class>`, and `classSha256` by typing `plugins hotfix-hash <class>` in the console of

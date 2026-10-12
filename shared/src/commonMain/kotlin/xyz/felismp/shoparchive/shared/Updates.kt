@@ -12,8 +12,9 @@ enum class UpdatePlatform {
 
 /**
  * One installer the server offers (`GET /api/v1/updates` lists them, `GET /api/v1/updates/{file}` sends one). [version] is `x.y.z`,
- * [build] the number after it in the file name (0 when the name has none), both read from [file]; the admin names the files,
- * see [parseUpdateFileName]. [sha256] is lower-case hex of the file's bytes: the app checks it before it installs.
+ * [build] the beta number of `-betaNNN` in the file name (0 for a final), both read from [file]; the admin names the files,
+ * see [parseUpdateFileName]. The field is still called `build` because apps of 0.1.0 read the number after `x.y.z-` in a name as it:
+ * a final sent as build 0 is a name they accept, so they upgrade to it. [sha256] is lower-case hex of the file's bytes: the app checks it before it installs.
  */
 @Serializable
 data class UpdateFile(
@@ -25,24 +26,33 @@ data class UpdateFile(
     val sha256: String,
 ) {
     /** [version] and [build] as one comparable value; null if this server sent a version this app cannot read. */
-    fun appVersion(): AppVersion? = AppVersion.parse(version)?.copy(build = build)
+    fun appVersion(): AppVersion? = if (build in 0..MAX_BETA) AppVersion.parse(version)?.copy(beta = build) else null
 }
 
-/** Version of an app or installer: `x.y.z` and a build number. A higher version wins; the same version with a higher build wins. */
-data class AppVersion(val major: Int, val minor: Int, val patch: Int, val build: Int = 0) : Comparable<AppVersion> {
-    override fun compareTo(other: AppVersion): Int =
-        compareValuesBy(this, other, AppVersion::major, AppVersion::minor, AppVersion::patch, AppVersion::build)
+private const val MAX_BETA = 998
 
-    override fun toString() = "$major.$minor.$patch" + if (build > 0) "-$build" else ""
+/**
+ * Version of an app or installer: `x.y.z`, and `-betaNNN` after it for a build that is only handed out for testing ([beta] 0 is a final).
+ * A higher `x.y.z` wins; of the same `x.y.z` the final wins over any beta, and a higher beta over a lower one.
+ */
+data class AppVersion(val major: Int, val minor: Int, val patch: Int, val beta: Int = 0) : Comparable<AppVersion> {
+    override fun compareTo(other: AppVersion): Int =
+        compareValuesBy(this, other, AppVersion::major, AppVersion::minor, AppVersion::patch, AppVersion::rank)
+
+    private val rank get() = if (beta == 0) Int.MAX_VALUE else beta // a final is above every beta
+
+    override fun toString() = "$major.$minor.$patch" + if (beta > 0) "-beta${beta.toString().padStart(3, '0')}" else ""
 
     companion object {
-        private val PATTERN = Regex("""(\d{1,4})\.(\d{1,4})\.(\d{1,4})(?:-(\d{1,6}))?""")
+        private val PATTERN = Regex("""(\d{1,4})\.(\d{1,4})\.(\d{1,4})(?:-beta(\d{3}))?""")
 
-        /** `1.2.3` or `1.2.3-4` (the number after the dash is the build); anything else is null. */
+        /** `1.2.3` or `1.2.3-beta004` (001..998); anything else is null. */
         fun parse(text: String): AppVersion? {
             val m = PATTERN.matchEntire(text.trim()) ?: return null
-            val (major, minor, patch, build) = m.destructured
-            return AppVersion(major.toInt(), minor.toInt(), patch.toInt(), build.toIntOrNull() ?: 0)
+            val (major, minor, patch, beta) = m.destructured
+            val number = beta.toIntOrNull() ?: 0
+            if (beta.isNotEmpty() && number !in 1..MAX_BETA) return null
+            return AppVersion(major.toInt(), minor.toInt(), patch.toInt(), number)
         }
     }
 }
@@ -50,10 +60,10 @@ data class AppVersion(val major: Int, val minor: Int, val patch: Int, val build:
 /** What a file name in `downloads/` says about the file. */
 data class UpdateFileName(val platform: UpdatePlatform, val version: AppVersion)
 
-private val UPDATE_FILE_NAME = Regex("""ShopArchive-(\d{1,4}\.\d{1,4}\.\d{1,4}(?:-\d{1,6})?)\.(apk|APK|msi|MSI)""")
+private val UPDATE_FILE_NAME = Regex("""ShopArchive-(\d{1,4}\.\d{1,4}\.\d{1,4}(?:-beta\d{3})?)\.(apk|APK|msi|MSI)""")
 
 /**
- * The naming rule: `ShopArchive-<x.y.z>[-<build>].apk` or `.msi`, e.g. `ShopArchive-1.0.1.apk`, `ShopArchive-1.2.0-2.msi`.
+ * The naming rule: `ShopArchive-<x.y.z>[-betaNNN].apk` or `.msi`, e.g. `ShopArchive-1.0.1.apk`, `ShopArchive-1.2.0-beta002.msi`.
  * Anything else (another name, another extension, a path) is null: such a file is not offered.
  */
 fun parseUpdateFileName(name: String): UpdateFileName? {
@@ -64,7 +74,7 @@ fun parseUpdateFileName(name: String): UpdateFileName? {
 }
 
 /**
- * Whether [UpdateFile.file] follows [parseUpdateFileName] and says the same platform, version and build as the rest of this entry.
+ * Whether [UpdateFile.file] follows [parseUpdateFileName] and says the same platform, version and beta as the rest of this entry.
  * The server only lists such files; a client calls this on what it received before the name goes near its disk.
  */
 fun UpdateFile.hasValidName(): Boolean {

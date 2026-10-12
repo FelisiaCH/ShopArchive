@@ -40,7 +40,7 @@ internal class DefaultUpdateService(private val folder: Path) : UpdateService {
                 if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) return@mapNotNull null
                 val version = parsed.version
                 val size = try { Files.size(path) } catch (_: java.io.IOException) { return@mapNotNull null }
-                UpdateFile(name, parsed.platform, "${version.major}.${version.minor}.${version.patch}", version.build, size, sha256Of(path, name))
+                UpdateFile(name, parsed.platform, "${version.major}.${version.minor}.${version.patch}", version.beta, size, sha256Of(path, name))
             }
         }
         hashes.keys.retainAll(found.map { it.file }.toSet())

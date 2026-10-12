@@ -203,7 +203,7 @@ class AppFlowTest {
 
     @AfterTest fun stop() = job.cancel()
 
-    private fun flow(updater: AppUpdater? = null, own: xyz.felismp.shoparchive.shared.AppVersion = xyz.felismp.shoparchive.shared.AppVersion(1, 0, 0, 1)) = AppFlow(
+    private fun flow(updater: AppUpdater? = null, own: xyz.felismp.shoparchive.shared.AppVersion = xyz.felismp.shoparchive.shared.AppVersion(1, 0, 0)) = AppFlow(
         scope, store, ThisDevice("Test PC", "windows"),
         connect = { pin, sid, eps -> connected += Triple(pin, sid, eps); probes[eps.singleOrNull()] ?: api.also { it.endpoints = eps } },
         probe = { probed = it; probeResult() },

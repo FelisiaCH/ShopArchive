@@ -51,7 +51,7 @@ class UpdateStateTest {
 
     private val calls = object : Calls { override suspend fun <T> run(block: suspend () -> T): T = block() }
 
-    private fun state(api: UpdatesApi, updater: AppUpdater, own: AppVersion = AppVersion(1, 0, 0, 1), checkNow: Boolean = false) =
+    private fun state(api: UpdatesApi, updater: AppUpdater, own: AppVersion = AppVersion(1, 0, 0), checkNow: Boolean = false) =
         UpdateState(CoroutineScope(Dispatchers.Unconfined), api, calls, updater, own, Dispatchers.Unconfined, checkNow)
 
     @Test
@@ -208,7 +208,7 @@ class UpdateStateTest {
     fun aNameThatDisagreesWithItsPlatformOrMetadataIsRefused() {
         installRefused(file("ShopArchive-1.2.0.msi", "1.2.0"))
         installRefused(file("ShopArchive-1.2.0.apk", "1.3.0"))
-        installRefused(file("ShopArchive-1.2.0-2.apk", "1.2.0", build = 3))
+        installRefused(file("ShopArchive-1.2.0-beta002.apk", "1.2.0", build = 3))
     }
 
     @Test

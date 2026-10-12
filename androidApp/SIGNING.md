@@ -27,7 +27,7 @@ CI reads the same four values from the environment instead: `SHOPARCHIVE_KEYSTOR
 ./gradlew :androidApp:releaseApk :androidApp:bundleRelease
 ```
 
-- APK: `androidApp/build/release/ShopArchive-<version>-<build>.apk`, already named for the server's `downloads/`: copy it there unchanged
+- APK: `androidApp/build/release/ShopArchive-<version>.apk`, already named for the server's `downloads/`: copy it there unchanged
 - AAB: `androidApp/build/outputs/bundle/release/androidApp-release.aab`
 
 Without a key the build still succeeds but prints a warning and the files are unsigned (`androidApp-release-unsigned.apk`); Android refuses to install those. The debug key is never used for a release.

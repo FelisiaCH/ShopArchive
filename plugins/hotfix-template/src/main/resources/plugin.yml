@@ -4,4 +4,4 @@ version: "0.1.0"
 hotfix: true
 fixes: [EXAMPLE-1]          # the IDs this fixes. When the core lists all of them in fixed-issues, this jar is skipped and can be removed
 severity: bug               # security: the server does not start if this cannot be applied (unless --ignore-hotfix <ID>). bug: warn and start without it
-target-build: 1             # the core build (gradle.properties buildNumber, shown by `status`) this was made for
+target-build: 1             # the core build (derived from version in gradle.properties, e.g. 101001 for 0.1.1-beta001; shown by `status`) this was made for

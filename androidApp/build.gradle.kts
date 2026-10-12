@@ -33,7 +33,7 @@ android {
         applicationId = "xyz.felismp.shoparchive"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = providers.gradleProperty("buildNumber").get().toInt()
+        versionCode = rootProject.extra["appCode"] as Int
         versionName = project.version.toString()
     }
 
@@ -69,9 +69,9 @@ if (!canSignRelease) {
     }
 }
 
-// `build/release/ShopArchive-<version>-<build>.apk`: the release APK (signed or not), named for the server's `downloads/` folder
-// (`ShopArchive-<x.y.z>-<buildNumber>`, the same name composeApp's `releaseMsi` builds); copy it there unchanged.
-val releaseApkName = "ShopArchive-${project.version.toString().substringBefore('-')}-${providers.gradleProperty("buildNumber").get()}.apk"
+// `build/release/ShopArchive-<version>.apk`: the release APK (signed or not), named for the server's `downloads/` folder
+// (`ShopArchive-<x.y.z>[-betaNNN]`, the same name composeApp's `releaseMsi` builds); copy it there unchanged.
+val releaseApkName = "ShopArchive-${project.version}.apk"
 androidComponents {
     onVariants(selector().withBuildType("release")) { variant ->
         tasks.register<Sync>("releaseApk") {

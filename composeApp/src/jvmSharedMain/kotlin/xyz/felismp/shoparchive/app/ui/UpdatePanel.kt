@@ -27,7 +27,7 @@ fun UpdatePanel(update: UpdateState, asked: Boolean = false, modifier: Modifier 
         UpdateUi.Checking -> if (asked) ShopBanner(stringResource(Res.string.working), Tone.Info, modifier)
         UpdateUi.UpToDate -> if (asked) ShopBanner(stringResource(Res.string.update_none), Tone.Success, modifier)
         is UpdateUi.Available -> {
-            ShopBanner(stringResource(Res.string.update_available, now.file.version + if (now.file.build > 0) "-" + now.file.build else ""), Tone.Info, modifier)
+            ShopBanner(stringResource(Res.string.update_available, now.file.appVersion()?.toString() ?: now.file.version), Tone.Info, modifier)
             Choices(update, modifier)
         }
         is UpdateUi.Downloading -> ShopBanner(stringResource(Res.string.update_downloading, megabytes(now.bytes), megabytes(now.file.size)), Tone.Info, modifier)

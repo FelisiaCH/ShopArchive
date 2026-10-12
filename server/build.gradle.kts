@@ -36,7 +36,7 @@ dependencies {
 // below doesn't capture the Project itself (the configuration cache requires that).
 val implementationVersion = project.version.toString()
 
-// shoparchive-build.properties: the build number and the merged fix IDs. The launcher reads it from the jar to judge hotfixes
+// shoparchive-build.properties: the core build (from version, see the root build.gradle.kts) and the merged fix IDs. The launcher reads it from the jar to judge hotfixes
 // before the core runs; the core shows it in the boot log and `status`.
 abstract class GenerateBuildInfo : DefaultTask() {
     @get:Input
@@ -52,7 +52,7 @@ abstract class GenerateBuildInfo : DefaultTask() {
     @TaskAction
     fun generate() {
         val number = build.get().trim().toIntOrNull()?.takeIf { it >= 1 }
-            ?: throw GradleException("buildNumber in gradle.properties must be a whole number from 1")
+            ?: throw GradleException("the core build derived from version in gradle.properties must be a whole number from 1, got '${build.get()}'")
         val ids = fixedIssues.get().asFile.readLines().map { it.substringBefore('#').trim() }.filter { it.isNotEmpty() }
         val bad = ids.filter { !Regex("[A-Za-z0-9][A-Za-z0-9._-]{0,63}").matches(it) }
         if (bad.isNotEmpty()) throw GradleException("server/fixed-issues.txt has lines that are not an ID: $bad")
@@ -63,7 +63,7 @@ abstract class GenerateBuildInfo : DefaultTask() {
 }
 
 val generateBuildInfo = tasks.register<GenerateBuildInfo>("generateBuildInfo") {
-    build.set(providers.gradleProperty("buildNumber"))
+    build.set(rootProject.extra["appCode"].toString())
     fixedIssues.set(layout.projectDirectory.file("fixed-issues.txt"))
     output.set(layout.buildDirectory.file("generated/buildinfo/shoparchive-build.properties"))
 }
