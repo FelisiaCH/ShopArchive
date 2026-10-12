@@ -141,7 +141,7 @@ val msi = tasks.register<Exec>("msi") {
     args(
         "--type", "msi", "--app-image", appImage.get().asFile.path, "--name", "ShopArchive", "--app-version", msiVersion,
         "--icon", project.file("icons/shoparchive.ico").path, "--resource-dir", windowsPackaging.asFile.path,
-        "--win-dir-chooser", "--win-shortcut", "--win-menu", "--win-menu-group", "ShopArchive", "--dest", msiDir.get().asFile.path,
+        "--win-dir-chooser", "--win-shortcut", "--win-shortcut-prompt", "--win-menu", "--win-menu-group", "ShopArchive", "--dest", msiDir.get().asFile.path,
     )
     environment("PATH", wixDir.get().asFile.path + File.pathSeparator + System.getenv("PATH"))
     val out = msiDir.get().asFile
