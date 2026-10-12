@@ -21,7 +21,22 @@ import javax.imageio.ImageIO
  */
 private val windowIcons = listOf(16, 20, 24, 32, 40, 48, 64, 256).map { ImageIO.read(object {}.javaClass.getResource("/icon/shoparchive-$it.png")) }
 
-fun main() = application {
+/**
+ * `--uninstall {product code}`, from the installer's Uninstall ShopArchive shortcut: the msiexec command that removes this product,
+ * or null for any other arguments. The shortcut runs the app rather than msiexec because Windows leaves out of Start a shortcut
+ * an installer made to msiexec.
+ */
+internal fun uninstallCommand(args: Array<String>): List<String>? =
+    args.takeIf { it.size == 2 && it[0] == "--uninstall" && PRODUCT_CODE.matches(it[1]) }?.let { listOf("msiexec", "/x", it[1]) }
+
+private val PRODUCT_CODE = Regex("""\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}}""")
+
+fun main(args: Array<String>) {
+    uninstallCommand(args)?.let { ProcessBuilder(it).start(); return }
+    app()
+}
+
+private fun app() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = stringResource(Res.string.app_name), // "ShopArchive"
