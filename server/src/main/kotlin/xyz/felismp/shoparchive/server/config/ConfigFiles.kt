@@ -207,8 +207,8 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
     )
 
     val backupEnabled = BoolKey(
-        "backup.enabled", true,
-        "Make a backup every day at backup.time while the server runs (and once shortly after a start when the last one is older than 24 hours). The console command backup works whichever this is.",
+        "backup.enabled", false,
+        "Make a backup every day at backup.time while the server runs (and once shortly after a start when the last one is older than 24 hours). Off until you turn it on here. The console command backup works whichever this is.",
     )
     val backupTime = TimeKey("backup.time", LocalTime.of(3, 0), "Time of day (in the server time zone) of the daily backup.")
     val backupKeep = IntKey(
@@ -218,7 +218,7 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyLi
     )
     val backupCopyTo = PathKey(
         "backup.copy-to",
-        "A second folder that gets every backup zip and slip image too, e.g. a USB drive or another disk. The folder must already exist: if it is missing (drive unplugged) or cannot be written, a warning is logged and the next backup tries again. A relative path is taken from the server root. Empty = no copy.",
+        "A second folder that gets every backup zip and slip image too, e.g. a USB drive or another disk: \"D:\\\\Backups\" on Windows, \"/home/backups\" on Linux. The folder must already exist: if it is missing (drive unplugged) or cannot be written, a warning is logged and the next backup tries again. A relative path is taken from the server root. Empty = no copy.",
     )
 
     val backupPauseTimeoutSeconds = IntKey(

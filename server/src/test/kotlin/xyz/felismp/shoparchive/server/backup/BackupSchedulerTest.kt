@@ -23,7 +23,9 @@ class BackupSchedulerTest {
         override fun sendMessage(message: String) { lines += message }
     }
 
-    private fun env(clock: TestClock, yml: String? = null) = BackupEnv(dir.resolve("root"), yml, clock).also { it.populate() }
+    // The daily backup is off by default; these tests are about its schedule, so it is on unless a test says otherwise.
+    private fun env(clock: TestClock, yml: String? = null) =
+        BackupEnv(dir.resolve("root"), if (yml?.contains("enabled:") == true) yml else "  enabled: true\n" + yml.orEmpty(), clock).also { it.populate() }
 
     private fun scheduler(env: BackupEnv, clock: TestClock, pause: ((() -> Unit) -> Unit)? = null): BackupScheduler {
         val service = if (pause == null) env.service else BackupService(env.root, { env.config.backup }, { ZoneOffset.UTC }, pause, env.log, clock, serverId = SERVER_ID)

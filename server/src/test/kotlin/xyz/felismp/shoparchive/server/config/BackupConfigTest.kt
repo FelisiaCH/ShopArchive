@@ -27,7 +27,7 @@ class BackupConfigTest {
     fun theDefaultsAreOnAtThreeKeepFourteenAndNoCopyAndAreWrittenUnderBackup() {
         val backup = loaded().backup
 
-        assertTrue(backup.enabled)
+        assertFalse(backup.enabled)
         assertEquals(LocalTime.of(3, 0), backup.time)
         assertEquals(14, backup.keep)
         assertEquals("", backup.copyTo)
@@ -36,7 +36,7 @@ class BackupConfigTest {
 
         val text = root.text("config/shoparchive.yml")
         val tail = text.substring(text.indexOf("\nbackup:\n"))
-        for (line in listOf("backup:\n", "  enabled: true\n", "  time: 03:00\n", "  keep: 14\n", "  copy-to: \"\"\n", "# Allowed: integer from 1 to 3650. Default: 14", "# Allowed: a time of day as HH:mm, e.g. 03:00. Default: 03:00")) {
+        for (line in listOf("backup:\n", "  enabled: false\n", "  time: 03:00\n", "  keep: 14\n", "  copy-to: \"\"\n", "# Allowed: integer from 1 to 3650. Default: 14", "# Allowed: a time of day as HH:mm, e.g. 03:00. Default: 03:00")) {
             assertTrue(line in tail, "missing ${line.trim()} in:\n$tail")
         }
     }

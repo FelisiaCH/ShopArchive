@@ -361,7 +361,7 @@ class BackupTest {
 
         assertTrue(lines[0].startsWith("Backup: last 2026-10-02 03:04 ok, ") && ok.zip in lines[0], lines.toString())
         assertEquals("Backup copy-to: not set", lines[1])
-        assertEquals("Backup: daily at 03:00, keep 14", lines[2])
+        assertEquals("Backup: daily backup is off (backup.enabled)", lines[2]) // the default
     }
 
     @Test

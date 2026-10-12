@@ -125,7 +125,7 @@ Stop the server, replace `shoparchive-server.jar` (and the start scripts) with t
 
 ### What is backed up
 
-The console command `backup` (and the daily run, see below) writes `backups/<yyyyMMdd-HHmmss>.zip`:
+The console command `backup` (and the daily run, once you turn it on, see below) writes `backups/<yyyyMMdd-HHmmss>.zip`:
 everything in the server folder except
 
 - the slip images (`record/**/slip-N.jpg|png`): each is copied once, under the checksum of its content, to `backups/slips/<sha256>.<jpg|png>`. The zip's `backup-manifest.json` says which slip belongs where.
@@ -148,7 +148,7 @@ Settings (`config/shoparchive.yml`):
 
 ```yaml
 backup:
-  enabled: true     # a daily backup while the server runs
+  enabled: false    # true: a daily backup while the server runs (off until you turn it on)
   time: 03:00       # server time zone; also: a start with no backup in 24 hours makes one a minute later
   keep: 14          # zips kept in backups/ and in copy-to (only this server's own)
   pause-timeout-seconds: 30  # how long a backup waits for running changes (users, devices) before it gives up
