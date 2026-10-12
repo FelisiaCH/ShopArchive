@@ -1,16 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- The Uninstall ShopArchive shortcut, 16 to 24 px: the small app icon in bright red, with a plain trash can where the coin is. -->
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="70 48 410 410" fill="none">
-  <g stroke="#E8312F" stroke-width="44" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M112 68H300L392 160V420H112V68Z" fill="white"/>
-    <path d="M300 68V160H392"/>
-    <path d="M178 236H300"/>
-    <path d="M178 318H250"/>
-  </g>
-  <circle cx="358" cy="358" r="110" fill="white"/>
-  <circle cx="358" cy="358" r="92" fill="#E8312F"/>
-  <g stroke="white" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <path d="M310 318H406"/>
-    <path d="M324 336L332 414H384L392 336"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="40 24 448 448" fill="none">
+  <path d="M112 56H368V448L320 412L272 448L224 412L176 448L112 448Z" fill="white" stroke="#E8312F" stroke-width="44" stroke-linejoin="round"/>
+  <g stroke="#E8312F" stroke-width="44" stroke-linecap="round"><path d="M176 152H304"/><path d="M176 244H248"/></g>
+  <circle cx="364" cy="372" r="112" fill="white"/><circle cx="364" cy="372" r="94" fill="#E8312F"/>
+  <g stroke="white" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M316 332H412"/><path d="M330 350L338 428H390L398 350"/></g>
 </svg>
