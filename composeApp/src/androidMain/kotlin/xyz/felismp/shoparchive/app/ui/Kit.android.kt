@@ -11,12 +11,14 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawing
@@ -240,6 +242,7 @@ actual fun ShopFixedPage(title: String, content: @Composable ColumnScope.() -> U
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 actual fun <T> ShopNavigation(
     items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T?, onSelect: (T) -> Unit, wide: Boolean,
@@ -288,7 +291,8 @@ actual fun <T> ShopNavigation(
         } else {
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                 Box(Modifier.weight(1f).fillMaxWidth()) { content() }
-                Row(Modifier.fillMaxWidth().background(colors.sidebar)) {
+                // As in Material apps the bar gives way to the keyboard: lifted above it, it would cover the form's own buttons.
+                if (!WindowInsets.isImeVisible) Row(Modifier.fillMaxWidth().background(colors.sidebar)) {
                     items.forEach { (value, label) -> Item(value, label, Modifier.weight(1f)) }
                 }
             }
