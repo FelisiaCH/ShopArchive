@@ -11,8 +11,8 @@
     <group
         android:scaleX="0.115"
         android:scaleY="0.115"
-        android:translateX="21.68"
-        android:translateY="24.45">
+        android:translateX="26.4"
+        android:translateY="24.79">
         <path
             android:pathData="M368,262V56H112V452L144,428L176,452L208,428L240,452L272,428L284,437"
             android:strokeColor="#FFFFFF"

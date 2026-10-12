@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- composeApp/icons/shoparchive.svg (512 x 512), scaled into the 66dp safe zone of the 108dp adaptive icon. -->
+<!-- composeApp/icons/shoparchive.svg (512 x 512), scaled into the 66dp safe zone of the 108dp adaptive icon with the receipt, not the receipt and coin together, centred: the coin hangs off its corner, and centring both put the receipt visibly to the left. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -8,8 +8,8 @@
     <group
         android:scaleX="0.115"
         android:scaleY="0.115"
-        android:translateX="21.68"
-        android:translateY="24.45">
+        android:translateX="26.4"
+        android:translateY="24.79">
         <path
             android:pathData="M112,56H368V452L336,428L304,452L272,428L240,452L208,428L176,452L144,428L112,452Z"
             android:fillColor="#FFFFFF"
