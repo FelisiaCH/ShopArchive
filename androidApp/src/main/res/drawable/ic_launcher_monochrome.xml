@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Themed icon (Android 13+): ic_launcher_foreground in one colour the system tints. With no white to hide them, the page's right
-  and bottom edges stop, round caps included, where the coin's white ring was (r = 94 around 358,358) instead of running under the coin.
+  Themed icon (Android 13+): ic_launcher_foreground in one colour the system tints. With no white to hide them, the receipt's right
+  edge and torn bottom stop where the coin's white rim was (r = 100 around 364,372), and the coin is a ring around the money symbol.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -9,22 +9,27 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <group
-        android:scaleX="0.124"
-        android:scaleY="0.124"
-        android:translateX="19.9"
-        android:translateY="22.63">
+        android:scaleX="0.115"
+        android:scaleY="0.115"
+        android:translateX="21.68"
+        android:translateY="24.45">
         <path
-            android:pathData="M392,256.4V160L300,68H112V420H273.35 M300,68V160H392 M164,224H314 M164,286H283 M164,348H250"
+            android:pathData="M368,262V56H112V452L144,428L176,452L208,428L240,452L272,428L284,437"
             android:strokeColor="#FFFFFF"
             android:strokeWidth="28"
             android:strokeLineCap="round"
             android:strokeLineJoin="round" />
         <path
-            android:pathData="M276,358a82,82 0,1 0,164 0a82,82 0,1 0,-164 0Z"
+            android:pathData="M164,140H316 M164,208H280 M164,276H244"
             android:strokeColor="#FFFFFF"
-            android:strokeWidth="24" />
+            android:strokeWidth="26"
+            android:strokeLineCap="round" />
         <path
-            android:pathData="M358,306V410 M392,324C383,310 370,304 354,304C333,304 318,316 318,333C318,351 332,359 358,364C383,369 398,378 398,395C398,414 382,426 358,426C337,426 320,418 310,402"
+            android:pathData="M287,372a77,77 0,1 0,154 0a77,77 0,1 0,-154 0Z"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="22" />
+        <path
+            android:pathData="M364,318V426 M398,336C389,322 376,316 360,316C339,316 324,328 324,345C324,363 338,371 364,376C389,381 404,390 404,407C404,426 388,438 364,438C343,438 326,430 316,414"
             android:strokeColor="#FFFFFF"
             android:strokeWidth="20"
             android:strokeLineCap="round"

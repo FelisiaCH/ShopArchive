@@ -1,23 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- ShopArchive icon: a shop receipt and a coin, in the green of money. The source of every platform's icon. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
-  <g stroke="#245A5A" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
-    <!-- document outline -->
-    <path d="M112 68H300L392 160V420H112V68Z"/>
-    <!-- folded corner -->
-    <path d="M300 68V160H392"/>
-    <!-- document lines -->
-    <path d="M164 224H314"/>
-    <path d="M164 286H286"/>
-    <path d="M164 348H250"/>
+  <!-- receipt, torn at the bottom -->
+  <path d="M112 56H368V452L336 428L304 452L272 428L240 452L208 428L176 452L144 428L112 452Z" fill="white" stroke="#1E8C45" stroke-width="28" stroke-linejoin="round"/>
+  <!-- lines of the receipt -->
+  <g stroke="#1E8C45" stroke-width="26" stroke-linecap="round">
+    <path d="M164 140H316"/>
+    <path d="M164 208H280"/>
+    <path d="M164 276H244"/>
   </g>
-
-  <!-- coin badge -->
-  <circle cx="358" cy="358" r="94" fill="white"/>
-  <circle cx="358" cy="358" r="82" stroke="#245A5A" stroke-width="24"/>
-
+  <!-- coin, white rim -->
+  <circle cx="364" cy="372" r="100" fill="white"/>
+  <circle cx="364" cy="372" r="84" fill="#1E8C45"/>
   <!-- money symbol, drawn as vector paths -->
-  <g stroke="#245A5A" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <path d="M358 306V410"/>
-    <path d="M392 324C383 310 370 304 354 304C333 304 318 316 318 333C318 351 332 359 358 364C383 369 398 378 398 395C398 414 382 426 358 426C337 426 320 418 310 402"/>
+  <g stroke="white" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M364 318V426"/>
+    <path d="M398 336C389 322 376 316 360 316C339 316 324 328 324 345C324 363 338 371 364 376C389 381 404 390 404 407C404 426 388 438 364 438C343 438 326 430 316 414"/>
   </g>
 </svg>
