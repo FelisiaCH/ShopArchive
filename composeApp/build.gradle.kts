@@ -123,9 +123,34 @@ val msiVersion: String = run {
 // (the grammar of `parseUpdateFileName` in shared). androidApp's `releaseApk` builds the same name.
 val releaseFileName = "ShopArchive-${project.version.toString().substringBefore('-')}-${providers.gradleProperty("buildNumber").get()}.msi"
 
-// `build/release/ShopArchive-<version>-<build>.msi`: the MSI from `packageMsi`, named for `downloads/`; copy it there unchanged.
+// The MSI that is handed out. jpackage packs the app image `createDistributable` made, with `packaging/windows` as its resource
+// directory: its main.wxs (jpackage's own from JDK 21, plus an uninstall that also removes the app's data) replaces jpackage's.
+// Compose's `packageMsi` cannot take one (it empties the resource directory it gives jpackage), so it is not used for releases.
+// The options match what `packageMsi` passes, so the UpgradeCode, and with it upgrading an installed copy, stays the same.
+val msiDir = layout.buildDirectory.dir("compose/binaries/main/msi-release")
+val wixDir = rootProject.layout.buildDirectory.dir("wix311")
+val windowsPackaging = layout.projectDirectory.dir("packaging/windows")
+val msi = tasks.register<Exec>("msi") {
+    dependsOn("createDistributable", ":unzipWix")
+    val appImage = layout.buildDirectory.dir("compose/binaries/main/app/ShopArchive")
+    inputs.dir(appImage)
+    inputs.dir(windowsPackaging)
+    outputs.dir(msiDir)
+    val jpackage = File(System.getProperty("java.home"), "bin/jpackage.exe").path
+    executable = jpackage
+    args(
+        "--type", "msi", "--app-image", appImage.get().asFile.path, "--name", "ShopArchive", "--app-version", msiVersion,
+        "--icon", project.file("icons/shoparchive.ico").path, "--resource-dir", windowsPackaging.asFile.path,
+        "--win-dir-chooser", "--win-shortcut", "--win-menu", "--win-menu-group", "ShopArchive", "--dest", msiDir.get().asFile.path,
+    )
+    environment("PATH", wixDir.get().asFile.path + File.pathSeparator + System.getenv("PATH"))
+    val out = msiDir.get().asFile
+    doFirst { out.deleteRecursively() } // jpackage refuses to overwrite
+}
+
+// `build/release/ShopArchive-<version>-<build>.msi`: the MSI from `msi`, named for `downloads/`; copy it there unchanged.
 tasks.register<Sync>("releaseMsi") {
-    from(tasks.named("packageMsi")) { include("*.msi") }
+    from(msi) { include("*.msi") }
     rename(".*", releaseFileName)
     into(layout.buildDirectory.dir("release"))
 }
