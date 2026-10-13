@@ -2,6 +2,7 @@ package xyz.felismp.shoparchive.api
 
 import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.LocalizedName
+import xyz.felismp.shoparchive.shared.NoteDto
 import xyz.felismp.shoparchive.shared.SessionDto
 
 /** The event types the core publishes. A plugin may publish and listen to types of its own. */
@@ -9,9 +10,10 @@ object ShopEventTypes {
     const val ENTRY_CREATED = "entry.created"
     const val DAY_CLOSED = "day.closed"
     const val DEVICE_NEW = "device.new"
+    const val NOTE_CREATED = "note.created"
 
     /** The types the core publishes. */
-    val all: List<String> = listOf(ENTRY_CREATED, DAY_CLOSED, DEVICE_NEW)
+    val all: List<String> = listOf(ENTRY_CREATED, DAY_CLOSED, DEVICE_NEW, NOTE_CREATED)
 }
 
 /** Something that happened in the shop and was already saved. Events are facts: a listener cannot veto or change what they describe. */
@@ -31,6 +33,13 @@ class EntryCreatedEvent(val entry: EntryDto, val branchName: String, val categor
     override val type get() = ShopEventTypes.ENTRY_CREATED
     override val branch get() = entry.branch
     override val at get() = entry.createdAt
+}
+
+/** A day note was written (not one that was sent again). [branchName] is the branch's display name. */
+class NoteCreatedEvent(val note: NoteDto, val branchName: String) : ShopEvent {
+    override val type get() = ShopEventTypes.NOTE_CREATED
+    override val branch get() = note.branch
+    override val at get() = note.createdAt
 }
 
 /**

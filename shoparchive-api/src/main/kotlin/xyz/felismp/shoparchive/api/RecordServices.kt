@@ -10,7 +10,11 @@ import xyz.felismp.shoparchive.shared.DashboardDto
 import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.HistoryItem
+import xyz.felismp.shoparchive.shared.CreateNoteRequest
+import xyz.felismp.shoparchive.shared.MarkNotesReadRequest
 import xyz.felismp.shoparchive.shared.MoveEntryRequest
+import xyz.felismp.shoparchive.shared.NoteDto
+import xyz.felismp.shoparchive.shared.NotesUnread
 import xyz.felismp.shoparchive.shared.OpenSessionRequest
 import xyz.felismp.shoparchive.shared.OpenSessionResponse
 import xyz.felismp.shoparchive.shared.SessionDto
@@ -141,4 +145,31 @@ interface DashboardService {
 
     /** Up to 20 item texts, most recently used first, of the entries the caller may list (only those of [category] if given), for suggestions. */
     fun recentItems(principal: Principal, category: String?): List<String>
+}
+
+/** [created] is false when the note id existed already and [note] is the stored one. */
+class CreatedNote(val note: NoteDto, val created: Boolean)
+
+/** Day notes: what staff leave for the owner, written once, with who read them. Every method checks what the caller may do and throws [ApiError] if not. */
+interface NoteService {
+    /**
+     * Leaves a note on the branch's current business day (the open day's date, else today). An id that exists already (from the same user) returns the stored note, unchanged.
+     * @throws ApiError 400 for empty text or an archived branch; 403 without `shoparchive.note.create` or the branch; 409 for an id that is someone else's
+     */
+    fun create(principal: Principal, request: CreateNoteRequest): CreatedNote
+
+    /**
+     * The notes of [branch] on [date] (`yyyy-MM-dd`) the caller may see, oldest first: all of them with `shoparchive.note.read`, else the caller's own.
+     * @throws ApiError 400 for a bad date; 403 without either note node or the branch
+     */
+    fun list(principal: Principal, branch: String, date: String): List<NoteDto>
+
+    /** Marks one note as read by the caller (a note read before keeps its time). @throws ApiError 403 without `shoparchive.note.read` or the branch; 404 */
+    fun markRead(principal: Principal, id: String): NoteDto
+
+    /** Marks every note of others that the caller has not read, on one day of a branch; answers the day's notes as [list] does. @throws ApiError 400; 403 without `shoparchive.note.read` or the branch */
+    fun markAllRead(principal: Principal, request: MarkNotesReadRequest): List<NoteDto>
+
+    /** How many notes of others on [date] the caller has not read. @throws ApiError 400; 403 without `shoparchive.note.read` or the branch */
+    fun unread(principal: Principal, branch: String, date: String): NotesUnread
 }

@@ -27,6 +27,7 @@ import xyz.felismp.shoparchive.api.DashboardService
 import xyz.felismp.shoparchive.api.EntryQuery
 import xyz.felismp.shoparchive.api.EntryService
 import xyz.felismp.shoparchive.api.ExportService
+import xyz.felismp.shoparchive.api.NoteService
 import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.api.ServiceRegistry
 import xyz.felismp.shoparchive.api.SessionService
@@ -34,8 +35,10 @@ import xyz.felismp.shoparchive.shared.CloseSessionRequest
 import xyz.felismp.shoparchive.shared.CreateBranchRequest
 import xyz.felismp.shoparchive.shared.CreateCategoryRequest
 import xyz.felismp.shoparchive.shared.CreateEntryRequest
+import xyz.felismp.shoparchive.shared.CreateNoteRequest
 import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.ErrorCode
+import xyz.felismp.shoparchive.shared.MarkNotesReadRequest
 import xyz.felismp.shoparchive.shared.MoveEntryRequest
 import xyz.felismp.shoparchive.shared.OpenSessionRequest
 import xyz.felismp.shoparchive.shared.UpdateBranchRequest
@@ -182,6 +185,24 @@ internal fun Route.recordRoutes(services: ServiceRegistry) {
         call.response.headers.append(HttpHeaders.ContentDisposition, ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, file.fileName).toString())
         call.respondBytes(file.bytes, ContentType.parse(file.contentType))
     }
+
+    // 201 when this call wrote the note; 200 when the id was there already.
+    post("/notes") {
+        val body = call.receive<CreateNoteRequest>()
+        val created = blocking { services.require<NoteService>().create(call.principal, body) }
+        call.respond(if (created.created) HttpStatusCode.Created else HttpStatusCode.OK, created.note)
+    }
+
+    get("/notes") { call.respond(blocking { services.require<NoteService>().list(call.principal, call.query("branch").orEmpty(), call.query("date").orEmpty()) }) }
+
+    get("/notes/unread") { call.respond(blocking { services.require<NoteService>().unread(call.principal, call.query("branch").orEmpty(), call.query("date").orEmpty()) }) }
+
+    post("/notes/read") {
+        val body = call.receive<MarkNotesReadRequest>()
+        call.respond(blocking { services.require<NoteService>().markAllRead(call.principal, body) })
+    }
+
+    post("/notes/{id}/read") { call.respond(blocking { services.require<NoteService>().markRead(call.principal, call.param("id")) }) }
 
     get("/dashboard") {
         call.respond(blocking { services.require<DashboardService>().dashboard(call.principal, call.query("from"), call.query("to"), call.query("branch"), call.query("currency")) })

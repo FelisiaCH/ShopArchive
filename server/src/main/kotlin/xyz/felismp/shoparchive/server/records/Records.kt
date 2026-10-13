@@ -5,6 +5,7 @@ import xyz.felismp.shoparchive.api.CategoryService
 import xyz.felismp.shoparchive.api.DashboardService
 import xyz.felismp.shoparchive.api.EntryService
 import xyz.felismp.shoparchive.api.ExportService
+import xyz.felismp.shoparchive.api.NoteService
 import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.api.ServiceRegistry
 import xyz.felismp.shoparchive.api.SessionService
@@ -45,6 +46,8 @@ internal class Records(
     val categories = CategoryStore(DataFileStore(root, CategoriesFile, log, clock, barrier))
     val store = RecordStore(root, exponents, writer, files, log, clock)
     val sessions = SessionStore(root, exponents, writer, files, log)
+    val notes = NoteStore(root, writer, files, log)
+    private val noteReads = NoteReadStore(root, writer, files, log)
 
     private val access = Access(services)
     private val branchService = DefaultBranchService(branches, access)
@@ -55,6 +58,7 @@ internal class Records(
         services.register(BranchService::class.java, branchService, CORE_SERVICE_PRIORITY, "core")
         services.register(CategoryService::class.java, DefaultCategoryService(categories, access), CORE_SERVICE_PRIORITY, "core")
         services.register(SessionService::class.java, sessionService, CORE_SERVICE_PRIORITY, "core")
+        services.register(NoteService::class.java, DefaultNoteService(config, branches, writer, notes, noteReads, sessions, access, services, clock), CORE_SERVICE_PRIORITY, "core")
         services.register(EntryService::class.java, entryService, CORE_SERVICE_PRIORITY, "core")
         services.register(ExportService::class.java, DefaultExportService(config, access, services), CORE_SERVICE_PRIORITY, "core")
         services.register(DashboardService::class.java, DefaultDashboardService(config, store, access, services, clock), CORE_SERVICE_PRIORITY, "core")
@@ -83,6 +87,8 @@ internal class Records(
     private fun loadAll(hint: Boolean) {
         readData(hint)
         sessions.load()
+        notes.load()
+        noteReads.load()
         store.load()
     }
 

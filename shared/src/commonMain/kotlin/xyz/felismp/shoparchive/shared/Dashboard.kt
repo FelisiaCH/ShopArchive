@@ -44,5 +44,6 @@ data class DashboardCurrency(
     val expenseItems: List<DashboardItem>,
 )
 
+/** [slips] is the number of slips attached to the period's entries, all currencies together (0 from a server that does not count them). */
 @Serializable
-data class DashboardDto(val from: String, val to: String, val currencies: List<DashboardCurrency>, val recent: List<EntryDto>)
+data class DashboardDto(val from: String, val to: String, val currencies: List<DashboardCurrency>, val recent: List<EntryDto>, val slips: Int = 0)

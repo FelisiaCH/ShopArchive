@@ -18,6 +18,8 @@ internal const val DAY_OPEN_NODE = PermissionNodes.DAY_OPEN
 internal const val DAY_CLOSE_NODE = PermissionNodes.DAY_CLOSE
 internal const val EXPORT_NODE = PermissionNodes.EXPORT
 internal const val DASHBOARD_VIEW_NODE = PermissionNodes.DASHBOARD_VIEW
+internal const val NOTE_CREATE_NODE = PermissionNodes.NOTE_CREATE
+internal const val NOTE_READ_NODE = PermissionNodes.NOTE_READ
 
 /** The permission nodes of records, branches and day sessions. Defaults: a clerk records and sees their own work; everything wider is given on purpose. */
 internal fun registerRecordNodes(nodes: PermissionNodeRegistry) {
@@ -93,5 +95,15 @@ internal fun registerRecordNodes(nodes: PermissionNodeRegistry) {
         DASHBOARD_VIEW_NODE, "See the dashboard: the totals of the branches you work in, whoever recorded them", false,
         "ดูแดชบอร์ด: ยอดรวมของสาขาที่ตนทำงานอยู่ ไม่ว่าใครเป็นผู้บันทึก",
         "ເບິ່ງແດຊບອດ: ຍອດລວມຂອງສາຂາທີ່ຕົນເຮັດວຽກຢູ່ ບໍ່ວ່າໃຜເປັນຜູ້ບັນທຶກ",
+    )
+    node(
+        NOTE_CREATE_NODE, "Leave a day note for the owner", true,
+        "ฝากโน้ตประจำวันถึงเจ้าของ",
+        "ຝາກບັນທຶກປະຈຳວັນຫາເຈົ້າຂອງ",
+    )
+    node(
+        NOTE_READ_NODE, "See every day note of your branches and mark them read", false,
+        "ดูโน้ตประจำวันทั้งหมดของสาขาที่ตนทำงานอยู่ และทำเครื่องหมายว่าอ่านแล้ว",
+        "ເບິ່ງບັນທຶກປະຈຳວັນທັງໝົດຂອງສາຂາທີ່ຕົນເຮັດວຽກຢູ່ ແລະ ໝາຍວ່າອ່ານແລ້ວ",
     )
 }
