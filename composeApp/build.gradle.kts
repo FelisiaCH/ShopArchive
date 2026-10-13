@@ -81,6 +81,7 @@ kotlin {
             implementation(libs.androidx.compose.material3)
             implementation(libs.androidx.core)
             implementation(libs.androidx.activity.compose)
+            implementation(libs.mlkit.text.recognition)
         }
         named("desktopMain") {
             dependencies {

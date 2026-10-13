@@ -35,6 +35,7 @@ lifecycle = "2.11.0"
 activity-compose = "1.13.0"
 material3 = "1.4.0"
 androidx-core = "1.18.0"
+mlkit-text-recognition = "16.0.1"
 
 [libraries]
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
@@ -87,6 +88,7 @@ lifecycle-viewmodel-compose = { module = "org.jetbrains.androidx.lifecycle:lifec
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
 androidx-core = { module = "androidx.core:core", version.ref = "androidx-core" }
 androidx-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
+mlkit-text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "mlkit-text-recognition" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

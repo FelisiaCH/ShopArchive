@@ -132,6 +132,7 @@
     <string name="slip_file">ເລືອກໄຟລ໌</string>
     <string name="slip_remove">ລຶບ %1$s</string>
     <string name="slip_preparing">ກຳລັງກຽມຮູບ…</string>
+    <string name="amount_from_slip">ອ່ານຈາກສະລິບ ກວດໃຫ້ຖືກກ່ອນບັນທຶກ</string>
     <string name="notice_too_many">ເພີ່ມສະລິບໄດ້ສູງສຸດ %1$s ໃບ.</string>
     <string name="notice_too_big">ຮູບນັ້ນຍັງໃຫຍ່ກວ່າ %1$s KB ຫຼັງບີບອັດ.</string>
     <string name="notice_unreadable">ໄຟລ໌ນັ້ນບໍ່ແມ່ນຮູບທີ່ອ່ານໄດ້.</string>

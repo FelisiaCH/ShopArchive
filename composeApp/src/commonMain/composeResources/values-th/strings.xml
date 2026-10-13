@@ -132,6 +132,7 @@
     <string name="slip_file">เลือกไฟล์</string>
     <string name="slip_remove">ลบ %1$s</string>
     <string name="slip_preparing">กำลังเตรียมรูป…</string>
+    <string name="amount_from_slip">อ่านจากสลิป ตรวจให้ตรงก่อนบันทึก</string>
     <string name="notice_too_many">เพิ่มสลิปได้สูงสุด %1$s ใบ</string>
     <string name="notice_too_big">รูปนั้นยังใหญ่กว่า %1$s KB หลังบีบอัด</string>
     <string name="notice_unreadable">ไฟล์นั้นไม่ใช่รูปที่อ่านได้</string>

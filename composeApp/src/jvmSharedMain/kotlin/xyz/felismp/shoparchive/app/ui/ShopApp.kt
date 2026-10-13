@@ -20,6 +20,7 @@ import xyz.felismp.shoparchive.app.client.probeFingerprint
 import xyz.felismp.shoparchive.app.flow.AppFlow
 import xyz.felismp.shoparchive.app.flow.createAppUpdater
 import xyz.felismp.shoparchive.app.flow.createSlipCompressor
+import xyz.felismp.shoparchive.app.flow.createSlipReader
 
 /** The whole app for one window / activity. */
 @Composable
@@ -34,6 +35,7 @@ fun ShopApp(context: PlatformContext) {
                     probe = { address -> probeFingerprint(address) },
                     prefs = createPreferencesStore(context),
                     compressor = createSlipCompressor(),
+                    reader = createSlipReader(),
                     discovery = createServerDiscovery(context),
                     updater = createAppUpdater(context),
                     ownVersion = AppBuild.version,

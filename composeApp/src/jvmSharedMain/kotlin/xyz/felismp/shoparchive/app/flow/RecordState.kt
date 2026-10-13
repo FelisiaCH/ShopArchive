@@ -71,6 +71,8 @@ class RecordUi(
     val block: SaveBlock?,
     val slipNotice: SlipNotice?,
     val compressing: Boolean,
+    /** The payment line whose amount was read from a slip and not yet changed by staff; the screen asks them to check it. */
+    val amountFromSlip: Int? = null,
     /** The branch the entry with an unknown result was sent for; it stays that one whatever branch is chosen now. */
     val pendingBranch: String? = null,
     /** The live connection is up: all a resend after an unknown result needs, whatever day or branch is shown. */
@@ -86,6 +88,7 @@ class RecordState(
     private val env: Env,
     private val today: TodayState,
     private val compressor: SlipCompressor,
+    private val reader: SlipReader,
 ) {
     private class Inner(
         val draft: Draft,
@@ -95,6 +98,8 @@ class RecordState(
         val compressing: Int = 0,
         /** The exact request of the first try, kept while its result is unknown so a resend cannot differ. */
         val sent: Sent? = null,
+        /** The row key of the payment line filled from a slip, until staff change its amount, remove it or the draft is replaced. */
+        val amountFromSlip: Int? = null,
     )
 
     private class Sent(val request: CreateEntryRequest, val slips: List<ByteArray>)
@@ -131,7 +136,7 @@ class RecordState(
                 policy.requireOpenDay && dayStatus != null && dayStatus !is DayStatus.Open -> SaveBlock.NO_DAY
                 else -> null
             },
-            s.notice, s.compressing > 0, s.sent?.request?.branch?.takeIf { s.phase is SavePhase.Unknown }, canWrite,
+            s.notice, s.compressing > 0, s.amountFromSlip, s.sent?.request?.branch?.takeIf { s.phase is SavePhase.Unknown }, canWrite,
         )
     }.stateIn(env.scope, SharingStarted.Eagerly, initialUi())
 
@@ -150,8 +155,8 @@ class RecordState(
     private fun freshDraft(type: EntryType, currency: String) =
         Draft(uuidV7(env.now()), type, null, "", "", listOf(TenderRow(++keys, currency, TenderMethod.CASH, "")), emptyList())
 
-    private fun Inner.copy(draft: Draft = this.draft, phase: SavePhase = this.phase, recent: List<String> = this.recent, notice: SlipNotice? = this.notice, compressing: Int = this.compressing, sent: Sent? = this.sent) =
-        Inner(draft, phase, recent, notice, compressing, sent)
+    private fun Inner.copy(draft: Draft = this.draft, phase: SavePhase = this.phase, recent: List<String> = this.recent, notice: SlipNotice? = this.notice, compressing: Int = this.compressing, sent: Sent? = this.sent, amountFromSlip: Int? = this.amountFromSlip) =
+        Inner(draft, phase, recent, notice, compressing, sent, amountFromSlip)
 
     private fun Draft.copy(
         type: EntryType = this.type, category: String? = this.category, item: String = this.item, note: String = this.note,
@@ -167,10 +172,15 @@ class RecordState(
     private fun currencyCodes() = (env.config.value as? ConfigState.Ready)?.config?.currencies.orEmpty().map { it.code }
 
     /** Changes the draft; refused while saving or while the answer is unknown (the id may already be stored with the old content). */
-    private fun edit(change: (Draft) -> Draft) {
-        inner.update { s ->
-            if (s.phase is SavePhase.Saving || s.phase is SavePhase.Unknown) s else s.copy(change(s.draft), phase = SavePhase.Editing)
-        }
+    private fun edit(change: (Draft) -> Draft) = editInner { s ->
+        val draft = change(s.draft)
+        // The amount read from a slip stops being "read" once its line is gone or its amount is changed.
+        val read = s.amountFromSlip?.takeIf { key -> draft.tenders.firstOrNull { it.key == key }?.amount == s.draft.tenders.firstOrNull { it.key == key }?.amount }
+        s.copy(draft, phase = SavePhase.Editing, amountFromSlip = read)
+    }
+
+    private fun editInner(change: (Inner) -> Inner) {
+        inner.update { s -> if (s.phase is SavePhase.Saving || s.phase is SavePhase.Unknown) s else change(s) }
     }
 
     fun setType(type: EntryType) {
@@ -231,14 +241,37 @@ class RecordState(
             } catch (_: Exception) {
                 null
             }
+            var added = false
             inner.update { s ->
                 val s2 = s.copy(compressing = s.compressing - 1)
+                added = false
                 when {
                     jpeg == null -> s2.copy(notice = SlipNotice.UNREADABLE)
                     jpeg.size > limits.slipMaxSizeKb * 1024L -> s2.copy(notice = SlipNotice.TOO_BIG)
-                    else -> s2.copy(s2.draft.copy(slips = s2.draft.slips + SlipItem(++keys, name, jpeg)), phase = SavePhase.Editing)
+                    else -> s2.copy(s2.draft.copy(slips = s2.draft.slips + SlipItem(++keys, name, jpeg)), phase = SavePhase.Editing).also { added = true }
                 }
             }
+            if (added && jpeg != null) fillAmountFromSlip(jpeg)
+        }
+    }
+
+    /** Reads the paid amount off a slip photo and puts it in the first empty online line of that currency. What staff typed is never replaced. */
+    private suspend fun fillAmountFromSlip(jpeg: ByteArray) {
+        val text = try {
+            reader.text(jpeg)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        } ?: return
+        val currencies = ui.value.currencies
+        val (code, minor) = slipAmount(text, currencies.associate { it.code to it.exponent }) ?: return
+        val exponent = currencies.first { it.code == code }.exponent
+        editInner { s ->
+            // Looked for now, not before the read: staff may have typed an amount meanwhile.
+            val row = s.draft.tenders.firstOrNull { it.method == TenderMethod.ONLINE && it.amount.isEmpty() && it.currency == code } ?: return@editInner s
+            val tenders = s.draft.tenders.map { if (it.key == row.key) it.copy(amount = formatAmount(minor, exponent)) else it }
+            s.copy(s.draft.copy(tenders = tenders), phase = SavePhase.Editing, amountFromSlip = row.key)
         }
     }
 

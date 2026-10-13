@@ -35,6 +35,7 @@ class Workspace(
     savedBranch: String?,
     private val saveBranch: (String) -> Unit,
     compressor: SlipCompressor,
+    reader: SlipReader,
     today: () -> LocalDate,
     now: () -> Long,
     /** Told every config the server answers, e.g. to keep the addresses it lists. */
@@ -61,7 +62,7 @@ class Workspace(
     private val env = Env(scope, api, calls, canWrite, config, branch, refetch, messages, today, now)
     val today = TodayState(env)
     val openDay = OpenDayState(env, this.today)
-    val record = RecordState(env, this.today, compressor)
+    val record = RecordState(env, this.today, compressor, reader)
     val history = HistoryState(env, compressor)
     val closeDay = CloseDayState(env, this.today)
     val reports = ReportsState(env)
