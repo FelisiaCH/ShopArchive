@@ -709,4 +709,21 @@ class RecordStateTest {
         assertEquals(known, record.ui.value.draft.slips.single().check)
         assertEquals("850000", record.ui.value.draft.tenders.single().amount, "what was sent stays on the frozen draft")
     }
+
+    @Test fun aBankAmountThatArrivesWhileSavingIsPutOnTheLineWhenTheSaveIsRefused() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying(slipText, bcel))
+        h.api.slipChecks = mapOf(bcel to known)
+        h.api.slipCheckGate = CompletableDeferred()
+        h.api.createGate = CompletableDeferred()
+        h.api.createFails = { ClientError.Api(409, ErrorCode.NO_OPEN_SESSION, "No day is open in this branch.", reason = ErrorReasons.SESSION_NO_OPEN_DAY) }
+        val row = record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.save()
+        h.api.slipCheckGate!!.complete(Unit)
+        assertEquals("850000", record.ui.value.draft.tenders.single().amount)
+        h.api.createGate!!.complete(Unit)
+        assertIs<SavePhase.Failed>(record.ui.value.phase)
+        assertEquals("800000", record.ui.value.draft.tenders.single().amount)
+        assertEquals(setOf(row), record.ui.value.amountFromSlip)
+    }
 }

@@ -318,7 +318,8 @@ class RecordState(
             val online = s.draft.tenders.filter { it.method == TenderMethod.ONLINE && it.currency == code }
             val row = online.firstOrNull { s.amountFromSlip[it.key] == slip } ?: online.firstOrNull { it.amount.isEmpty() } ?: return@editInner s
             val tenders = s.draft.tenders.map { if (it.key == row.key) it.copy(amount = formatAmount(minor, exponent)) else it }
-            s.copy(s.draft.copy(tenders = tenders), phase = SavePhase.Editing, amountFromSlip = s.amountFromSlip + (row.key to slip))
+            // The phase stays: the notice of a refused save is still true.
+            s.copy(s.draft.copy(tenders = tenders), amountFromSlip = s.amountFromSlip + (row.key to slip))
         }
     }
 
@@ -359,6 +360,11 @@ class RecordState(
         } ?: return
         // Kept even while saving, like the uses.
         inner.update { s -> s.copy(s.draft.copy(slips = s.draft.slips.map { if (it.key == slip && it.code == code) it.copy(check = check) else it })) }
+        applyCheck(slip, check)
+    }
+
+    /** Puts the amount of a transfer the bank knows on a payment line; nothing while saving, so a refused save applies it again. */
+    private fun applyCheck(slip: Int, check: SlipCheckDto) {
         val amount = check.amount
         val currency = check.currency
         if (check.known && amount != null && currency != null) fillCheckedAmount(slip, currency, amount)
@@ -412,6 +418,8 @@ class RecordState(
                 // A refusal means nothing was recorded. A lost connection (or anything else unexpected) after sending may mean it was.
                 val unknown = e !is ClientError.Api && (e is ClientError.Unreachable || e !is ClientError)
                 inner.update { it.copy(phase = if (unknown) SavePhase.Unknown(e.toFailure()) else SavePhase.Failed(e.toFailure()), sent = if (unknown) sent else null) }
+                // A bank answer that came while saving could not change the draft then.
+                if (!unknown) inner.value.draft.slips.forEach { slip -> slip.check?.let { applyCheck(slip.key, it) } }
             }
         }
     }
