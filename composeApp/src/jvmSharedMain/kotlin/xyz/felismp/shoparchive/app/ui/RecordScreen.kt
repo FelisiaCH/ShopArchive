@@ -36,6 +36,7 @@ fun RecordScreen(ws: Workspace) {
     val record = ws.record
     val d = ui.draft
     val picker = rememberSlipPicker(record::addSlip)
+    val scanner = rememberSlipPicker(record::scanQr)
     val editable = !ui.frozen
     ShopPage(stringResource(Res.string.record_title)) {
         if (ui.block == SaveBlock.NO_DAY) {
@@ -65,15 +66,27 @@ fun RecordScreen(ws: Workspace) {
         d.tenders.forEach { TenderCard(it, ui, ws, editable) }
         ShopButton(stringResource(Res.string.tender_add), record::addTender, primary = false, enabled = editable, icon = ShopIcon.AddPayment)
 
-        if (ui.online || d.slips.isNotEmpty()) {
+        if (ui.online || d.slips.isNotEmpty() || d.transfers.isNotEmpty()) {
             ShopText(stringResource(Res.string.slips_title), TextRole.Title)
             ShopText(stringResource(Res.string.slips_count, d.slips.size.toString(), ui.policy.slipMaxCount.toString()), TextRole.Caption, muted = true)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val camera = picker.takePhoto
                 ShopButton(stringResource(if (camera != null) Res.string.slip_gallery else Res.string.slip_file), picker.pickFromLibrary, primary = false, enabled = editable)
                 if (camera != null) ShopButton(stringResource(Res.string.slip_camera), camera, primary = false, enabled = editable)
+                ShopButton(stringResource(Res.string.slip_scan), scanner.takePhoto ?: scanner.pickFromLibrary, primary = false, enabled = editable)
             }
             if (ui.compressing) ShopText(stringResource(Res.string.slip_preparing), muted = true)
+            if (ui.scanning) ShopText(stringResource(Res.string.slip_scanning), muted = true)
+            d.transfers.forEach { t ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ShopText("QR · " + t.check.source, modifier = Modifier.weight(1f))
+                    ShopButton(stringResource(Res.string.slip_remove, "QR"), { record.removeTransfer(t.key) }, primary = false, enabled = editable)
+                }
+                t.uses.firstOrNull()?.let { use ->
+                    ShopBanner(stringResource(Res.string.slip_used_before, use.date, ws.branchName(use.branch), use.createdBy.name), Tone.Error)
+                }
+                SlipCheckBanner(t.check)
+            }
             d.slips.forEach { slip ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     ShopText(slip.name + " · " + (slip.bytes.size / 1024 + 1) + " KB", modifier = Modifier.weight(1f))
@@ -89,6 +102,9 @@ fun RecordScreen(ws: Workspace) {
                 SlipNotice.TOO_MANY -> ShopBanner(stringResource(Res.string.notice_too_many, ui.policy.slipMaxCount.toString()), Tone.Error)
                 SlipNotice.TOO_BIG -> ShopBanner(stringResource(Res.string.notice_too_big, ui.policy.slipMaxSizeKb.toString()), Tone.Error)
                 SlipNotice.UNREADABLE -> ShopBanner(stringResource(Res.string.notice_unreadable), Tone.Error)
+                SlipNotice.NO_QR -> ShopBanner(stringResource(Res.string.notice_no_qr), Tone.Error)
+                SlipNotice.ALREADY_ADDED -> ShopBanner(stringResource(Res.string.slip_attached_twice), Tone.Error)
+                SlipNotice.NOT_CONFIRMED -> ShopBanner(stringResource(Res.string.notice_not_confirmed), Tone.Error)
                 null -> Unit
             }
         }

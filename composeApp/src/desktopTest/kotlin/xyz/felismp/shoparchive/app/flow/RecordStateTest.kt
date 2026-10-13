@@ -726,4 +726,88 @@ class RecordStateTest {
         assertEquals("800000", record.ui.value.draft.tenders.single().amount)
         assertEquals(setOf(row), record.ui.value.amountFromSlip)
     }
+
+    // --- a QR code scanned without keeping the photo ---
+
+    @Test fun aScannedTransferTheBankConfirmsIsAddedWithoutAPhotoAndFillsTheAmount() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying("", bcel))
+        h.api.slipChecks = mapOf(bcel to known)
+        h.api.slipUsed = mapOf(bcel to listOf(before))
+        val row = record.makeOnline()
+        record.scanQr("scan.jpg", byteArrayOf(1))
+        val t = record.ui.value.draft.transfers.single()
+        assertEquals(bcel, t.code)
+        assertEquals(known, t.check)
+        assertEquals(listOf(before), t.uses)
+        assertEquals(emptyList(), record.ui.value.draft.slips, "the photo is not kept")
+        assertEquals("800000", record.ui.value.draft.tenders.single().amount)
+        assertEquals(setOf(row), record.ui.value.amountFromSlip)
+        assertTrue(record.ui.value.canSave, "a confirmed transfer is enough for an online payment")
+        record.save()
+        val (request, slips) = h.api.created.single()
+        assertEquals(listOf(bcel), request.transferCodes)
+        assertEquals(emptyList(), slips)
+    }
+
+    @Test fun aScanWithoutACodeOrThatTheBankDoesNotConfirmAddsNothingAndSaysWhy() = runTest(UnconfinedTestDispatcher()) {
+        val cases = listOf<Pair<SlipReader, SlipCheckDto?>>(none to known, saying("", bcel) to null, saying("", bcel) to SlipCheckDto("BCEL", known = false))
+        for ((reader, answer) in cases) {
+            val (h, record) = setup(reader = reader)
+            answer?.let { h.api.slipChecks = mapOf(bcel to it) }
+            record.makeOnline()
+            record.scanQr("scan.jpg", byteArrayOf(1))
+            assertEquals(emptyList(), record.ui.value.draft.transfers)
+            assertEquals(if (reader === none) SlipNotice.NO_QR else SlipNotice.NOT_CONFIRMED, record.ui.value.slipNotice)
+            assertEquals(listOf(RecordIssue.AMOUNT_MISSING, RecordIssue.SLIP_NEEDED), record.ui.value.issues)
+        }
+        val (h, record) = setup(reader = saying("", bcel))
+        h.api.slipCheckError = ClientError.Unreachable()
+        record.scanQr("scan.jpg", byteArrayOf(1))
+        assertEquals(SlipNotice.NOT_CONFIRMED, record.ui.value.slipNotice)
+    }
+
+    @Test fun aCodeAlreadyOnTheDraftIsNotScannedAgain() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying("", bcel))
+        h.api.slipChecks = mapOf(bcel to known)
+        record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.scanQr("scan.jpg", byteArrayOf(2))
+        assertEquals(emptyList(), record.ui.value.draft.transfers)
+        assertEquals(SlipNotice.ALREADY_ADDED, record.ui.value.slipNotice)
+    }
+
+    @Test fun aScanHoldsSavingUntilTheBankAnswers() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = { jpeg -> SlipScan("", if (jpeg[0].toInt() == 2) bcel else null) })
+        h.api.slipChecks = mapOf(bcel to known)
+        h.api.slipCheckGate = CompletableDeferred()
+        val row = record.makeOnline()
+        record.setAmount(row, "800000")
+        record.addSlip("a.jpg", byteArrayOf(1))
+        assertTrue(record.ui.value.canSave)
+        record.scanQr("scan.jpg", byteArrayOf(2))
+        assertTrue(record.ui.value.scanning)
+        assertFalse(record.ui.value.canSave)
+        h.api.slipCheckGate!!.complete(Unit)
+        assertFalse(record.ui.value.scanning)
+        assertTrue(record.ui.value.canSave)
+        assertEquals(1, record.ui.value.draft.transfers.size)
+    }
+
+    @Test fun removingTheScannedTransferAsksForASlipAgain() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying("", bcel))
+        h.api.slipChecks = mapOf(bcel to known)
+        record.makeOnline()
+        record.scanQr("scan.jpg", byteArrayOf(1))
+        record.removeTransfer(record.ui.value.draft.transfers.single().key)
+        assertEquals(listOf(RecordIssue.SLIP_NEEDED), record.ui.value.issues)
+    }
+
+    @Test fun aScannedTransferOnACashEntryIsNotAllowed() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying("", bcel))
+        h.api.slipChecks = mapOf(bcel to known)
+        val row = record.ui.value.draft.tenders.single().key
+        record.setAmount(row, "1000")
+        record.scanQr("scan.jpg", byteArrayOf(1))
+        assertEquals(listOf(RecordIssue.SLIP_NOT_ALLOWED), record.ui.value.issues)
+    }
 }

@@ -139,6 +139,11 @@
     <string name="slip_check_to">ถึง %1$s</string>
     <string name="slip_check_not_shop">โอนให้ %1$s ไม่ใช่บัญชีของร้าน</string>
     <string name="slip_check_unknown">%1$s ไม่รู้จักสลิปนี้</string>
+    <string name="slip_scan">สแกน QR</string>
+    <string name="slip_scanning">กำลังตรวจกับธนาคาร…</string>
+    <string name="notice_no_qr">ไม่พบ QR ในรูปนั้น</string>
+    <string name="notice_not_confirmed">ธนาคารไม่ยืนยันการโอนนี้ ให้แนบรูปสลิปแทน</string>
+    <string name="detail_transfers">การโอน</string>
     <string name="notice_too_many">เพิ่มสลิปได้สูงสุด %1$s ใบ</string>
     <string name="notice_too_big">รูปนั้นยังใหญ่กว่า %1$s KB หลังบีบอัด</string>
     <string name="notice_unreadable">ไฟล์นั้นไม่ใช่รูปที่อ่านได้</string>

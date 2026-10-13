@@ -139,6 +139,11 @@
     <string name="slip_check_to">to %1$s</string>
     <string name="slip_check_not_shop">Paid to %1$s, not to the shop's account</string>
     <string name="slip_check_unknown">%1$s does not know this slip</string>
+    <string name="slip_scan">Scan QR</string>
+    <string name="slip_scanning">Checking with the bank…</string>
+    <string name="notice_no_qr">No QR code was found on that photo.</string>
+    <string name="notice_not_confirmed">The bank did not confirm this transfer. Attach the slip photo instead.</string>
+    <string name="detail_transfers">Transfers</string>
     <string name="notice_too_many">You can add at most %1$s slips.</string>
     <string name="notice_too_big">That photo is still over %1$s KB after compressing.</string>
     <string name="notice_unreadable">That file is not a picture this device can read.</string>

@@ -38,6 +38,7 @@ import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.HistoryItem
 import xyz.felismp.shoparchive.shared.TenderMethod
+import xyz.felismp.shoparchive.shared.TransferDto
 
 @Composable
 fun HistoryScreen(ws: Workspace) {
@@ -158,6 +159,10 @@ private fun EntryDetailScreen(ws: Workspace, state: EntryDetailState) {
         ShopText(stringResource(Res.string.slips_title), TextRole.Title)
         if (e.slips.isEmpty()) ShopText(stringResource(Res.string.detail_no_slips), muted = true)
         ui.slips.toSortedMap().forEach { (n, load) -> SlipImage(n, load) }
+        if (e.transfers.isNotEmpty()) {
+            ShopText(stringResource(Res.string.detail_transfers), TextRole.Title)
+            e.transfers.forEach { TransferLine(it) }
+        }
         ShopText(stringResource(Res.string.detail_history), TextRole.Title)
         when (val h = ui.history) {
             Load.Loading -> ShopText(stringResource(Res.string.working), muted = true)
@@ -221,6 +226,17 @@ private fun Actions(state: EntryDetailState, ui: DetailUi) {
         is ActionPhase.Failed -> ShopBanner(stringResource(Res.string.detail_failed) + " " + a.failure.text(), Tone.Error)
         ActionPhase.Idle -> Unit
     }
+}
+
+/** What the bank confirmed when the entry was saved: amount, time, and who paid whom (names and accounts as the bank shows them). */
+@Composable
+private fun TransferLine(t: TransferDto) {
+    val payer = t.from?.let { name -> name + (t.fromAccount?.let { " ($it)" } ?: "") }
+    val text = listOfNotNull(
+        "${t.source} ✓ ${groupThousands(t.amount)} ${t.currency}", t.time,
+        listOfNotNull(payer, "${t.to} (${t.toAccount})").joinToString(" → "),
+    ).joinToString(" · ")
+    if (t.toShop == false) ShopBanner(stringResource(Res.string.slip_check_not_shop, t.to) + "\n" + text, Tone.Error) else ShopBanner(text, Tone.Success)
 }
 
 @Composable
@@ -297,6 +313,8 @@ private fun EditForm(ws: Workspace, state: EntryDetailState, ui: DetailUi, edit:
             SlipNotice.TOO_MANY -> ShopBanner(stringResource(Res.string.notice_too_many, edit.policy.slipMaxCount.toString()), Tone.Error)
             SlipNotice.TOO_BIG -> ShopBanner(stringResource(Res.string.notice_too_big, edit.policy.slipMaxSizeKb.toString()), Tone.Error)
             SlipNotice.UNREADABLE -> ShopBanner(stringResource(Res.string.notice_unreadable), Tone.Error)
+            // Only Record scans a QR code.
+            SlipNotice.NO_QR, SlipNotice.ALREADY_ADDED, SlipNotice.NOT_CONFIRMED -> Unit
             null -> Unit
         }
     }

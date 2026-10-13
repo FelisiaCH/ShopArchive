@@ -138,11 +138,14 @@ class EntryDetailState(
             val bad = f.tenders.filter { it.amount.isNotEmpty() && exponents[it.currency]?.let { e -> parseTypedAmount(it.amount, e) } == null }.map { it.key }.toSet()
             val online = f.tenders.any { it.method == TenderMethod.ONLINE }
             val slipCount = f.keep.size + f.added.size
+            // As the server does: the transfer of a slip that is removed goes with it, one scanned without a photo stays.
+            val removedCodes = s.entry.slips.filter { it !in f.keep }.mapNotNull { it.code }.toSet() - f.keep.mapNotNull { it.code }.toSet()
+            val transfers = s.entry.transfers.count { it.code !in removedCodes }
             val issues = buildList {
                 if (f.tenders.any { it.amount.isEmpty() }) add(RecordIssue.AMOUNT_MISSING)
                 if (bad.isNotEmpty()) add(RecordIssue.AMOUNT_INVALID)
-                if (online && slipCount == 0) add(RecordIssue.SLIP_NEEDED)
-                if (!online && slipCount > 0) add(RecordIssue.SLIP_NOT_ALLOWED)
+                if (online && slipCount == 0 && transfers == 0) add(RecordIssue.SLIP_NEEDED)
+                if (!online && slipCount + transfers > 0) add(RecordIssue.SLIP_NOT_ALLOWED)
                 if (slipCount > policy.slipMaxCount) add(RecordIssue.TOO_MANY_SLIPS)
                 if (policy.requireCategory && f.category == null) add(RecordIssue.CATEGORY_NEEDED)
             }

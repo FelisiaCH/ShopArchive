@@ -139,6 +139,11 @@
     <string name="slip_check_to">ຫາ %1$s</string>
     <string name="slip_check_not_shop">ໂອນໃຫ້ %1$s ບໍ່ແມ່ນບັນຊີຂອງຮ້ານ</string>
     <string name="slip_check_unknown">%1$s ບໍ່ຮູ້ຈັກສະລິບນີ້</string>
+    <string name="slip_scan">ສະແກນ QR</string>
+    <string name="slip_scanning">ກຳລັງກວດກັບທະນາຄານ…</string>
+    <string name="notice_no_qr">ບໍ່ພົບ QR ໃນຮູບນັ້ນ</string>
+    <string name="notice_not_confirmed">ທະນາຄານບໍ່ຢືນຢັນການໂອນນີ້ ໃຫ້ແນບຮູບສະລິບແທນ</string>
+    <string name="detail_transfers">ການໂອນ</string>
     <string name="notice_too_many">ເພີ່ມສະລິບໄດ້ສູງສຸດ %1$s ໃບ.</string>
     <string name="notice_too_big">ຮູບນັ້ນຍັງໃຫຍ່ກວ່າ %1$s KB ຫຼັງບີບອັດ.</string>
     <string name="notice_unreadable">ໄຟລ໌ນັ້ນບໍ່ແມ່ນຮູບທີ່ອ່ານໄດ້.</string>

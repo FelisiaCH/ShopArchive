@@ -18,6 +18,7 @@ import xyz.felismp.shoparchive.shared.RecordsPolicy
 import xyz.felismp.shoparchive.shared.SlipDto
 import xyz.felismp.shoparchive.shared.TenderDto
 import xyz.felismp.shoparchive.shared.TenderMethod
+import xyz.felismp.shoparchive.shared.TransferDto
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -251,6 +252,22 @@ class HistoryStateTest {
         assertTrue(h.api.updates.isEmpty())
         d.setMethod(d.ui.value.edit!!.form.tenders.single().key, TenderMethod.CASH)
         assertTrue(d.ui.value.edit!!.issues.isEmpty())
+    }
+
+    @Test fun aScannedTransferStaysWhenSlipsGoButTheTransferOfARemovedSlipGoesWithIt() = runTest(UnconfinedTestDispatcher()) {
+        fun transfer(code: String) = TransferDto(code, "BCEL", "5000", "LAK", "2026-09-18 19:18:00", "Shop", "160")
+        val online = listOf(TenderDto("LAK", TenderMethod.ONLINE, "5000"))
+        val scanned = testEntry(tenders = online, slips = listOf(SlipDto("slip-1.jpg", "x", "PHOTO"))).copy(transfers = listOf(transfer("PHOTO"), transfer("SCANNED")))
+        val (_, _, d) = openEntry(scanned)
+        d.startEdit()
+        d.removeStoredSlip("slip-1.jpg")
+        assertTrue(d.ui.value.edit!!.issues.isEmpty(), "the scanned transfer still shows the payment")
+
+        val photoOnly = testEntry(tenders = online, slips = listOf(SlipDto("slip-1.jpg", "x", "PHOTO"))).copy(transfers = listOf(transfer("PHOTO")))
+        val (_, _, d2) = openEntry(photoOnly)
+        d2.startEdit()
+        d2.removeStoredSlip("slip-1.jpg")
+        assertTrue(RecordIssue.SLIP_NEEDED in d2.ui.value.edit!!.issues)
     }
 
     @Test fun tooManySlipsAreNotAdded() = runTest(UnconfinedTestDispatcher()) {
