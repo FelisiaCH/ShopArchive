@@ -16,6 +16,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.io.TempDir
 import xyz.felismp.shoparchive.api.EventService
+import xyz.felismp.shoparchive.api.SlipChecker
 import xyz.felismp.shoparchive.server.auth.AuthEnv
 import xyz.felismp.shoparchive.server.auth.NO_BACKOFF
 import xyz.felismp.shoparchive.server.auth.TEST_PIN
@@ -38,6 +39,7 @@ import xyz.felismp.shoparchive.shared.MoveEntryRequest
 import xyz.felismp.shoparchive.shared.PROTOCOL_HEADER
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.ReauthRequest
+import xyz.felismp.shoparchive.shared.SlipCheckDto
 import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
 import java.nio.file.Files
@@ -880,6 +882,54 @@ class EntriesApiTest {
             }
             assertEquals(HttpStatusCode.BadRequest, getPath("/api/v1/slips/uses", noy).status)
             assertEquals(HttpStatusCode.Unauthorized, getPath("/api/v1/slips/uses?code=$bcel").status)
+        }
+    }
+
+    @Test
+    fun theCheckOfACodeIsWhatTheRegisteredCheckerAnswersAndNothingWithoutOne() = env().run {
+        val noy = login("noy")
+        val answer = SlipCheckDto("BCEL", true, "850000", "LAK", "2026-09-18 19:18:42", "Go Mobile", toShop = true)
+        api {
+            val none = getPath("/api/v1/slips/check?code=$bcel", noy)
+            assertEquals(HttpStatusCode.NoContent, none.status)
+            assertEquals("", none.bodyAsText())
+
+            val asked = mutableListOf<String>()
+            services.register(SlipChecker::class.java, SlipChecker { code -> asked += code; if (code == bcel) answer else null }, 10, "test")
+
+            assertEquals(answer, getPath("/api/v1/slips/check?code=$bcel", noy).parsed(SlipCheckDto.serializer()))
+            assertEquals(HttpStatusCode.NoContent, getPath("/api/v1/slips/check?code=$trust", noy).status)
+            assertEquals(listOf(bcel, trust), asked)
+        }
+    }
+
+    @Test
+    fun aCheckerThatThrowsIsNoAnswer() = env().run {
+        val noy = login("noy")
+        services.register(SlipChecker::class.java, SlipChecker { error("the bank is down") }, 10, "test")
+        api {
+            assertEquals(HttpStatusCode.NoContent, getPath("/api/v1/slips/check?code=$bcel", noy).status)
+        }
+    }
+
+    @Test
+    fun askingForTheCheckNeedsTheNodeToRecordAndACodeThatCanBeOne() = env().run {
+        users.addUser("nobody", "none", listOf("main"))
+        users.setUserPermission("nobody", ENTRY_CREATE_NODE, false)
+        val noy = login("noy")
+        val nobody = login("nobody")
+        val asked = mutableListOf<String>()
+        services.register(SlipChecker::class.java, SlipChecker { code -> asked += code; SlipCheckDto("BCEL", false) }, 10, "test")
+        api {
+            assertEquals(HttpStatusCode.Forbidden, getPath("/api/v1/slips/check?code=$bcel", nobody).status)
+            for (code in listOf("a%07b", "x".repeat(513))) {
+                val refused = getPath("/api/v1/slips/check?code=$code", noy)
+                assertEquals(HttpStatusCode.BadRequest, refused.status, code)
+                assertEquals(ErrorReasons.ENTRY_SLIP_CODE_INVALID, refused.errorReason())
+            }
+            assertEquals(HttpStatusCode.BadRequest, getPath("/api/v1/slips/check", noy).status)
+            assertEquals(HttpStatusCode.Unauthorized, getPath("/api/v1/slips/check?code=$bcel").status)
+            assertEquals(emptyList(), asked, "the bank is asked about nothing that was refused")
         }
     }
 

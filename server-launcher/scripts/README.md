@@ -11,6 +11,7 @@ Contents of the release zip:
 | `service/shoparchive.service` | systemd unit template |
 | `service/shoparchive-winsw.xml` | WinSW (Windows service) template |
 | `plugins/shoparchive-telegram.jar` | the Telegram notification plugin (off until you approve and set it up) |
+| `plugins/shoparchive-bcel.jar` | the BCEL slip check plugin (off until you approve it) |
 | `README.md` | this file |
 | `OPS.md` | running the server: console, service, firewall, going online, plugins, updates, backup |
 

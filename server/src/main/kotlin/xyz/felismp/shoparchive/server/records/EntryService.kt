@@ -9,6 +9,7 @@ import xyz.felismp.shoparchive.api.EventService
 import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.api.ServiceRegistry
 import xyz.felismp.shoparchive.api.ShopEvents
+import xyz.felismp.shoparchive.api.SlipChecker
 import xyz.felismp.shoparchive.api.SlipFile
 import xyz.felismp.shoparchive.server.Log
 import xyz.felismp.shoparchive.server.config.ConfigService
@@ -26,6 +27,7 @@ import xyz.felismp.shoparchive.shared.HistoryChange
 import xyz.felismp.shoparchive.shared.HistoryItem
 import xyz.felismp.shoparchive.shared.MoveEntryRequest
 import xyz.felismp.shoparchive.shared.SLIP_CODE_MAX
+import xyz.felismp.shoparchive.shared.SlipCheckDto
 import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.TenderDto
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
@@ -196,9 +198,24 @@ internal class DefaultEntryService(
     }
 
     override fun slipUses(principal: Principal, code: String): List<SlipUseDto> {
+        requireSlipCode(principal, code)
+        return store.slipUses(code).map { SlipUseDto(it.id, it.date.toString(), it.branch, it.createdBy, it.createdAt) }
+    }
+
+    override fun slipCheck(principal: Principal, code: String): SlipCheckDto? {
+        requireSlipCode(principal, code)
+        val checker = services.get(SlipChecker::class.java) ?: return null
+        return try {
+            checker.check(code)
+        } catch (e: Exception) {
+            Log.debug("the slip checker failed: ${e.javaClass.simpleName}")
+            null
+        }
+    }
+
+    private fun requireSlipCode(principal: Principal, code: String) {
         access.require(principal, ENTRY_CREATE_NODE)
         if (!isSlipCode(code)) throw badRequest("A slip code is 1 to $SLIP_CODE_MAX characters without control characters.", ErrorReasons.ENTRY_SLIP_CODE_INVALID)
-        return store.slipUses(code).map { SlipUseDto(it.id, it.date.toString(), it.branch, it.createdBy, it.createdAt) }
     }
 
     // --- change ---

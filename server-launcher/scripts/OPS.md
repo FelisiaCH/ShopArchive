@@ -63,7 +63,7 @@ Only the HTTPS port needs to be reachable; do not forward 5353.
 
 ## Plugins
 
-A plugin has full access to the server, so a jar is not loaded until you approve it (`plugins.require-approval`, on by default). The release ships `plugins/shoparchive-telegram.jar`.
+A plugin has full access to the server, so a jar is not loaded until you approve it (`plugins.require-approval`, on by default). The release ships `plugins/shoparchive-telegram.jar` and `plugins/shoparchive-bcel.jar`.
 
 ```
 plugins                   list the plugins and their state
@@ -86,6 +86,14 @@ Sends "entry recorded" and "day closed" messages to Telegram chats.
 6. In the console: `reload Telegram`. The plugin warns at start if something is missing.
 
 The bot token is a secret: it is in `plugins/Telegram/config.yml`, and therefore in every backup (see below). While a message cannot be sent the server keeps it in its outbox and tries again (`notify` lists the messages, `notify resend <id>` sends one again).
+
+### BCEL
+
+When staff attach the photo of a BCEL OneProof slip, the server asks BCEL whether it knows the slip and the Record screen shows the answer under the slip: the amount, the time, who was paid, or a red "BCEL does not know this slip". Nothing is blocked. It does not need an account or a key, but it does need this computer to reach `bcel.la`. The check is the one behind BCEL's OneProof QR code, which BCEL does not publish as an API for shops, so it may change or stop working; when BCEL does not answer, nothing is shown.
+
+1. Approve the plugin and restart the server once (`plugins approve BCEL`, `stop`, start again): the first start copies `plugins/BCEL/config.yml`.
+2. To get a warning when a slip was paid to some other account, put the shop's BCEL account numbers, written in full, in `accounts` in `plugins/BCEL/config.yml`, then `reload BCEL`. Leave `accounts` empty to skip that check.
+3. `timeout-seconds` is how long to wait for BCEL (2 to 30).
 
 ### Hotfixes
 

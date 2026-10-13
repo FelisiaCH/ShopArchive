@@ -19,6 +19,7 @@ import xyz.felismp.shoparchive.shared.OpenSessionRequest
 import xyz.felismp.shoparchive.shared.OpenSessionResponse
 import xyz.felismp.shoparchive.shared.SessionDto
 import xyz.felismp.shoparchive.shared.SessionPreview
+import xyz.felismp.shoparchive.shared.SlipCheckDto
 import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.UpdateBranchRequest
 import xyz.felismp.shoparchive.shared.UpdateCategoryRequest
@@ -101,6 +102,12 @@ interface EntryService {
      * @throws ApiError 400 for a text that cannot be a slip code; 403
      */
     fun slipUses(principal: Principal, code: String): List<SlipUseDto>
+
+    /**
+     * What the registered [SlipChecker] (a bank plugin) says about the slip with this [code], or null when there is none or it gave no answer. Needs `shoparchive.entry.create`.
+     * @throws ApiError 400 for a text that cannot be a slip code; 403
+     */
+    fun slipCheck(principal: Principal, code: String): SlipCheckDto?
 }
 
 /** The day sessions: open the day with the change counted, close it with the drawer counted. */

@@ -167,9 +167,10 @@ val dist = tasks.register<Sync>("dist") {
 }
 
 evaluationDependsOn(":plugins:telegram")
+evaluationDependsOn(":plugins:bcel")
 
 // The server release: shoparchive-server-<version>.zip, unpacked into a folder of its own. Same files as `dist`, plus the
-// Telegram plugin under plugins/ (the server does not load it until the admin approves it). start.sh keeps its exec bit.
+// Telegram and BCEL plugins under plugins/ (the server does not load them until the admin approves them). start.sh keeps its exec bit.
 val serverZip = tasks.register<Zip>("serverZip") {
     archiveFileName.set("shoparchive-server-${project.version}.zip")
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
@@ -180,9 +181,10 @@ val serverZip = tasks.register<Zip>("serverZip") {
     }
     from("scripts") { exclude("start.sh") }
     from(project(":plugins:telegram").tasks.named("jar")) { into("plugins") }
+    from(project(":plugins:bcel").tasks.named("jar")) { into("plugins") }
 }
 
-// Opens the zip as built and asserts what an admin will find in it: every file, start.sh executable, and a Telegram plugin
+// Opens the zip as built and asserts what an admin will find in it: every file, start.sh executable, and plugin
 // jar that carries only its own classes (the host's classloader supplies kotlin/ and the API; a bundled copy would shadow it).
 abstract class CheckServerZip : DefaultTask() {
     @get:InputFile
@@ -198,6 +200,7 @@ abstract class CheckServerZip : DefaultTask() {
             val required = listOf(
                 "shoparchive-server.jar", "start.sh", "start.bat", "README.md", "OPS.md",
                 "service/shoparchive.service", "service/shoparchive-winsw.xml", "plugins/shoparchive-telegram.jar",
+                "plugins/shoparchive-bcel.jar",
             )
             val missing = required.filter { it !in names }
             if (missing.isNotEmpty()) throw GradleException("server zip is missing $missing (has ${names.sorted()})")
@@ -206,17 +209,19 @@ abstract class CheckServerZip : DefaultTask() {
             if (unixModes(zipFile.get().asFile)["start.sh"]?.let { it and 0b001_000_000 } in listOf(null, 0)) {
                 throw GradleException("start.sh in the server zip is not executable")
             }
-            val bundled = zip.getInputStream(zip.getEntry("plugins/shoparchive-telegram.jar")).use { input ->
-                val found = mutableListOf<String>()
-                ZipInputStream(input).use { jar ->
-                    while (true) {
-                        val name = (jar.nextEntry ?: break).name
-                        if (name.startsWith("kotlin/") || name.startsWith("xyz/felismp/shoparchive/api/")) found += name
+            for (plugin in listOf("telegram", "bcel")) {
+                val bundled = zip.getInputStream(zip.getEntry("plugins/shoparchive-$plugin.jar")).use { input ->
+                    val found = mutableListOf<String>()
+                    ZipInputStream(input).use { jar ->
+                        while (true) {
+                            val name = (jar.nextEntry ?: break).name
+                            if (name.startsWith("kotlin/") || name.startsWith("xyz/felismp/shoparchive/api/")) found += name
+                        }
                     }
+                    found
                 }
-                found
+                if (bundled.isNotEmpty()) throw GradleException("the $plugin plugin jar bundles host classes: ${bundled.take(5)}")
             }
-            if (bundled.isNotEmpty()) throw GradleException("the Telegram plugin jar bundles host classes: ${bundled.take(5)}")
         }
         upToDateMarker.get().asFile.writeText("ok\n")
     }
