@@ -11,6 +11,7 @@ import xyz.felismp.shoparchive.shared.NoteDto
 import xyz.felismp.shoparchive.shared.NotesUnread
 import xyz.felismp.shoparchive.shared.NotificationDto
 import xyz.felismp.shoparchive.shared.SessionPreview
+import xyz.felismp.shoparchive.shared.SlipCheckDto
 import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
 import xyz.felismp.shoparchive.shared.wire
@@ -81,6 +82,9 @@ interface RecordsApi {
 
     /** The entries, not deleted, that carry a slip with [code] (the text of its QR), oldest first. */
     suspend fun slipUses(code: String): List<SlipUseDto>
+
+    /** What the bank that printed the slip with [code] says about it; null when no bank plugin on the server knows that kind of slip. */
+    suspend fun slipCheck(code: String): SlipCheckDto?
 
     /** Closes the day session [id] of [branch] with the money counted. Answers the closed session. */
     suspend fun closeSession(branch: String, id: String, request: CloseSessionRequest): SessionDto

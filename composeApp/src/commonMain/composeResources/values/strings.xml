@@ -135,6 +135,10 @@
     <string name="amount_from_slip">Read from the slip — check it before saving</string>
     <string name="slip_used_before">This slip was already recorded on %1$s · %2$s · %3$s</string>
     <string name="slip_attached_twice">This slip is attached twice</string>
+    <string name="slip_check_known">%1$s ✓ %2$s</string>
+    <string name="slip_check_to">to %1$s</string>
+    <string name="slip_check_not_shop">Paid to %1$s, not to the shop's account</string>
+    <string name="slip_check_unknown">%1$s does not know this slip</string>
     <string name="notice_too_many">You can add at most %1$s slips.</string>
     <string name="notice_too_big">That photo is still over %1$s KB after compressing.</string>
     <string name="notice_unreadable">That file is not a picture this device can read.</string>

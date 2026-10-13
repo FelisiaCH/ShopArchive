@@ -42,6 +42,7 @@ import xyz.felismp.shoparchive.shared.NoteDto
 import xyz.felismp.shoparchive.shared.NotesUnread
 import xyz.felismp.shoparchive.shared.NotificationDto
 import xyz.felismp.shoparchive.shared.SessionPreview
+import xyz.felismp.shoparchive.shared.SlipCheckDto
 import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.MoveEntryRequest
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
@@ -218,6 +219,11 @@ class ApiClient(
     override suspend fun history(date: String, id: String): List<HistoryItem> = get(entryPath(date, id) + "/history")
 
     override suspend fun slipUses(code: String): List<SlipUseDto> = get("/api/v1/slips/uses?code=${code.encodeURLParameter()}")
+
+    override suspend fun slipCheck(code: String): SlipCheckDto? {
+        val reply = exchange(HttpMethod.Get, "/api/v1/slips/check?code=${code.encodeURLParameter()}", Auth.Token) { null }
+        return if (reply.status == 204) null else clientJson.decodeFromString(reply.text)
+    }
 
     override suspend fun closeSession(branch: String, id: String, request: CloseSessionRequest): SessionDto =
         post("/api/v1/sessions/${branch.encodeURLPath()}/${id.encodeURLPath()}/close", request)

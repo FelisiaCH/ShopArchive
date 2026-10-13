@@ -17,6 +17,7 @@ import xyz.felismp.shoparchive.shared.CurrencyInfo
 import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.RecordsPolicy
+import xyz.felismp.shoparchive.shared.SlipCheckDto
 import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.TenderDto
 import xyz.felismp.shoparchive.shared.TenderMethod
@@ -28,12 +29,14 @@ class TenderRow(val key: Int, val currency: String, val method: TenderMethod, va
 /**
  * A compressed slip photo waiting to be sent. [code] is the text of the QR read off it, if any. [uses] are the entries already recorded
  * with that code (empty when none, or when the server was not asked); [twiceHere] says the same code is on another slip of this draft.
+ * [check] is what the bank that printed the slip says about it (null when no bank was asked or none answered).
  */
 class SlipItem(
     val key: Int, val name: String, val bytes: ByteArray,
-    val code: String? = null, val uses: List<SlipUseDto> = emptyList(), val twiceHere: Boolean = false,
+    val code: String? = null, val uses: List<SlipUseDto> = emptyList(), val twiceHere: Boolean = false, val check: SlipCheckDto? = null,
 ) {
-    fun copy(code: String? = this.code, uses: List<SlipUseDto> = this.uses, twiceHere: Boolean = this.twiceHere) = SlipItem(key, name, bytes, code, uses, twiceHere)
+    fun copy(code: String? = this.code, uses: List<SlipUseDto> = this.uses, twiceHere: Boolean = this.twiceHere, check: SlipCheckDto? = this.check) =
+        SlipItem(key, name, bytes, code, uses, twiceHere, check)
 }
 
 /** The entry being written. [id] is made once per draft and stays the same on every resend. */
@@ -107,8 +110,8 @@ class RecordState(
         val compressing: Int = 0,
         /** The exact request of the first try, kept while its result is unknown so a resend cannot differ. */
         val sent: Sent? = null,
-        /** The row keys of the payment lines filled from a slip, each until staff change its amount, remove it or the draft is replaced. */
-        val amountFromSlip: Set<Int> = emptySet(),
+        /** The payment lines filled from a slip (row key to slip key), each until staff change its amount, remove it or the draft is replaced. */
+        val amountFromSlip: Map<Int, Int> = emptyMap(),
         /** The slips whose photo is still being read: saving waits for them, so their code goes along. */
         val reading: Set<Int> = emptySet(),
     )
@@ -147,7 +150,7 @@ class RecordState(
                 policy.requireOpenDay && dayStatus != null && dayStatus !is DayStatus.Open -> SaveBlock.NO_DAY
                 else -> null
             },
-            s.notice, s.compressing > 0 || s.draft.slips.any { it.key in s.reading }, s.amountFromSlip, s.sent?.request?.branch?.takeIf { s.phase is SavePhase.Unknown }, canWrite,
+            s.notice, s.compressing > 0 || s.draft.slips.any { it.key in s.reading }, s.amountFromSlip.keys, s.sent?.request?.branch?.takeIf { s.phase is SavePhase.Unknown }, canWrite,
         )
     }.stateIn(env.scope, SharingStarted.Eagerly, initialUi())
 
@@ -166,7 +169,7 @@ class RecordState(
     private fun freshDraft(type: EntryType, currency: String) =
         Draft(uuidV7(env.now()), type, null, "", "", listOf(TenderRow(++keys, currency, TenderMethod.CASH, "")), emptyList())
 
-    private fun Inner.copy(draft: Draft = this.draft, phase: SavePhase = this.phase, recent: List<String> = this.recent, notice: SlipNotice? = this.notice, compressing: Int = this.compressing, sent: Sent? = this.sent, amountFromSlip: Set<Int> = this.amountFromSlip, reading: Set<Int> = this.reading) =
+    private fun Inner.copy(draft: Draft = this.draft, phase: SavePhase = this.phase, recent: List<String> = this.recent, notice: SlipNotice? = this.notice, compressing: Int = this.compressing, sent: Sent? = this.sent, amountFromSlip: Map<Int, Int> = this.amountFromSlip, reading: Set<Int> = this.reading) =
         Inner(draft, phase, recent, notice, compressing, sent, amountFromSlip, reading)
 
     private fun Draft.copy(
@@ -186,7 +189,7 @@ class RecordState(
     private fun edit(change: (Draft) -> Draft) = editInner { s ->
         val draft = change(s.draft)
         // The amount read from a slip stops being "read" once its line is gone or its amount is changed.
-        val read = s.amountFromSlip.filter { key -> draft.tenders.firstOrNull { it.key == key }?.amount == s.draft.tenders.firstOrNull { it.key == key }?.amount }.toSet()
+        val read = s.amountFromSlip.filterKeys { key -> draft.tenders.firstOrNull { it.key == key }?.amount == s.draft.tenders.firstOrNull { it.key == key }?.amount }
         s.copy(draft, phase = SavePhase.Editing, amountFromSlip = read)
     }
 
@@ -270,7 +273,7 @@ class RecordState(
         }
     }
 
-    /** Reads the photo of slip [slip] once: its amount goes on a payment line, its code on the slip; then asks who used that code already. */
+    /** Reads the photo of slip [slip] once: its amount goes on a payment line, its code on the slip; then asks who used that code already and what the bank says. */
     private suspend fun readSlip(slip: Int, jpeg: ByteArray) {
         val scan = try {
             reader.tryRead(jpeg)?.also { scan ->
@@ -280,7 +283,10 @@ class RecordState(
         } finally {
             inner.update { it.copy(reading = it.reading - slip) }
         }
-        scan?.code?.let { askUses(slip, it) }
+        scan?.code?.let {
+            askUses(slip, it)
+            askCheck(slip, it)
+        }
     }
 
     /**
@@ -296,7 +302,23 @@ class RecordState(
             // Looked for now, not before the read: staff may have typed an amount meanwhile.
             val row = s.draft.tenders.firstOrNull { it.method == TenderMethod.ONLINE && it.amount.isEmpty() && it.currency == code } ?: return@editInner s
             val tenders = s.draft.tenders.map { if (it.key == row.key) it.copy(amount = formatAmount(minor, exponent)) else it }
-            s.copy(s.draft.copy(tenders = tenders), phase = SavePhase.Editing, amountFromSlip = s.amountFromSlip + row.key)
+            s.copy(s.draft.copy(tenders = tenders), phase = SavePhase.Editing, amountFromSlip = s.amountFromSlip + (row.key to slip))
+        }
+    }
+
+    /**
+     * Puts the amount the bank gave for slip [slip] on the online line of that currency the slip filled before, or else on the first empty one,
+     * if that slip is still attached. It replaces what was read off the photo; what staff typed is never replaced.
+     */
+    private fun fillCheckedAmount(slip: Int, code: String, amount: String) {
+        val exponent = ui.value.currencies.firstOrNull { it.code == code }?.exponent ?: return
+        val minor = parseTypedAmount(amount, exponent) ?: return
+        editInner { s ->
+            if (s.draft.slips.none { it.key == slip }) return@editInner s
+            val online = s.draft.tenders.filter { it.method == TenderMethod.ONLINE && it.currency == code }
+            val row = online.firstOrNull { s.amountFromSlip[it.key] == slip } ?: online.firstOrNull { it.amount.isEmpty() } ?: return@editInner s
+            val tenders = s.draft.tenders.map { if (it.key == row.key) it.copy(amount = formatAmount(minor, exponent)) else it }
+            s.copy(s.draft.copy(tenders = tenders), phase = SavePhase.Editing, amountFromSlip = s.amountFromSlip + (row.key to slip))
         }
     }
 
@@ -320,6 +342,26 @@ class RecordState(
         }
         // Kept even while saving: the warning is not part of what is sent, and a refused save goes back to a draft that still needs it.
         inner.update { s -> s.copy(s.draft.copy(slips = s.draft.slips.map { if (it.key == slip && it.code == code) it.copy(uses = uses) else it })) }
+    }
+
+    /**
+     * Asks the server what the bank says about [code], the code of slip [slip]. Like [askUses] it never holds saving, and no answer shows nothing.
+     * A transfer the bank knows puts its amount on a payment line.
+     */
+    private suspend fun askCheck(slip: Int, code: String) {
+        if (inner.value.draft.slips.none { it.key == slip && it.code == code }) return
+        val check = try {
+            env.calls.run { env.api.slipCheck(code) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return
+        } ?: return
+        // Kept even while saving, like the uses.
+        inner.update { s -> s.copy(s.draft.copy(slips = s.draft.slips.map { if (it.key == slip && it.code == code) it.copy(check = check) else it })) }
+        val amount = check.amount
+        val currency = check.currency
+        if (check.known && amount != null && currency != null) fillCheckedAmount(slip, currency, amount)
     }
 
     /** The slips with [SlipItem.twiceHere] set on every one whose code is on another slip of the draft too. */
