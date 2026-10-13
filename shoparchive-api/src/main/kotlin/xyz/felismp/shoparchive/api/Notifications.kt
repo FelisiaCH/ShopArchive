@@ -31,7 +31,18 @@ class Notification(
     val attempt: Int = 1,
     /** The id of the message this one repeats, if it was sent again by hand. */
     val resendOf: String? = null,
+    /** The id of the entry or the day the message is about; null for a message that is about neither (a new device) or was queued before the server kept it. */
+    val subject: String? = null,
 )
+
+/**
+ * The images that belong to a [Notification], for a channel that can send pictures with its message: the slips of the entry of an `entry.created`
+ * message, in the order of the entry, and nothing for any other event. A slip that cannot be read is left out, so what comes back may be shorter than the entry's list,
+ * and the call never throws for a missing or damaged file. It needs no user: the message was made by the server, not asked for by a caller. A channel gets it from [ServiceRegistry].
+ */
+fun interface NotificationImages {
+    fun images(notification: Notification): List<SlipFile>
+}
 
 /** What a [Notifier] says about one try. Anything else it does (throwing) is understood from what is thrown, see [Notifier.deliver]. */
 sealed interface DeliveryResult {

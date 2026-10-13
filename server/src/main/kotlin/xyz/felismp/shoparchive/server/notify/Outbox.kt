@@ -217,7 +217,7 @@ internal class OutboxStore(root: Path, private val config: ConfigService, privat
     private fun addInLock(draft: Draft): OutboxItem {
         val prefix = idTime.format(clock.instant().atZone(config.timezone))
         val id = generateSequence(1) { it + 1 }.map { "$prefix-%03d".format(it) }.first { !items.containsKey(it) && !Files.exists(dir.resolve("$it.yml")) }
-        val notification = Notification(id, draft.code, draft.event, draft.createdAt, draft.branch, draft.user, draft.locale, draft.fields, 1, draft.resendOf)
+        val notification = Notification(id, draft.code, draft.event, draft.createdAt, draft.branch, draft.user, draft.locale, draft.fields, 1, draft.resendOf, draft.subject)
         return OutboxItem(notification, NotificationState.QUEUED, subject = draft.subject).also { putInLock(it, config.notify.backoffBaseSeconds.toLong()) }
     }
 }
@@ -302,7 +302,7 @@ internal class Outbox(
             Attempt.Answer(DeliveryResult.Retry("no notifier is registered"))
         } else {
             val n = item.notification
-            deliverer.deliver(sender, Notification(n.id, n.code, n.event, n.createdAt, n.branch, n.user, n.locale, n.fields, item.attempts + 1, n.resendOf), settings.timeoutSeconds)
+            deliverer.deliver(sender, Notification(n.id, n.code, n.event, n.createdAt, n.branch, n.user, n.locale, n.fields, item.attempts + 1, n.resendOf, item.subject), settings.timeoutSeconds)
         }
         val now = clock.instant()
         val at = stamp(clock, config)
