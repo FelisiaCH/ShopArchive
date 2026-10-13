@@ -116,13 +116,18 @@ class NotesState(private val env: Env) {
         }
         loading.value = true
         publish()
+        val day = date.value
+        // Another load (a post, a reload) may run beside this one: an answer for a branch or day no longer shown is dropped.
+        fun stillShown() = env.branch.value == branch && date.value == day
         try {
-            val day = date.value.toString()
-            notes.value = sorted(env.calls.run { env.api.notes(branch, day) })
+            val list = sorted(env.calls.run { env.api.notes(branch, day.toString()) })
+            if (!stillShown()) return
+            notes.value = list
             failure.value = null
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            if (!stillShown()) return
             failure.value = e.toFailure()
         }
         loading.value = false

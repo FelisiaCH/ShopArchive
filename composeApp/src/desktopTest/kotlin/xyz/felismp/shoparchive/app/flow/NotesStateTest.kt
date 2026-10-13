@@ -223,6 +223,19 @@ class NotesStateTest {
         assertTrue(state.ui.value.marking.isEmpty())
     }
 
+    @Test fun aSlowLoadForADayThatIsNoLongerShownDoesNotReplaceTheNewDay() = runTest(UnconfinedTestDispatcher()) {
+        val h = harness(backgroundScope)
+        h.api.noteList = listOf(note("today-note"), note("yesterday-note", date = "2026-10-03"))
+        val state = NotesState(h.env)
+        h.api.notesGates["2026-10-04"] = CompletableDeferred()
+        state.reload()
+        state.previousDay()
+        assertEquals(listOf("yesterday-note"), state.ui.value.notes!!.map { it.id })
+        h.api.notesGates.getValue("2026-10-04").complete(Unit)
+        assertEquals(listOf("yesterday-note"), state.ui.value.notes!!.map { it.id }, "the slow answer was for today")
+        assertFalse(state.ui.value.loading)
+    }
+
     @Test fun aMarkFailureForADayThatIsNoLongerShownIsNotShown() = runTest(UnconfinedTestDispatcher()) {
         val h = harness(backgroundScope)
         h.api.noteList = listOf(note("a"))
