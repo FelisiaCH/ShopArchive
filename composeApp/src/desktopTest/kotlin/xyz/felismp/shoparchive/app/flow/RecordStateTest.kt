@@ -401,7 +401,7 @@ class RecordStateTest {
         val row = record.makeOnline()
         record.addSlip("a.jpg", byteArrayOf(1))
         assertEquals("850000", record.ui.value.draft.tenders.single().amount)
-        assertEquals(row, record.ui.value.amountFromSlip)
+        assertEquals(setOf(row), record.ui.value.amountFromSlip)
         assertEquals(1, record.ui.value.draft.slips.size)
         assertTrue(record.ui.value.canSave)
     }
@@ -415,14 +415,14 @@ class RecordStateTest {
         record.setAmount(row, "700000")
         gate.complete(Unit)
         assertEquals("700000", record.ui.value.draft.tenders.single().amount)
-        assertNull(record.ui.value.amountFromSlip)
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
     }
 
     @Test fun aCashLineIsNeverFilled() = runTest(UnconfinedTestDispatcher()) {
         val (_, record) = setup(reader = saying(slipText))
         record.addSlip("a.jpg", byteArrayOf(1))
         assertEquals("", record.ui.value.draft.tenders.single().amount)
-        assertNull(record.ui.value.amountFromSlip)
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
     }
 
     @Test fun aSlipInAnotherCurrencyFillsNothing() = runTest(UnconfinedTestDispatcher()) {
@@ -431,7 +431,7 @@ class RecordStateTest {
         record.setCurrency(row, "THB")
         record.addSlip("a.jpg", byteArrayOf(1))
         assertEquals("", record.ui.value.draft.tenders.single().amount)
-        assertNull(record.ui.value.amountFromSlip)
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
     }
 
     @Test fun aReaderThatFindsNothingOrFailsLeavesTheSlipAttachedAndTheAmountAlone() = runTest(UnconfinedTestDispatcher()) {
@@ -441,7 +441,7 @@ class RecordStateTest {
             record.addSlip("a.jpg", byteArrayOf(1))
             assertEquals(1, record.ui.value.draft.slips.size)
             assertEquals("", record.ui.value.draft.tenders.single().amount)
-            assertNull(record.ui.value.amountFromSlip)
+            assertEquals(emptySet(), record.ui.value.amountFromSlip)
             assertNull(record.ui.value.slipNotice)
         }
     }
@@ -450,15 +450,15 @@ class RecordStateTest {
         val (_, record) = setup(reader = saying(slipText))
         val row = record.makeOnline()
         record.addSlip("a.jpg", byteArrayOf(1))
-        assertEquals(row, record.ui.value.amountFromSlip)
+        assertEquals(setOf(row), record.ui.value.amountFromSlip)
         record.setAmount(row, "850001")
-        assertNull(record.ui.value.amountFromSlip)
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
         record.setAmount(row, "")
         record.addSlip("b.jpg", byteArrayOf(2))
-        assertEquals(row, record.ui.value.amountFromSlip)
+        assertEquals(setOf(row), record.ui.value.amountFromSlip)
         record.addTender()
         record.removeTender(row)
-        assertNull(record.ui.value.amountFromSlip)
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
     }
 
     @Test fun theMarkEndsWithTheDraft() = runTest(UnconfinedTestDispatcher()) {
@@ -467,6 +467,30 @@ class RecordStateTest {
         record.addSlip("a.jpg", byteArrayOf(1))
         record.save()
         assertIs<SavePhase.Saved>(record.ui.value.phase)
-        assertNull(record.ui.value.amountFromSlip)
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
+    }
+
+    @Test fun aSlipRemovedWhileItWasReadFillsNothing() = runTest(UnconfinedTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val (_, record) = setup(reader = SlipReader { gate.await(); slipText })
+        record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.removeSlip(record.ui.value.draft.slips.single().key)
+        gate.complete(Unit)
+        assertEquals("", record.ui.value.draft.tenders.single().amount)
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
+    }
+
+    @Test fun twoSlipsFillTwoLinesAndBothAreMarked() = runTest(UnconfinedTestDispatcher()) {
+        val (_, record) = setup(reader = saying(slipText))
+        val first = record.makeOnline()
+        record.addTender()
+        val second = record.ui.value.draft.tenders.last().key
+        record.setCurrency(second, "LAK")
+        record.setMethod(second, TenderMethod.ONLINE)
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.addSlip("b.jpg", byteArrayOf(2))
+        assertEquals(listOf("850000", "850000"), record.ui.value.draft.tenders.map { it.amount })
+        assertEquals(setOf(first, second), record.ui.value.amountFromSlip)
     }
 }

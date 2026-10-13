@@ -115,7 +115,7 @@ private fun TenderCard(row: TenderRow, ui: RecordUi, ws: Workspace, editable: Bo
         } else if (row.key in ui.badRows) {
             ShopText(stringResource(Res.string.issue_amount_invalid), TextRole.Caption)
         }
-        if (row.key == ui.amountFromSlip) ShopText(stringResource(Res.string.amount_from_slip), TextRole.Caption, muted = true)
+        if (row.key in ui.amountFromSlip) ShopText(stringResource(Res.string.amount_from_slip), TextRole.Caption, muted = true)
         if (ui.draft.tenders.size > 1) ShopButton(stringResource(Res.string.tender_remove), { record.removeTender(row.key) }, primary = false, enabled = editable)
     }
 }
