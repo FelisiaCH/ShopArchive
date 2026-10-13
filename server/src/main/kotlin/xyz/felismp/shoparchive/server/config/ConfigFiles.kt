@@ -28,8 +28,22 @@ internal object ServerProperties : PropertiesConfigFile() {
     override val keys = listOf(serverName, motd, port, bindAddress, lanDiscovery, logLevel)
 }
 
+/**
+ * 1 -> 2: `note.created` joined the default `notify.events`. A list that was kept as it stood (written by the server before, or by hand) and is not empty
+ * gets it too, so day notes reach the channel without the owner editing the file; an empty list is the admin's choice of no messages and is left. Both the
+ * nested form (`notify:` / `events:`) and the dotted key (`notify.events:`) are read.
+ */
+private val addNoteEvent = MigrationStep(1) { content ->
+    fun withNote(events: Any?): Any? = if (events is List<*> && events.isNotEmpty() && ShopEventTypes.NOTE_CREATED !in events) events + ShopEventTypes.NOTE_CREATED else events
+    val section = content["notify"] as? Map<*, *>
+    LinkedHashMap(content).also { out ->
+        if (section != null && "events" in section) out["notify"] = LinkedHashMap(section).also { it["events"] = withNote(section["events"]) }
+        if ("notify.events" in out) out["notify.events"] = withNote(out["notify.events"])
+    }
+}
+
 /** `config/shoparchive.yml`: how the core behaves. Sections for later features are added by the phase that uses them. */
-internal object CoreConfig : YamlConfigFile<Values>("config-version", 1, emptyList()) {
+internal object CoreConfig : YamlConfigFile<Values>("config-version", 2, listOf(addNoteEvent)) {
     override val path = "config/shoparchive.yml"
     override val title = "ShopArchive core settings. Changes apply on restart or reload."
 

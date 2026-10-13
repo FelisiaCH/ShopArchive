@@ -4,6 +4,10 @@
 # The plugin is used only when bot-token and chat-ids are filled in and every event it sends has a template in the chosen
 # language. Otherwise it warns at start and does not take over: the server then sends to the next channel (at worst only its
 # own log), so nothing is lost. Messages wait in the server's outbox until a channel takes them.
+#
+# This file is yours: the plugin never rewrites it. When a newer jar ships something this file lacks (a template, an event), the plugin uses the jar's
+# version of it without changing the file, and says so in the log; copy it from the config.yml in the jar when you want to edit it.
+config-version: 2
 
 # The bot's token from @BotFather. A secret: shown as *** by `plugins info Telegram` and never written to a log or a message status.
 bot-token: ""

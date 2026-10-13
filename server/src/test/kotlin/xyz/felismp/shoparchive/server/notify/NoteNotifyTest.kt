@@ -51,7 +51,7 @@ class NoteNotifyTest {
     }
 
     @Test
-    fun noteCreatedLeftOutOfNotifyEventsQueuesNothing() = env("notify:\n  events: [day.closed, entry.created]\n").run {
+    fun noteCreatedLeftOutOfNotifyEventsQueuesNothing() = env(NO_BACKOFF.replace("version: 1", "version: 2") + "notify:\n  events: [day.closed, entry.created]\n").run {
         val noy = login("noy")
         api {
             postJson("/api/v1/notes", CreateNoteRequest.serializer(), CreateNoteRequest(newUuid7(), "main", "hello"), noy)

@@ -53,13 +53,18 @@ class TelegramSettings(
         val HTTP_TIMEOUT_RANGE = 2..25
         const val DEFAULT_LEDGER_KEEP_DAYS = 7
         val LEDGER_KEEP_RANGE = 1..90
+        private const val NOTE_CREATED = "note.created"
         private val CHAT_ID = Regex("-?\\d{1,20}|@[A-Za-z][A-Za-z0-9_]{3,}")
 
         /**
          * Reads and checks the config. Returns the settings, or null when the channel cannot work (a reason is given to [warn]);
          * values that are merely off (a bad language, a timeout out of range, one bad chat id) are corrected with a warning.
+         *
+         * The file itself is never rewritten, but a file from an older jar is read as if it had what the jar ships now (the way Bukkit's `getConfig()` falls back to the
+         * defaults in the jar), and [info] says so once: a template the file lacks, for an event it sends, is the [shipped] one; the entry template of 0.1.1, unchanged, is the [shipped] one; and a file
+         * without `config-version` 2 whose `events` lists something gets `note.created` added (an empty list stays empty).
          */
-        fun read(config: PluginConfig, warn: (String) -> Unit): TelegramSettings? {
+        fun read(config: PluginConfig, info: (String) -> Unit = {}, shipped: String? = ShippedConfig.text, warn: (String) -> Unit): TelegramSettings? {
             var ok = true
             fun problem(text: String) { warn(text); ok = false }
 
@@ -78,13 +83,34 @@ class TelegramSettings(
                 language = DEFAULT_LANGUAGE
             }
 
-            val events = config.getStringList("events").map { it.trim() }.filter { it.isNotEmpty() }.filter {
+            val upgraded = mutableListOf<String>()
+            val listed = config.getStringList("events").map { it.trim() }.filter { it.isNotEmpty() }.let { names ->
+                if (config.getInt("config-version", 1) < ShippedConfig.VERSION && names.isNotEmpty() && NOTE_CREATED !in names) {
+                    upgraded += "events: note.created"
+                    names + NOTE_CREATED
+                } else names
+            }
+            val events = listed.filter {
                 (it in KNOWN_EVENTS).also { known -> if (!known) warn("events: '$it' is not an event this channel sends (${KNOWN_EVENTS.joinToString()}); ignored") }
             }.toSet()
             if (events.isEmpty()) problem("events lists nothing to send")
 
             val templates = KNOWN_EVENTS.associateWith { event ->
-                LANGUAGES.mapNotNull { lang -> config.getString("templates.${templateKey(event)}.$lang", "").takeIf { it.isNotBlank() }?.let { lang to it } }.toMap()
+                LANGUAGES.mapNotNull { lang ->
+                    val path = "templates.${templateKey(event)}.$lang"
+                    val own = config.getString(path, "").replace("\r\n", "\n").takeIf { it.isNotBlank() }
+                    val fromJar by lazy { shipped?.let { ShippedConfig.template(it, event, lang) } }
+                    val text = when {
+                        event !in events -> own // only what this channel sends is looked after
+                        own == null -> fromJar?.also { upgraded += path }
+                        event == "entry.created" && own == ShippedConfig.OLD_ENTRY_TEMPLATES[lang] -> (fromJar ?: own).also { if (it != own) upgraded += path }
+                        else -> own
+                    }
+                    text?.let { lang to it }
+                }.toMap()
+            }
+            if (upgraded.isNotEmpty()) {
+                info("config.yml is from an older version: using the new defaults for ${upgraded.joinToString()} without changing the file. Copy those blocks from the config.yml in the plugin's jar to keep them.")
             }
             for (event in events) if (language !in templates.getValue(event)) problem("templates.${templateKey(event)}.$language is missing")
 

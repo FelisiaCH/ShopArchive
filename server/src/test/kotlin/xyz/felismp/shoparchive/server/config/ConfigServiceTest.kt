@@ -49,7 +49,7 @@ class ConfigServiceTest {
             assertTrue("\n${key.path}=" in text, "no line for ${key.path}")
         }
         val yaml = root.text("config/shoparchive.yml")
-        assertTrue(yaml.lines().first { !it.startsWith("#") }.startsWith("config-version: 1"), yaml)
+        assertTrue(yaml.lines().first { !it.startsWith("#") }.startsWith("config-version: 2"), yaml)
         for (key in CoreConfig.keys) assertTrue("# ${key.comment}" in yaml, "no comment for ${key.path}")
         assertTrue("shutdown:\n  # " in yaml && "\n  hook-timeout-ms: 30000" in yaml, yaml)
         assertTrue("your own comments are not" in root.text("server.properties") && "unknown keys are dropped" in root.text("server.properties"))
@@ -302,12 +302,12 @@ class ConfigServiceTest {
 
     @Test
     fun newerConfigVersionIsRefusedAndTheFileIsLeftAlone() {
-        val future = "config-version: 2\ntimezone: Asia/Vientiane\nsomething-new: 1\n"
+        val future = "config-version: 3\ntimezone: Asia/Vientiane\nsomething-new: 1\n"
         root.write("config/shoparchive.yml", future)
 
         val e = assertFailsWith<ConfigFileException> { service().load() }
 
-        assertTrue("config-version 2" in e.message!! && "untouched" in e.message!! && "config/shoparchive.yml" in e.message!!, e.message)
+        assertTrue("config-version 3" in e.message!! && "untouched" in e.message!! && "config/shoparchive.yml" in e.message!!, e.message)
         assertEquals(future, root.text("config/shoparchive.yml"))
         assertEquals(emptyList(), root.backups())
     }
@@ -327,7 +327,7 @@ class ConfigServiceTest {
 
         assertEquals(ZoneId.of("Asia/Bangkok"), loaded().timezone)
 
-        assertTrue(root.text("config/shoparchive.yml").lines().first { !it.startsWith("#") }.startsWith("config-version: 1"))
+        assertTrue(root.text("config/shoparchive.yml").lines().first { !it.startsWith("#") }.startsWith("config-version: 2"))
     }
 
     // --- currencies ---
