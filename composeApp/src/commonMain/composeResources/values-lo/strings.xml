@@ -135,6 +135,10 @@
     <string name="amount_from_slip">ອ່ານຈາກສະລິບ ກວດໃຫ້ຖືກກ່ອນບັນທຶກ</string>
     <string name="slip_used_before">ສະລິບນີ້ເຄີຍບັນທຶກແລ້ວ %1$s · %2$s · %3$s</string>
     <string name="slip_attached_twice">ແນບສະລິບນີ້ຊ້ຳສອງເທື່ອ</string>
+    <string name="slip_check_known">%1$s ✓ %2$s</string>
+    <string name="slip_check_to">ຫາ %1$s</string>
+    <string name="slip_check_not_shop">ໂອນໃຫ້ %1$s ບໍ່ແມ່ນບັນຊີຂອງຮ້ານ</string>
+    <string name="slip_check_unknown">%1$s ບໍ່ຮູ້ຈັກສະລິບນີ້</string>
     <string name="notice_too_many">ເພີ່ມສະລິບໄດ້ສູງສຸດ %1$s ໃບ.</string>
     <string name="notice_too_big">ຮູບນັ້ນຍັງໃຫຍ່ກວ່າ %1$s KB ຫຼັງບີບອັດ.</string>
     <string name="notice_unreadable">ໄຟລ໌ນັ້ນບໍ່ແມ່ນຮູບທີ່ອ່ານໄດ້.</string>

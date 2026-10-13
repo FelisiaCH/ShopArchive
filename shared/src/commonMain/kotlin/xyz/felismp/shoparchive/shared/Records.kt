@@ -84,6 +84,19 @@ data class SlipDto(val file: String, val sha256: String, val code: String? = nul
 @Serializable
 data class SlipUseDto(val id: String, val date: String, val branch: String, val createdBy: UserRef, val createdAt: String)
 
+/**
+ * What the bank that printed a slip says about it (a `SlipChecker` plugin asked it). [source] names the bank; [known] is false when the bank does not know the slip.
+ * The rest is what the bank told about the transfer, null when it did not: [amount] in the currency's normal format ("850000", "120.50"), [time] as the bank sent it (`yyyy-MM-dd HH:mm:ss`),
+ * [to] the name of the account that was paid and [toAccount] its number as the bank masks it, [toShop] whether that account is one of the shop's (null when the plugin
+ * was not told the shop's accounts), [from] and [fromAccount] the payer's name and masked account (the owner keeps them with the entry: Felisia 2026-10-13).
+ */
+@Serializable
+data class SlipCheckDto(
+    val source: String, val known: Boolean, val amount: String? = null, val currency: String? = null,
+    val time: String? = null, val to: String? = null, val toShop: Boolean? = null,
+    val toAccount: String? = null, val from: String? = null, val fromAccount: String? = null,
+)
+
 @Serializable
 data class EntryDto(
     val id: String,

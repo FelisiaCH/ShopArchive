@@ -1,0 +1,16 @@
+# BCEL slip check. Copied to plugins/BCEL/config.yml the first time the plugin runs; your edits are kept.
+# `reload BCEL` in the server console reads this file again.
+#
+# When staff attach the photo of a BCEL OneProof slip, the server asks BCEL whether it knows the slip and shows the answer
+# (and the amount BCEL has) under the slip on the Record screen. Nothing is blocked: it is a hint for the person recording.
+# Slips of other banks are ignored. The payer's name and account are never kept, logged or shown.
+#
+# Careful: this uses the check behind BCEL's OneProof QR code. BCEL does not publish it as an API for shops, so it may change or stop working
+# without notice. When BCEL does not answer, the Record screen shows nothing.
+
+# The shop's own BCEL account numbers, written in full as on the slip, e.g. "160-12-00-12345678-001". Leave the list empty to skip the check
+# of who was paid; with accounts here a slip paid to any other account gets a red warning. BCEL hides some digits of the account (XXXXXX) and those match anything.
+accounts: []
+
+# How long to wait for BCEL, in seconds (2 to 30). An answer that takes longer is dropped and the Record screen shows nothing.
+timeout-seconds: 10

@@ -21,8 +21,10 @@ import xyz.felismp.shoparchive.app.flow.SlipNotice
 import xyz.felismp.shoparchive.app.flow.TenderRow
 import xyz.felismp.shoparchive.app.flow.Workspace
 import xyz.felismp.shoparchive.app.flow.displayAmount
+import xyz.felismp.shoparchive.app.flow.groupThousands
 import xyz.felismp.shoparchive.app.resources.*
 import xyz.felismp.shoparchive.shared.EntryType
+import xyz.felismp.shoparchive.shared.SlipCheckDto
 import xyz.felismp.shoparchive.shared.TenderMethod
 import xyz.felismp.shoparchive.app.flow.parseTypedAmount
 
@@ -81,6 +83,7 @@ fun RecordScreen(ws: Workspace) {
                     ShopBanner(stringResource(Res.string.slip_used_before, use.date, ws.branchName(use.branch), use.createdBy.name), Tone.Error)
                 }
                 if (slip.twiceHere) ShopBanner(stringResource(Res.string.slip_attached_twice), Tone.Error)
+                slip.check?.let { SlipCheckBanner(it) }
             }
             when (ui.slipNotice) {
                 SlipNotice.TOO_MANY -> ShopBanner(stringResource(Res.string.notice_too_many, ui.policy.slipMaxCount.toString()), Tone.Error)
@@ -94,6 +97,23 @@ fun RecordScreen(ws: Workspace) {
         ui.issues.firstOrNull()?.let { if (ui.phase !is SavePhase.Saved) ShopText(it.text(), TextRole.Caption, muted = true) }
         if (ui.block == SaveBlock.OFFLINE) ShopText(stringResource(Res.string.needs_connection), TextRole.Caption, muted = true)
         ShopButton(stringResource(Res.string.record_save), record::save, Modifier.fillWidthOnPhone(), enabled = ui.canSave, icon = ShopIcon.Save)
+    }
+}
+
+/** What the bank said about a slip: the transfer it knows, that it was paid to another account, or that it does not know the slip. */
+@Composable
+private fun SlipCheckBanner(check: SlipCheckDto) {
+    when {
+        !check.known -> ShopBanner(stringResource(Res.string.slip_check_unknown, check.source), Tone.Error)
+        check.toShop == false -> ShopBanner(stringResource(Res.string.slip_check_not_shop, check.to ?: check.toAccount.orEmpty()), Tone.Error)
+        else -> {
+            val details = listOfNotNull(
+                check.amount?.let { groupThousands(it) + (check.currency?.let { c -> " $c" } ?: "") },
+                check.time,
+                check.to?.let { stringResource(Res.string.slip_check_to, it) },
+            )
+            ShopBanner(stringResource(Res.string.slip_check_known, check.source, details.joinToString(" · ")), Tone.Success)
+        }
     }
 }
 

@@ -23,6 +23,7 @@ import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.HistoryItem
 import xyz.felismp.shoparchive.shared.SessionPreview
 import xyz.felismp.shoparchive.shared.SlipDto
+import xyz.felismp.shoparchive.shared.SlipCheckDto
 import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
 import xyz.felismp.shoparchive.shared.ErrorCode
@@ -187,6 +188,19 @@ class FakeRecordsApi : RecordsApi {
         slipUsesGate?.await()
         slipUsesError?.let { throw it }
         return slipUsed[code].orEmpty()
+    }
+
+    /** What `slipCheck` answers for each code (null: no bank plugin knows it); every code asked is kept in [slipCheckCalls]. */
+    var slipChecks: Map<String, SlipCheckDto> = emptyMap()
+    var slipCheckError: Exception? = null
+    var slipCheckGate: CompletableDeferred<Unit>? = null
+    val slipCheckCalls = mutableListOf<String>()
+
+    override suspend fun slipCheck(code: String): SlipCheckDto? {
+        slipCheckCalls += code
+        slipCheckGate?.await()
+        slipCheckError?.let { throw it }
+        return slipChecks[code]
     }
 
     override suspend fun history(date: String, id: String): List<HistoryItem> {

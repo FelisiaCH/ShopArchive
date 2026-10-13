@@ -10,6 +10,7 @@ import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.RecordsPolicy
+import xyz.felismp.shoparchive.shared.SlipCheckDto
 import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.TenderDto
 import xyz.felismp.shoparchive.shared.TenderMethod
@@ -618,5 +619,111 @@ class RecordStateTest {
         record.addSlip("b.jpg", byteArrayOf(2))
         assertEquals(listOf("850000", "850000"), record.ui.value.draft.tenders.map { it.amount })
         assertEquals(setOf(first, second), record.ui.value.amountFromSlip)
+    }
+
+    private val bcel = "00020101021238670016A00526628466257701082771041802030010324BCEL20260918191800000104"
+    private val known = SlipCheckDto("BCEL", known = true, amount = "800000", currency = "LAK", time = "2026-09-18 19:18:00", to = "SHOP", toShop = true)
+
+    @Test fun anAmountTheBankKnowsReplacesTheOneReadOffThePhoto() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying(slipText, bcel))
+        h.api.slipChecks = mapOf(bcel to known)
+        val row = record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        assertEquals(listOf(bcel), h.api.slipCheckCalls)
+        assertEquals(known, record.ui.value.draft.slips.single().check)
+        assertEquals("800000", record.ui.value.draft.tenders.single().amount)
+        assertEquals(setOf(row), record.ui.value.amountFromSlip)
+    }
+
+    @Test fun anAmountTheBankKnowsFillsAnEmptyLineWhenThePhotoGaveNone() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = { SlipScan(null, bcel) })
+        h.api.slipChecks = mapOf(bcel to known)
+        val row = record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        assertEquals("800000", record.ui.value.draft.tenders.single().amount)
+        assertEquals(setOf(row), record.ui.value.amountFromSlip)
+    }
+
+    @Test fun anAmountStaffTypedIsNeverReplacedByTheBank() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying(slipText, bcel))
+        h.api.slipChecks = mapOf(bcel to known)
+        h.api.slipCheckGate = CompletableDeferred()
+        val row = record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.setAmount(row, "700000")
+        h.api.slipCheckGate!!.complete(Unit)
+        assertEquals("700000", record.ui.value.draft.tenders.single().amount)
+        assertEquals(known, record.ui.value.draft.slips.single().check)
+    }
+
+    @Test fun theBankAnswerForOneSlipLeavesTheLineAnotherSlipFilled() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = { jpeg -> SlipScan(slipText, "code-${jpeg[0]}") })
+        h.api.slipChecks = mapOf("code-2" to known)
+        h.api.slipCheckGate = CompletableDeferred()
+        record.makeOnline()
+        record.addTender()
+        val second = record.ui.value.draft.tenders.last().key
+        record.setCurrency(second, "LAK")
+        record.setMethod(second, TenderMethod.ONLINE)
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.addSlip("b.jpg", byteArrayOf(2))
+        h.api.slipCheckGate!!.complete(Unit)
+        assertEquals(listOf("850000", "800000"), record.ui.value.draft.tenders.map { it.amount })
+    }
+
+    @Test fun aSlipTheBankDoesNotKnowKeepsTheAmountReadOffThePhoto() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying(slipText, bcel))
+        val unknown = SlipCheckDto("BCEL", known = false)
+        h.api.slipChecks = mapOf(bcel to unknown)
+        record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        assertEquals(unknown, record.ui.value.draft.slips.single().check)
+        assertEquals("850000", record.ui.value.draft.tenders.single().amount)
+    }
+
+    @Test fun noBankOrNoAnswerShowsNothingAndSavingStillWorks() = runTest(UnconfinedTestDispatcher()) {
+        for (error in listOf(null, ClientError.Unreachable())) {
+            val (h, record) = setup(reader = saying(slipText, bcel))
+            h.api.slipCheckError = error
+            record.makeOnline()
+            record.addSlip("a.jpg", byteArrayOf(1))
+            assertNull(record.ui.value.draft.slips.single().check)
+            assertEquals("850000", record.ui.value.draft.tenders.single().amount)
+            record.save()
+            assertIs<SavePhase.Saved>(record.ui.value.phase)
+        }
+    }
+
+    @Test fun aBankAnswerThatArrivesWhileSavingIsKeptWhenTheSaveDoesNotGoThrough() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying(slipText, bcel))
+        h.api.slipChecks = mapOf(bcel to known)
+        h.api.slipCheckGate = CompletableDeferred()
+        h.api.createGate = CompletableDeferred()
+        h.api.createFails = { ClientError.Unreachable() }
+        record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.save()
+        h.api.slipCheckGate!!.complete(Unit)
+        h.api.createGate!!.complete(Unit)
+        assertIs<SavePhase.Unknown>(record.ui.value.phase)
+        assertEquals(known, record.ui.value.draft.slips.single().check)
+        assertEquals("850000", record.ui.value.draft.tenders.single().amount, "what was sent stays on the frozen draft")
+    }
+
+    @Test fun aBankAmountThatArrivesWhileSavingIsPutOnTheLineWhenTheSaveIsRefused() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying(slipText, bcel))
+        h.api.slipChecks = mapOf(bcel to known)
+        h.api.slipCheckGate = CompletableDeferred()
+        h.api.createGate = CompletableDeferred()
+        h.api.createFails = { ClientError.Api(409, ErrorCode.NO_OPEN_SESSION, "No day is open in this branch.", reason = ErrorReasons.SESSION_NO_OPEN_DAY) }
+        val row = record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.save()
+        h.api.slipCheckGate!!.complete(Unit)
+        assertEquals("850000", record.ui.value.draft.tenders.single().amount)
+        h.api.createGate!!.complete(Unit)
+        assertIs<SavePhase.Failed>(record.ui.value.phase)
+        assertEquals("800000", record.ui.value.draft.tenders.single().amount)
+        assertEquals(setOf(row), record.ui.value.amountFromSlip)
     }
 }
