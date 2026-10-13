@@ -42,6 +42,9 @@ class PlaceholderRenderer : TemplateRenderer {
         "code" -> n.code
         "type" -> n.fields["type"]?.let { TYPE_WORDS[language]?.get(it) ?: it } ?: ""
         "time" -> n.fields["time"]?.let(::shortTime) ?: ""
+        // A message queued by a server that did not make `money` yet still shows its amounts.
+        "money" -> n.fields["money"] ?: listOfNotNull(n.fields["amount"], n.fields["currency"]).takeIf { it.size == 2 }
+            ?.let { (amounts, currencies) -> amounts.split(", ").zip(currencies.split(", ")).joinToString(", ") { (a, c) -> "$a $c" } } ?: ""
         else -> n.fields[name] ?: ""
     }
 

@@ -109,6 +109,7 @@ class FileSentLedger(private val dir: Path) : SentLedger {
  * A notification with images (the slips of an entry) is one `sendPhoto` with the text as caption, or one `sendMediaGroup` per ten images with the caption on the first photo; a text
  * longer than Telegram's caption limit is sent as a message first and the photos follow without caption. A chat accepted it when every one of these requests was accepted;
  * the first one that is not ends the try for that chat, and a try again starts that chat from the first request, so a chat may get the first part twice (the code makes it recognisable).
+ * Photos refused for good (Telegram's size rules) do not lose the message: the text is sent alone, unless it already arrived.
  * Nothing it returns or throws holds the bot token or the address: the address contains the token.
  */
 class TelegramNotifier(
@@ -170,8 +171,8 @@ class TelegramNotifier(
             emptyList()
         }
 
-    /** One request to the Bot API: JSON when [json] is set, otherwise a multipart form of [parts]. */
-    private class Call(val method: String, val json: String? = null, val parts: List<FormPart> = emptyList())
+    /** One request to the Bot API: JSON when [json] is set, otherwise a multipart form of [parts]; [hasText] when it carries the message's text. */
+    private class Call(val method: String, val json: String? = null, val parts: List<FormPart> = emptyList(), val hasText: Boolean = false)
 
     private fun calls(chat: String, text: String, pictures: List<SlipFile>): List<Call> {
         if (pictures.isEmpty()) return listOf(message(chat, text))
@@ -183,24 +184,33 @@ class TelegramNotifier(
                 val first = group * GROUP_LIMIT
                 fun file(field: String, i: Int, f: SlipFile) = FormPart(field, f.bytes, "slip-${first + i + 1}.${if (f.contentType == "image/png") "png" else "jpg"}", f.contentType)
                 if (files.size == 1) {
-                    add(Call("sendPhoto", parts = listOfNotNull(FormPart("chat_id", chat), caption?.let { FormPart("caption", it) }, file("photo", 0, files[0]))))
+                    add(Call("sendPhoto", parts = listOfNotNull(FormPart("chat_id", chat), caption?.let { FormPart("caption", it) }, file("photo", 0, files[0])), hasText = caption != null))
                 } else {
                     val media = files.indices.joinToString(",", "[", "]") { i ->
                         """{"type":"photo","media":"attach://photo${first + i}"${if (i == 0 && caption != null) ""","caption":${jsonString(caption)}""" else ""}}"""
                     }
-                    add(Call("sendMediaGroup", parts = listOf(FormPart("chat_id", chat), FormPart("media", media)) + files.mapIndexed { i, f -> file("photo${first + i}", i, f) }))
+                    add(Call("sendMediaGroup", parts = listOf(FormPart("chat_id", chat), FormPart("media", media)) + files.mapIndexed { i, f -> file("photo${first + i}", i, f) }, hasText = caption != null))
                 }
             }
         }
     }
 
     private fun message(chat: String, text: String) =
-        Call("sendMessage", json = """{"chat_id":${jsonString(chat)},"text":${jsonString(text)},"disable_web_page_preview":true}""")
+        Call("sendMessage", json = """{"chat_id":${jsonString(chat)},"text":${jsonString(text)},"disable_web_page_preview":true}""", hasText = true)
 
     private fun send(s: TelegramSettings, chat: String, text: String, pictures: List<SlipFile>): Outcome {
+        var textArrived = false
         for (call in calls(chat, text, pictures)) {
             val outcome = execute(s, chat, call)
-            if (outcome !is Outcome.Accepted) return outcome
+            when {
+                outcome is Outcome.Accepted -> textArrived = textArrived || call.hasText
+                // Telegram refused the photos for good (e.g. a size its rules do not take): the words of the entry still go, without them.
+                outcome is Outcome.Never && call.method != "sendMessage" -> {
+                    log("chat $chat: the photos were refused; the message goes without them")
+                    return if (textArrived) Outcome.Accepted else execute(s, chat, message(chat, text))
+                }
+                else -> return outcome
+            }
         }
         return Outcome.Accepted
     }

@@ -279,6 +279,8 @@ class TelegramTest {
         val day = note(event = "day.closed", fields = mapOf("date" to "2026-10-03", "float" to "LAK 100000", "handover" to "LAK 400000", "note" to ""))
         assertEquals("Closed 2026-10-03 float LAK 100000 handover LAK 400000", r.render("Closed {date} float {float} handover {handover} {note}", day, "en"))
         assertEquals("{x}", r.render("{v}", note(fields = mapOf("v" to "{x}")), "en"))
+        // Queued before the server made `money`: built from the amounts and currencies it had.
+        assertEquals("1000 LAK, 20.50 THB", r.render("{money}", note(fields = mapOf("amount" to "1000, 20.50", "currency" to "LAK, THB")), "en"))
     }
 
     @Test
@@ -480,11 +482,21 @@ class TelegramImagesTest {
     }
 
     @Test
-    fun aPhotoTheChatRefusesFailsTheNotificationAndTimeoutsAndNetworkErrorsKeepTheirMeaning() {
-        val refused = FakeTransport(ArrayDeque(listOf({ HttpAnswer(400, "{\"description\":\"Bad Request: PHOTO_INVALID_DIMENSIONS\"}") })))
+    fun aRefusedPhotoStillSendsTheTextAndTimeoutsAndNetworkErrorsKeepTheirMeaning() {
+        val photoRefused = { HttpAnswer(400, "{\"description\":\"Bad Request: PHOTO_INVALID_DIMENSIONS\"}") }
+        val refused = FakeTransport(ArrayDeque(listOf(photoRefused, { HttpAnswer(200, "") })))
         val ledger = MemoryLedger()
-        assertTrue(notifier(refused, listOf(slip(1)), ledger).deliver(note(fields = entryFields)) is DeliveryResult.Failed)
-        assertEquals(mapOf("111" to "dead"), ledger.read("20261003-150000-001"))
+        assertTrue(notifier(refused, listOf(slip(1)), ledger).deliver(note(fields = entryFields)) is DeliveryResult.Sent)
+        assertEquals(listOf("sendPhoto", "sendMessage"), refused.methods)
+        assertEquals(mapOf("111" to "ok"), ledger.read("20261003-150000-001"))
+        // The caption arrived with the first ten; the rest are refused: nothing more is sent.
+        val second = FakeTransport(ArrayDeque(listOf({ HttpAnswer(200, "") }, photoRefused)))
+        assertTrue(notifier(second, (1..11).map { slip(it) }).deliver(note(fields = entryFields)) is DeliveryResult.Sent)
+        assertEquals(listOf("sendMediaGroup", "sendPhoto"), second.methods)
+        val blocked = FakeTransport(ArrayDeque(listOf({ HttpAnswer(403, "{\"description\":\"Forbidden: bot was blocked by the user\"}") }, { HttpAnswer(403, "") })))
+        val deadLedger = MemoryLedger()
+        assertTrue(notifier(blocked, listOf(slip(1)), deadLedger).deliver(note(fields = entryFields)) is DeliveryResult.Failed)
+        assertEquals(mapOf("111" to "dead"), deadLedger.read("20261003-150000-001"))
         val slow = FakeTransport(ArrayDeque(listOf({ throw java.net.http.HttpTimeoutException("x $TOKEN") })))
         assertFailsWith<TimeoutException> { notifier(slow, listOf(slip(1), slip(2))).deliver(note(fields = entryFields)) }
         val down = FakeTransport(ArrayDeque(listOf({ throw java.io.IOException("connect to https://api/bot$TOKEN failed") })))
