@@ -44,6 +44,17 @@ class RecordsTest {
     }
 
     @Test
+    fun aSlipCodeIsOneToFiveHundredTwelveCharactersWithoutControlCharacters() {
+        assertTrue(isSlipCode("FQR26267XZTK2414"))
+        assertTrue(isSlipCode("00020101021133650004BCEL0108ONEPROOF0206ONEPAY0312BAGSTL8O2VVK041520260918668438563047AD6"))
+        assertTrue(isSlipCode("ໃບໂອນ กาแฟ ☕"))
+        assertTrue(isSlipCode("x".repeat(512)))
+        assertFalse(isSlipCode(""))
+        assertFalse(isSlipCode("x".repeat(513)))
+        for (control in listOf("a\nb", "a\tb", "a\u0000b", "a\u007Fb", "\r")) assertFalse(isSlipCode(control), control)
+    }
+
+    @Test
     fun aCashEntryWithoutCategoryOrSlipIsAcceptedWhenCategoriesAreOptional() {
         assertNull(check())
     }

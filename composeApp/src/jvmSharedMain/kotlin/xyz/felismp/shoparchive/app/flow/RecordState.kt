@@ -17,6 +17,7 @@ import xyz.felismp.shoparchive.shared.CurrencyInfo
 import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.RecordsPolicy
+import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.TenderDto
 import xyz.felismp.shoparchive.shared.TenderMethod
 import xyz.felismp.shoparchive.shared.covers
@@ -24,8 +25,16 @@ import xyz.felismp.shoparchive.shared.formatAmount
 
 class TenderRow(val key: Int, val currency: String, val method: TenderMethod, val amount: String)
 
-/** A compressed slip photo waiting to be sent. */
-class SlipItem(val key: Int, val name: String, val bytes: ByteArray)
+/**
+ * A compressed slip photo waiting to be sent. [code] is the text of the QR read off it, if any. [uses] are the entries already recorded
+ * with that code (empty when none, or when the server was not asked); [twiceHere] says the same code is on another slip of this draft.
+ */
+class SlipItem(
+    val key: Int, val name: String, val bytes: ByteArray,
+    val code: String? = null, val uses: List<SlipUseDto> = emptyList(), val twiceHere: Boolean = false,
+) {
+    fun copy(code: String? = this.code, uses: List<SlipUseDto> = this.uses, twiceHere: Boolean = this.twiceHere) = SlipItem(key, name, bytes, code, uses, twiceHere)
+}
 
 /** The entry being written. [id] is made once per draft and stays the same on every resend. */
 class Draft(
@@ -100,6 +109,8 @@ class RecordState(
         val sent: Sent? = null,
         /** The row keys of the payment lines filled from a slip, each until staff change its amount, remove it or the draft is replaced. */
         val amountFromSlip: Set<Int> = emptySet(),
+        /** The slips whose photo is still being read: saving waits for them, so their code goes along. */
+        val reading: Set<Int> = emptySet(),
     )
 
     private class Sent(val request: CreateEntryRequest, val slips: List<ByteArray>)
@@ -136,7 +147,7 @@ class RecordState(
                 policy.requireOpenDay && dayStatus != null && dayStatus !is DayStatus.Open -> SaveBlock.NO_DAY
                 else -> null
             },
-            s.notice, s.compressing > 0, s.amountFromSlip, s.sent?.request?.branch?.takeIf { s.phase is SavePhase.Unknown }, canWrite,
+            s.notice, s.compressing > 0 || s.draft.slips.any { it.key in s.reading }, s.amountFromSlip, s.sent?.request?.branch?.takeIf { s.phase is SavePhase.Unknown }, canWrite,
         )
     }.stateIn(env.scope, SharingStarted.Eagerly, initialUi())
 
@@ -155,8 +166,8 @@ class RecordState(
     private fun freshDraft(type: EntryType, currency: String) =
         Draft(uuidV7(env.now()), type, null, "", "", listOf(TenderRow(++keys, currency, TenderMethod.CASH, "")), emptyList())
 
-    private fun Inner.copy(draft: Draft = this.draft, phase: SavePhase = this.phase, recent: List<String> = this.recent, notice: SlipNotice? = this.notice, compressing: Int = this.compressing, sent: Sent? = this.sent, amountFromSlip: Set<Int> = this.amountFromSlip) =
-        Inner(draft, phase, recent, notice, compressing, sent, amountFromSlip)
+    private fun Inner.copy(draft: Draft = this.draft, phase: SavePhase = this.phase, recent: List<String> = this.recent, notice: SlipNotice? = this.notice, compressing: Int = this.compressing, sent: Sent? = this.sent, amountFromSlip: Set<Int> = this.amountFromSlip, reading: Set<Int> = this.reading) =
+        Inner(draft, phase, recent, notice, compressing, sent, amountFromSlip, reading)
 
     private fun Draft.copy(
         type: EntryType = this.type, category: String? = this.category, item: String = this.item, note: String = this.note,
@@ -219,7 +230,7 @@ class RecordState(
     fun removeTender(row: Int) = edit { d -> if (d.tenders.size > 1) d.copy(tenders = d.tenders.filter { it.key != row }) else d }
 
     fun removeSlip(key: Int) {
-        edit { d -> d.copy(slips = d.slips.filter { it.key != key }) }
+        edit { d -> d.copy(slips = d.slips.filter { it.key != key }.withTwiceHere()) }
         inner.update { it.copy(notice = null) }
     }
 
@@ -251,26 +262,32 @@ class RecordState(
                     else -> {
                         val slip = SlipItem(++keys, name, jpeg)
                         added = slip.key
-                        s2.copy(s2.draft.copy(slips = s2.draft.slips + slip), phase = SavePhase.Editing)
+                        s2.copy(s2.draft.copy(slips = s2.draft.slips + slip), phase = SavePhase.Editing, reading = s2.reading + slip.key)
                     }
                 }
             }
-            added?.let { if (jpeg != null) fillAmountFromSlip(it, jpeg) }
+            added?.let { if (jpeg != null) readSlip(it, jpeg) }
         }
     }
 
+    /** Reads the photo of slip [slip] once: its amount goes on a payment line, its code on the slip; then asks who used that code already. */
+    private suspend fun readSlip(slip: Int, jpeg: ByteArray) {
+        val scan = try {
+            reader.tryRead(jpeg)?.also { scan ->
+                scan.text?.let { fillAmountFromSlip(slip, it) }
+                scan.code?.let { setCode(slip, it) }
+            }
+        } finally {
+            inner.update { it.copy(reading = it.reading - slip) }
+        }
+        scan?.code?.let { askUses(slip, it) }
+    }
+
     /**
-     * Reads the paid amount off the photo of slip [slip] and puts it in the first empty online line of that currency, if that slip is still
+     * Puts the paid amount in [text], read off the photo of slip [slip], in the first empty online line of that currency, if that slip is still
      * attached (not removed, nor the draft replaced, while it was read). What staff typed is never replaced.
      */
-    private suspend fun fillAmountFromSlip(slip: Int, jpeg: ByteArray) {
-        val text = try {
-            reader.text(jpeg)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            null
-        } ?: return
+    private fun fillAmountFromSlip(slip: Int, text: String) {
         val currencies = ui.value.currencies
         val (code, minor) = slipAmount(text, currencies.associate { it.code to it.exponent }) ?: return
         val exponent = currencies.first { it.code == code }.exponent
@@ -282,6 +299,31 @@ class RecordState(
             s.copy(s.draft.copy(tenders = tenders), phase = SavePhase.Editing, amountFromSlip = s.amountFromSlip + row.key)
         }
     }
+
+    /** Gives slip [slip] the [code] read off its photo, if that slip is still attached. */
+    private fun setCode(slip: Int, code: String) = editInner { s ->
+        if (s.draft.slips.none { it.key == slip }) s else s.copy(s.draft.copy(slips = s.draft.slips.map { if (it.key == slip) it.copy(code = code) else it }.withTwiceHere()))
+    }
+
+    /**
+     * Asks the server which entries carry [code], the code of slip [slip], already. It only warns: saving is never held for the answer,
+     * and a code the server could not be asked about shows nothing.
+     */
+    private suspend fun askUses(slip: Int, code: String) {
+        if (inner.value.draft.slips.none { it.key == slip && it.code == code }) return
+        val uses = try {
+            env.calls.run { env.api.slipUses(code) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return
+        }
+        // Kept even while saving: the warning is not part of what is sent, and a refused save goes back to a draft that still needs it.
+        inner.update { s -> s.copy(s.draft.copy(slips = s.draft.slips.map { if (it.key == slip && it.code == code) it.copy(uses = uses) else it })) }
+    }
+
+    /** The slips with [SlipItem.twiceHere] set on every one whose code is on another slip of the draft too. */
+    private fun List<SlipItem>.withTwiceHere() = map { s -> s.copy(twiceHere = s.code != null && count { it.code == s.code } > 1) }
 
     private fun loadSuggestions(category: String?) {
         suggestionJob?.cancel()
@@ -340,7 +382,7 @@ class RecordState(
         val d = inner.value.draft
         val exponents = state.currencies.associate { it.code to it.exponent }
         val tenders = d.tenders.map { TenderDto(it.currency, it.method, formatAmount(amountOf(it, exponents) ?: return null, exponents.getValue(it.currency))) }
-        return Sent(CreateEntryRequest(d.id, d.type, branch, d.category, d.item.trim(), d.note.trim(), tenders), d.slips.map { it.bytes })
+        return Sent(CreateEntryRequest(d.id, d.type, branch, d.category, d.item.trim(), d.note.trim(), tenders, d.slips.map { it.code }), d.slips.map { it.bytes })
     }
 
     private companion object {

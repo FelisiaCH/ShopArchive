@@ -46,6 +46,12 @@ private val SLUG = Regex("[a-z0-9-]{1,32}")
 
 fun isSlug(text: String): Boolean = SLUG.matches(text)
 
+/** The longest slip code, in characters; the QR of a bank slip is far shorter. */
+const val SLIP_CODE_MAX = 512
+
+/** Whether [text] can be the code of a slip: the text of the QR on a bank slip, 1..[SLIP_CODE_MAX] characters, none of them a control character. */
+fun isSlipCode(text: String): Boolean = text.length in 1..SLIP_CODE_MAX && text.none { it.isISOControl() }
+
 /** Whether [text] is a date that exists, written `2026-09-27` (the days of each month and leap years are checked). */
 fun isIsoDate(text: String): Boolean {
     val match = Regex("(\\d{4})-(\\d{2})-(\\d{2})").matchEntire(text) ?: return false
@@ -70,8 +76,13 @@ data class UserRef(val id: String, val name: String)
 @Serializable
 data class TenderDto(val currency: String, val method: TenderMethod, val amount: String)
 
+/** One slip photo of an entry. [code] is the text of the QR the bank prints on a slip (unique per transfer), when the phone could read one. */
 @Serializable
-data class SlipDto(val file: String, val sha256: String)
+data class SlipDto(val file: String, val sha256: String, val code: String? = null)
+
+/** An entry that carries a slip code: what a clerk is told when the slip in their hand was recorded before. */
+@Serializable
+data class SlipUseDto(val id: String, val date: String, val branch: String, val createdBy: UserRef, val createdAt: String)
 
 @Serializable
 data class EntryDto(
@@ -102,6 +113,8 @@ data class CreateEntryRequest(
     val item: String = "",
     val note: String = "",
     val tenders: List<TenderDto>,
+    /** The code of the i-th slip sent with the request, null for a slip with none; may be shorter than the slips (the rest have none). */
+    val slipCodes: List<String?> = emptyList(),
 )
 
 /** Body of `PUT /api/v1/entries/{date}/{id}`. [keepSlips] are the files (`slip-1.jpg`) that stay; null keeps all. Slips sent with the request are added. */
@@ -115,6 +128,8 @@ data class UpdateEntryRequest(
     val keepSlips: List<String>? = null,
     /** The entry's `updatedAt` the edit started from. When it is not the stored one any more the change is refused (409), so a newer change is never overwritten. Null skips the check. */
     val expectedUpdatedAt: String? = null,
+    /** The code of the i-th slip this request adds, null for a slip with none; may be shorter than the slips added (the rest have none). */
+    val addedSlipCodes: List<String?> = emptyList(),
 )
 
 @Serializable

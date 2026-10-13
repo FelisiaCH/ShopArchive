@@ -55,7 +55,7 @@ data class HistoryUi(
 )
 
 /** History: the entries of a date range, filtered, and the entry being looked at. Reloads on a filter change, a reconnect and any live entry message. */
-class HistoryState(private val env: Env, private val compressor: SlipCompressor) {
+class HistoryState(private val env: Env, private val compressor: SlipCompressor, private val reader: SlipReader) {
     private class Form(
         val from: String, val to: String, val branch: String? = null, val type: EntryType? = null,
         val currency: String? = null, val category: String? = null, val includeDeleted: Boolean = false,
@@ -149,7 +149,7 @@ class HistoryState(private val env: Env, private val compressor: SlipCompressor)
     /** Opens [entry] (a row of the list). */
     fun open(entry: EntryDto) {
         _detail.value?.close()
-        _detail.value = EntryDetailState(env, entry, compressor) { reload() }
+        _detail.value = EntryDetailState(env, entry, compressor, reader) { reload() }
     }
 
     fun closeDetail() {

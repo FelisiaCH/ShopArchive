@@ -133,6 +133,8 @@
     <string name="slip_remove">ລຶບ %1$s</string>
     <string name="slip_preparing">ກຳລັງກຽມຮູບ…</string>
     <string name="amount_from_slip">ອ່ານຈາກສະລິບ ກວດໃຫ້ຖືກກ່ອນບັນທຶກ</string>
+    <string name="slip_used_before">ສະລິບນີ້ເຄີຍບັນທຶກແລ້ວ %1$s · %2$s · %3$s</string>
+    <string name="slip_attached_twice">ແນບສະລິບນີ້ຊ້ຳສອງເທື່ອ</string>
     <string name="notice_too_many">ເພີ່ມສະລິບໄດ້ສູງສຸດ %1$s ໃບ.</string>
     <string name="notice_too_big">ຮູບນັ້ນຍັງໃຫຍ່ກວ່າ %1$s KB ຫຼັງບີບອັດ.</string>
     <string name="notice_unreadable">ໄຟລ໌ນັ້ນບໍ່ແມ່ນຮູບທີ່ອ່ານໄດ້.</string>
@@ -266,6 +268,7 @@
     <string name="reason_entry_slip_too_many">ລາຍການນີ້ມີສະລິບຫຼາຍເກີນໄປ</string>
     <string name="reason_entry_slip_type">ສະລິບຕ້ອງເປັນຮູບ JPEG ຫຼື PNG</string>
     <string name="reason_entry_slip_unknown">ສະລິບທີ່ຈະເກັບໄວ້ບໍ່ຢູ່ໃນລາຍການນີ້ແລ້ວ ໂຫຼດລາຍການໃໝ່</string>
+    <string name="reason_entry_slip_code_invalid">ລະຫັດຂອງສະລິບບໍ່ຖືກຕ້ອງ</string>
     <string name="reason_entry_category_required">ເລືອກໝວດໝູ່</string>
     <string name="reason_entry_category_unknown">ບໍ່ມີໝວດໝູ່ນີ້</string>
     <string name="reason_entry_category_archived">ໝວດໝູ່ນີ້ເລີກໃຊ້ແລ້ວ ເລືອກໝວດອື່ນ</string>

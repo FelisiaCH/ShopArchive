@@ -133,6 +133,8 @@
     <string name="slip_remove">ลบ %1$s</string>
     <string name="slip_preparing">กำลังเตรียมรูป…</string>
     <string name="amount_from_slip">อ่านจากสลิป ตรวจให้ตรงก่อนบันทึก</string>
+    <string name="slip_used_before">สลิปนี้เคยบันทึกแล้ว %1$s · %2$s · %3$s</string>
+    <string name="slip_attached_twice">แนบสลิปนี้ซ้ำสองครั้ง</string>
     <string name="notice_too_many">เพิ่มสลิปได้สูงสุด %1$s ใบ</string>
     <string name="notice_too_big">รูปนั้นยังใหญ่กว่า %1$s KB หลังบีบอัด</string>
     <string name="notice_unreadable">ไฟล์นั้นไม่ใช่รูปที่อ่านได้</string>
@@ -266,6 +268,7 @@
     <string name="reason_entry_slip_too_many">รายการนี้มีสลิปมากเกินไป</string>
     <string name="reason_entry_slip_type">สลิปต้องเป็นรูป JPEG หรือ PNG</string>
     <string name="reason_entry_slip_unknown">สลิปที่จะเก็บไว้ไม่อยู่ในรายการนี้แล้ว โหลดรายการใหม่</string>
+    <string name="reason_entry_slip_code_invalid">รหัสของสลิปไม่ถูกต้อง</string>
     <string name="reason_entry_category_required">เลือกหมวดหมู่</string>
     <string name="reason_entry_category_unknown">ไม่มีหมวดหมู่นี้</string>
     <string name="reason_entry_category_archived">หมวดหมู่นี้เลิกใช้แล้ว เลือกหมวดอื่น</string>

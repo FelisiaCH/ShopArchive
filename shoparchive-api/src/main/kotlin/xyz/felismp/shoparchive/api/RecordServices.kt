@@ -19,6 +19,7 @@ import xyz.felismp.shoparchive.shared.OpenSessionRequest
 import xyz.felismp.shoparchive.shared.OpenSessionResponse
 import xyz.felismp.shoparchive.shared.SessionDto
 import xyz.felismp.shoparchive.shared.SessionPreview
+import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.UpdateBranchRequest
 import xyz.felismp.shoparchive.shared.UpdateCategoryRequest
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
@@ -94,6 +95,12 @@ interface EntryService {
     fun slip(principal: Principal, date: String, id: String, n: Int): SlipFile
 
     fun history(principal: Principal, date: String, id: String): List<HistoryItem>
+
+    /**
+     * The entries, not deleted, that carry a slip with this [code] (the text of its QR), oldest first. Needs `shoparchive.entry.create`.
+     * @throws ApiError 400 for a text that cannot be a slip code; 403
+     */
+    fun slipUses(principal: Principal, code: String): List<SlipUseDto>
 }
 
 /** The day sessions: open the day with the change counted, close it with the drawer counted. */

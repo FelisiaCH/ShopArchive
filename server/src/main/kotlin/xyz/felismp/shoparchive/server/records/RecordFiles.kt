@@ -10,12 +10,14 @@ import xyz.felismp.shoparchive.shared.HistoryItem
 import xyz.felismp.shoparchive.shared.SessionClose
 import xyz.felismp.shoparchive.shared.SessionDto
 import xyz.felismp.shoparchive.shared.SessionStatus
+import xyz.felismp.shoparchive.shared.SLIP_CODE_MAX
 import xyz.felismp.shoparchive.shared.SlipDto
 import xyz.felismp.shoparchive.shared.TenderDto
 import xyz.felismp.shoparchive.shared.TenderMethod
 import xyz.felismp.shoparchive.shared.UserRef
 import xyz.felismp.shoparchive.shared.formatAmount
 import xyz.felismp.shoparchive.shared.isIsoDate
+import xyz.felismp.shoparchive.shared.isSlipCode
 import xyz.felismp.shoparchive.shared.isSlug
 import xyz.felismp.shoparchive.shared.isUuidV7
 import xyz.felismp.shoparchive.shared.parseAmount
@@ -38,8 +40,8 @@ internal data class Tender(val currency: String, val method: TenderMethod, val a
     fun toDto() = TenderDto(currency, method, amount.text)
 }
 
-internal data class Slip(val file: String, val sha256: String) {
-    fun toDto() = SlipDto(file, sha256)
+internal data class Slip(val file: String, val sha256: String, val code: String? = null) {
+    fun toDto() = SlipDto(file, sha256, code)
 
     /** The N of `slip-N.jpg`. */
     val number: Int get() = file.removePrefix("slip-").substringBefore('.').toInt()
@@ -152,7 +154,10 @@ internal fun renderEntry(e: Entry): String = buildString {
     append("tenders:\n")
     for (t in e.tenders) append("  - currency: ${t.currency}\n    method: ${t.method.wire()}\n    amount: ${quoted(t.amount.text)}\n")
     if (e.slips.isEmpty()) append("slips: []\n") else append("slips:\n")
-    for (s in e.slips) append("  - file: ${quoted(s.file)}\n    sha256: ${quoted(s.sha256)}\n")
+    for (s in e.slips) {
+        append("  - file: ${quoted(s.file)}\n    sha256: ${quoted(s.sha256)}\n")
+        s.code?.let { append("    code: ${quoted(it)}\n") }
+    }
 }
 
 internal fun renderSession(s: Session): String = buildString {
@@ -308,7 +313,8 @@ internal fun parseEntry(text: String, exponents: Map<String, Int>): Entry {
     val slips = f.items("slips").map { s ->
         val file = s.text("file").also { if (!SLIP_FILE.matches(it)) throw RecordFormatException("entry.yml: '$it' is not a slip file name like slip-1.jpg") }
         val sha = s.text("sha256").also { if (!Regex("[0-9a-f]{64}").matches(it)) throw RecordFormatException("entry.yml: the sha256 of $file is not 64 hex digits") }
-        Slip(file, sha)
+        val code = s.optionalText("code")?.also { if (!isSlipCode(it)) throw RecordFormatException("entry.yml: the code of $file is not 1 to $SLIP_CODE_MAX characters without control characters") }
+        Slip(file, sha, code)
     }
     return Entry(
         id = id, date = LocalDate.parse(date), type = type, branch = branch,

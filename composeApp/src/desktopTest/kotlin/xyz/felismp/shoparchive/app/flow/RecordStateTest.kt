@@ -10,8 +10,10 @@ import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.RecordsPolicy
+import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.TenderDto
 import xyz.felismp.shoparchive.shared.TenderMethod
+import xyz.felismp.shoparchive.shared.UserRef
 import xyz.felismp.shoparchive.shared.isUuidV7
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -29,7 +31,7 @@ class RecordStateTest {
     /** A reader that finds no text on any photo. */
     private val none = SlipReader { null }
 
-    private fun saying(text: String) = SlipReader { text }
+    private fun saying(text: String, code: String? = null) = SlipReader { SlipScan(text, code) }
 
     private fun TestScope.setup(
         policy: RecordsPolicy = RecordsPolicy(),
@@ -408,7 +410,7 @@ class RecordStateTest {
 
     @Test fun anAmountTypedBeforeTheReadFinishedIsNotReplaced() = runTest(UnconfinedTestDispatcher()) {
         val gate = CompletableDeferred<Unit>()
-        val (_, record) = setup(reader = SlipReader { gate.await(); slipText })
+        val (_, record) = setup(reader = SlipReader { gate.await(); SlipScan(slipText, null) })
         val row = record.makeOnline()
         record.addSlip("a.jpg", byteArrayOf(1))
         assertEquals(1, record.ui.value.draft.slips.size)
@@ -472,13 +474,137 @@ class RecordStateTest {
 
     @Test fun aSlipRemovedWhileItWasReadFillsNothing() = runTest(UnconfinedTestDispatcher()) {
         val gate = CompletableDeferred<Unit>()
-        val (_, record) = setup(reader = SlipReader { gate.await(); slipText })
+        val (_, record) = setup(reader = SlipReader { gate.await(); SlipScan(slipText, null) })
         record.makeOnline()
         record.addSlip("a.jpg", byteArrayOf(1))
         record.removeSlip(record.ui.value.draft.slips.single().key)
         gate.complete(Unit)
         assertEquals("", record.ui.value.draft.tenders.single().amount)
         assertEquals(emptySet(), record.ui.value.amountFromSlip)
+    }
+
+    private val code = "FQR26267XZTK2414"
+    private val before = SlipUseDto("e0", "2026-10-01", "main", UserRef("u2", "noy"), "2026-10-01T10:00:00+07:00")
+
+    @Test fun theCodeOnTheSlipIsKeptWithItAndTheAmountIsStillFilled() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying(slipText, code))
+        record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        val slip = record.ui.value.draft.slips.single()
+        assertEquals(code, slip.code)
+        assertEquals(emptyList(), slip.uses)
+        assertFalse(slip.twiceHere)
+        assertEquals(listOf(code), h.api.slipUseCalls)
+        assertEquals("850000", record.ui.value.draft.tenders.single().amount)
+    }
+
+    @Test fun aWarningThatArrivesWhileSavingIsKeptWhenTheSaveDoesNotGoThrough() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying(slipText, code))
+        h.api.slipUsed = mapOf(code to listOf(before))
+        h.api.slipUsesGate = CompletableDeferred()
+        h.api.createGate = CompletableDeferred()
+        h.api.createFails = { ClientError.Unreachable() }
+        record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.save()
+        assertEquals(SavePhase.Saving, record.ui.value.phase)
+        h.api.slipUsesGate!!.complete(Unit)
+        h.api.createGate!!.complete(Unit)
+        assertIs<SavePhase.Unknown>(record.ui.value.phase)
+        assertEquals(listOf(before), record.ui.value.draft.slips.single().uses)
+    }
+
+    @Test fun theEntriesThatHaveTheCodeAlreadyAreKeptWithTheSlip() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying(slipText, code))
+        h.api.slipUsed = mapOf(code to listOf(before))
+        record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        assertEquals(listOf(before), record.ui.value.draft.slips.single().uses)
+        assertTrue(record.ui.value.canSave, "a warning never blocks saving")
+    }
+
+    @Test fun aSlipWithoutACodeOrWithOneThatCannotBeOneAsksNothing() = runTest(UnconfinedTestDispatcher()) {
+        for (scan in listOf(SlipScan(slipText, null), SlipScan(slipText, "a\u0007b"), SlipScan(slipText, ""), SlipScan(slipText, "x".repeat(513)))) {
+            val (h, record) = setup(reader = { scan })
+            record.addSlip("a.jpg", byteArrayOf(1))
+            assertNull(record.ui.value.draft.slips.single().code)
+            assertEquals(emptyList(), h.api.slipUseCalls)
+        }
+    }
+
+    @Test fun aServerThatCannotBeAskedShowsNothingAndSavingStillWorks() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying(slipText, code))
+        h.api.slipUsesError = ClientError.Unreachable()
+        record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        val slip = record.ui.value.draft.slips.single()
+        assertEquals(code, slip.code)
+        assertEquals(emptyList(), slip.uses)
+        record.save()
+        assertEquals(listOf<String?>(code), h.api.created.single().first.slipCodes)
+    }
+
+    @Test fun theSameCodeOnTwoSlipsOfTheDraftMarksBothUntilOneIsRemoved() = runTest(UnconfinedTestDispatcher()) {
+        val (_, record) = setup(reader = saying(slipText, code))
+        record.addSlip("a.jpg", byteArrayOf(1))
+        assertFalse(record.ui.value.draft.slips.single().twiceHere)
+        record.addSlip("b.jpg", byteArrayOf(2))
+        assertEquals(listOf(true, true), record.ui.value.draft.slips.map { it.twiceHere })
+        record.removeSlip(record.ui.value.draft.slips.first().key)
+        assertEquals(listOf(false), record.ui.value.draft.slips.map { it.twiceHere })
+    }
+
+    @Test fun differentCodesOnTwoSlipsMarkNeither() = runTest(UnconfinedTestDispatcher()) {
+        val (_, record) = setup(reader = { jpeg -> SlipScan(slipText, "code-${jpeg[0]}") })
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.addSlip("b.jpg", byteArrayOf(2))
+        assertEquals(listOf("code-1", "code-2"), record.ui.value.draft.slips.map { it.code })
+        assertEquals(listOf(false, false), record.ui.value.draft.slips.map { it.twiceHere })
+    }
+
+    @Test fun aSlipRemovedWhileItWasReadGetsNoCodeAndNothingIsAsked() = runTest(UnconfinedTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val (h, record) = setup(reader = SlipReader { gate.await(); SlipScan(slipText, code) })
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.removeSlip(record.ui.value.draft.slips.single().key)
+        gate.complete(Unit)
+        assertEquals(emptyList(), record.ui.value.draft.slips)
+        assertEquals(emptyList(), h.api.slipUseCalls)
+    }
+
+    @Test fun savingWaitsForTheSlipPhotoToBeReadSoItsCodeGoesAlong() = runTest(UnconfinedTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val (h, record) = setup(reader = SlipReader { gate.await(); SlipScan(slipText, code) })
+        val row = record.makeOnline()
+        record.setAmount(row, "850000")
+        record.addSlip("a.jpg", byteArrayOf(1))
+        assertTrue(record.ui.value.compressing)
+        assertFalse(record.ui.value.canSave)
+        gate.complete(Unit)
+        assertTrue(record.ui.value.canSave)
+        record.save()
+        assertEquals(listOf<String?>(code), h.api.created.single().first.slipCodes)
+    }
+
+    @Test fun aSlipRemovedWhileBeingReadDoesNotHoldSaving() = runTest(UnconfinedTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val (_, record) = setup(reader = SlipReader { gate.await(); SlipScan(slipText, code) })
+        val row = record.ui.value.draft.tenders.single().key
+        record.setAmount(row, "1000")
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.removeSlip(record.ui.value.draft.slips.single().key)
+        assertFalse(record.ui.value.compressing)
+        assertTrue(record.ui.value.canSave)
+    }
+
+    @Test fun theCodesAreSentInTheOrderOfTheSlipsWithNullForOneThatHasNone() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = { jpeg -> SlipScan(slipText, if (jpeg[0].toInt() == 2) null else "code-${jpeg[0]}") })
+        record.makeOnline()
+        for (n in 1..3) record.addSlip("$n.jpg", byteArrayOf(n.toByte()))
+        record.save()
+        val (request, slips) = h.api.created.single()
+        assertEquals(listOf<String?>("code-1", null, "code-3"), request.slipCodes)
+        assertEquals(listOf<List<Byte>>(listOf(1), listOf(2), listOf(3)), slips.map { it.toList() })
     }
 
     @Test fun twoSlipsFillTwoLinesAndBothAreMarked() = runTest(UnconfinedTestDispatcher()) {
