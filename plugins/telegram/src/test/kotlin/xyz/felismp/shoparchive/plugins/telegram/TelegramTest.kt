@@ -257,13 +257,22 @@ class TelegramTest {
     fun templatesRenderPerLanguageAndAnEmptyCategoryLeavesNoBlankLine() {
         val r = PlaceholderRenderer()
         val n = note(fields = entryFields)
-        assertEquals("EN Income 150000 LAK coffee\nnoy 2026-10-03 15:00 #20261003-A3F9C", r.render("EN {type} {amount} {currency} {category} {item}\n{user} {time} #{code}", n, "en"))
-        assertEquals("รายรับ", r.render("{type}", n, "th"))
-        assertEquals("ລາຍຮັບ", r.render("{type}", n, "lo"))
+        assertEquals("EN 🟢 Income 150000 LAK coffee\nnoy 2026-10-03 15:00 #20261003-A3F9C", r.render("EN {type} {amount} {currency} {category} {item}\n{user} {time} #{code}", n, "en"))
+        assertEquals("🟢 รายรับ", r.render("{type}", n, "th"))
+        assertEquals("🟢 ລາຍຮັບ", r.render("{type}", n, "lo"))
         assertEquals("a\nb", r.render("a\n{category}\nb", n, "en"))
         val day = note(event = "day.closed", fields = mapOf("date" to "2026-10-03", "float" to "LAK 100000", "handover" to "LAK 400000", "note" to ""))
         assertEquals("Closed 2026-10-03 float LAK 100000 handover LAK 400000", r.render("Closed {date} float {float} handover {handover} {note}", day, "en"))
         assertEquals("{x}", r.render("{v}", note(fields = mapOf("v" to "{x}")), "en"))
+    }
+
+    @Test
+    fun theShippedEntryTemplateLeadsWithTheMarkTheWordAndTheSignedMoney() {
+        val r = PlaceholderRenderer()
+        val income = note(fields = entryFields + mapOf("money" to "+150.000 LAK", "branch" to "Main Shop", "category" to "ເຄື່ອງດື່ມ"))
+        assertEquals("🟢 ລາຍຮັບ +150.000 LAK\nເຄື່ອງດື່ມ coffee\nMain Shop · noy · 2026-10-03 15:00\nລະຫັດ 20261003-A3F9C", r.render(shippedTemplate("entry.created", "lo"), income, "lo"))
+        val expense = note(fields = entryFields + mapOf("type" to "expense", "money" to "-50,000 LAK, -20.50 THB", "branch" to "Main Shop", "note" to "for the cooler"))
+        assertEquals("🔴 Expense -50,000 LAK, -20.50 THB\ncoffee\n📝 for the cooler\nMain Shop · noy · 2026-10-03 15:00\nCode 20261003-A3F9C", r.render(shippedTemplate("entry.created", "en"), expense, "en"))
     }
 
     @Test

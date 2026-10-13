@@ -7,11 +7,11 @@ interface TemplateRenderer {
     fun render(template: String, notification: Notification, language: String): String
 }
 
-/** The words `{type}` becomes, by language. */
+/** The words `{type}` becomes, by language; the coloured mark tells income from expense when a chat is only skimmed. */
 private val TYPE_WORDS = mapOf(
-    "lo" to mapOf("income" to "ລາຍຮັບ", "expense" to "ລາຍຈ່າຍ"),
-    "th" to mapOf("income" to "รายรับ", "expense" to "รายจ่าย"),
-    "en" to mapOf("income" to "Income", "expense" to "Expense"),
+    "lo" to mapOf("income" to "🟢 ລາຍຮັບ", "expense" to "🔴 ລາຍຈ່າຍ"),
+    "th" to mapOf("income" to "🟢 รายรับ", "expense" to "🔴 รายจ่าย"),
+    "en" to mapOf("income" to "🟢 Income", "expense" to "🔴 Expense"),
 )
 
 /**
