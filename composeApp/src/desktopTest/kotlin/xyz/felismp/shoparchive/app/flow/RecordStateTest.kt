@@ -498,6 +498,22 @@ class RecordStateTest {
         assertEquals("850000", record.ui.value.draft.tenders.single().amount)
     }
 
+    @Test fun aWarningThatArrivesWhileSavingIsKeptWhenTheSaveDoesNotGoThrough() = runTest(UnconfinedTestDispatcher()) {
+        val (h, record) = setup(reader = saying(slipText, code))
+        h.api.slipUsed = mapOf(code to listOf(before))
+        h.api.slipUsesGate = CompletableDeferred()
+        h.api.createGate = CompletableDeferred()
+        h.api.createFails = { ClientError.Unreachable() }
+        record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.save()
+        assertEquals(SavePhase.Saving, record.ui.value.phase)
+        h.api.slipUsesGate!!.complete(Unit)
+        h.api.createGate!!.complete(Unit)
+        assertIs<SavePhase.Unknown>(record.ui.value.phase)
+        assertEquals(listOf(before), record.ui.value.draft.slips.single().uses)
+    }
+
     @Test fun theEntriesThatHaveTheCodeAlreadyAreKeptWithTheSlip() = runTest(UnconfinedTestDispatcher()) {
         val (h, record) = setup(reader = saying(slipText, code))
         h.api.slipUsed = mapOf(code to listOf(before))

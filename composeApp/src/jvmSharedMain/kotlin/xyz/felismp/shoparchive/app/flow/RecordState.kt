@@ -318,7 +318,8 @@ class RecordState(
         } catch (_: Exception) {
             return
         }
-        editInner { s -> s.copy(s.draft.copy(slips = s.draft.slips.map { if (it.key == slip) it.copy(uses = uses) else it })) }
+        // Kept even while saving: the warning is not part of what is sent, and a refused save goes back to a draft that still needs it.
+        inner.update { s -> s.copy(s.draft.copy(slips = s.draft.slips.map { if (it.key == slip && it.code == code) it.copy(uses = uses) else it })) }
     }
 
     /** The slips with [SlipItem.twiceHere] set on every one whose code is on another slip of the draft too. */

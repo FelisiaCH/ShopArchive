@@ -179,10 +179,12 @@ class FakeRecordsApi : RecordsApi {
     /** What `slipUses` answers for each code; every code asked is kept in [slipUseCalls]. */
     var slipUsed: Map<String, List<SlipUseDto>> = emptyMap()
     var slipUsesError: Exception? = null
+    var slipUsesGate: CompletableDeferred<Unit>? = null
     val slipUseCalls = mutableListOf<String>()
 
     override suspend fun slipUses(code: String): List<SlipUseDto> {
         slipUseCalls += code
+        slipUsesGate?.await()
         slipUsesError?.let { throw it }
         return slipUsed[code].orEmpty()
     }
