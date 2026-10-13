@@ -77,6 +77,10 @@ fun RecordScreen(ws: Workspace) {
                     ShopText(slip.name + " · " + (slip.bytes.size / 1024 + 1) + " KB", modifier = Modifier.weight(1f))
                     ShopButton(stringResource(Res.string.slip_remove, slip.name), { record.removeSlip(slip.key) }, primary = false, enabled = editable)
                 }
+                slip.uses.firstOrNull()?.let { use ->
+                    ShopBanner(stringResource(Res.string.slip_used_before, use.date, ws.branchName(use.branch), use.createdBy.name), Tone.Error)
+                }
+                if (slip.twiceHere) ShopBanner(stringResource(Res.string.slip_attached_twice), Tone.Error)
             }
             when (ui.slipNotice) {
                 SlipNotice.TOO_MANY -> ShopBanner(stringResource(Res.string.notice_too_many, ui.policy.slipMaxCount.toString()), Tone.Error)

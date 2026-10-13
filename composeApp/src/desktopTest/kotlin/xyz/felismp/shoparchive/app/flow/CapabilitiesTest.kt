@@ -99,11 +99,11 @@ class CapabilitiesTest {
     @Test fun theWindowComesFromTheConfigAndTheDetailHidesWhatIsRefused() = runTest(UnconfinedTestDispatcher()) {
         val own = listOf(PermissionNodes.ENTRY_VIEW_OWN, PermissionNodes.ENTRY_EDIT_OWN)
         val h = Harness(backgroundScope, ConfigState.Ready(testConfig(RecordsPolicy(editWindowDays = 1), permissions = own)))
-        val inWindow = EntryDetailState(h.env, mine("2026-10-03"), SlipCompressor { it }) { }
+        val inWindow = EntryDetailState(h.env, mine("2026-10-03"), SlipCompressor { it }, SlipReader { null }) { }
         assertTrue(inWindow.ui.value.canEdit)
         assertFalse(inWindow.ui.value.canDelete, "no delete node")
-        assertFalse(EntryDetailState(h.env, mine("2026-10-02"), SlipCompressor { it }) { }.ui.value.canEdit)
-        assertFalse(EntryDetailState(h.env, theirs(), SlipCompressor { it }) { }.ui.value.canEdit)
+        assertFalse(EntryDetailState(h.env, mine("2026-10-02"), SlipCompressor { it }, SlipReader { null }) { }.ui.value.canEdit)
+        assertFalse(EntryDetailState(h.env, theirs(), SlipCompressor { it }, SlipReader { null }) { }.ui.value.canEdit)
     }
 
     // ---- the screens' state holders ----

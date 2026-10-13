@@ -179,6 +179,8 @@ internal fun Route.recordRoutes(services: ServiceRegistry) {
 
     get("/entries/{date}/{id}/history") { call.respond(blocking { services.require<EntryService>().history(call.principal, call.param("date"), call.param("id")) }) }
 
+    get("/slips/uses") { call.respond(blocking { services.require<EntryService>().slipUses(call.principal, call.query("code").orEmpty()) }) }
+
     get("/export") {
         val query = EntryQuery(call.query("from"), call.query("to"), call.query("branch"), null, null, null, includeDeleted = call.query("includeDeleted") == "true")
         val file = blocking { services.require<ExportService>().export(call.principal, query, call.query("format") ?: "csv") }

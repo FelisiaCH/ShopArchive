@@ -102,6 +102,7 @@ class EntryDetailState(
     private val env: Env,
     first: EntryDto,
     private val compressor: SlipCompressor,
+    private val reader: SlipReader,
     private val changed: () -> Unit,
 ) {
     private val job = SupervisorJob(env.scope.coroutineContext[Job])
@@ -331,6 +332,8 @@ class EntryDetailState(
             } catch (_: Exception) {
                 null
             }
+            // Read before the slip is added, while the form still counts it as being prepared: saving then always carries its code.
+            val code = jpeg?.let { reader.tryRead(it)?.code }
             inner.update { st ->
                 val done = st.copy(compressing = st.compressing - 1)
                 val current = done.edit
@@ -338,7 +341,7 @@ class EntryDetailState(
                     jpeg == null -> done.copy(notice = SlipNotice.UNREADABLE)
                     jpeg.size > limits.slipMaxSizeKb * 1024L -> done.copy(notice = SlipNotice.TOO_BIG)
                     current == null -> done // the edit was closed meanwhile
-                    else -> done.copy(edit = current.with(added = current.added + SlipItem(++keys, name, jpeg)))
+                    else -> done.copy(edit = current.with(added = current.added + SlipItem(++keys, name, jpeg, code)))
                 }
             }
         }
@@ -356,7 +359,7 @@ class EntryDetailState(
             val exponent = exponents[row.currency] ?: return
             TenderDto(row.currency, row.method, formatAmount(parseTypedAmount(row.amount, exponent) ?: return, exponent))
         }
-        val request = UpdateEntryRequest(form.type, form.category, form.item.trim(), form.note.trim(), tenders, form.keep.map { it.file }, form.base)
+        val request = UpdateEntryRequest(form.type, form.category, form.item.trim(), form.note.trim(), tenders, form.keep.map { it.file }, form.base, form.added.map { it.code })
         act { env.api.updateEntry(s.entry.date, s.entry.id, request, form.added.map { it.bytes }) }
     }
 }

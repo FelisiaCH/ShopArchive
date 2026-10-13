@@ -133,6 +133,8 @@
     <string name="slip_remove">Remove %1$s</string>
     <string name="slip_preparing">Preparing photo…</string>
     <string name="amount_from_slip">Read from the slip — check it before saving</string>
+    <string name="slip_used_before">This slip was already recorded on %1$s · %2$s · %3$s</string>
+    <string name="slip_attached_twice">This slip is attached twice</string>
     <string name="notice_too_many">You can add at most %1$s slips.</string>
     <string name="notice_too_big">That photo is still over %1$s KB after compressing.</string>
     <string name="notice_unreadable">That file is not a picture this device can read.</string>
@@ -266,6 +268,7 @@
     <string name="reason_entry_slip_too_many">There are too many slips on this entry.</string>
     <string name="reason_entry_slip_type">A slip must be a JPEG or a PNG picture.</string>
     <string name="reason_entry_slip_unknown">A slip to keep is not on this entry any more. Load the entry again.</string>
+    <string name="reason_entry_slip_code_invalid">The code on a slip is not valid.</string>
     <string name="reason_entry_category_required">Choose a category.</string>
     <string name="reason_entry_category_unknown">That category does not exist.</string>
     <string name="reason_entry_category_archived">That category is not in use any more. Choose another one.</string>

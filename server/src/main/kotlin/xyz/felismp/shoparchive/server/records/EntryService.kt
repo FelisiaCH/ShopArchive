@@ -25,6 +25,8 @@ import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.HistoryChange
 import xyz.felismp.shoparchive.shared.HistoryItem
 import xyz.felismp.shoparchive.shared.MoveEntryRequest
+import xyz.felismp.shoparchive.shared.SLIP_CODE_MAX
+import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.TenderDto
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
 import xyz.felismp.shoparchive.shared.UserRef
@@ -32,6 +34,7 @@ import xyz.felismp.shoparchive.shared.WsMessage
 import xyz.felismp.shoparchive.shared.checkEntry
 import xyz.felismp.shoparchive.shared.detectSlipExtension
 import xyz.felismp.shoparchive.shared.isIsoDate
+import xyz.felismp.shoparchive.shared.isSlipCode
 import xyz.felismp.shoparchive.shared.isUuidV7
 import xyz.felismp.shoparchive.shared.parseAmount
 import xyz.felismp.shoparchive.shared.wire
@@ -116,6 +119,7 @@ internal class DefaultEntryService(
         val branch = branches.find(request.branch) ?: throw badRequest("There is no branch '${request.branch}'.", ErrorReasons.BRANCH_UNKNOWN)
         checkEntry(request.type, request.category, request.tenders, slips.size, rules())?.let { throw badRequest(it) }
         val slipFiles = slipFiles(slips, firstNumber = 1)
+        val codes = slipCodes(request.slipCodes, slips.size)
         val tenders = tenders(request.tenders)
 
         val (stored, isNew) = store.writer.run {
@@ -134,7 +138,7 @@ internal class DefaultEntryService(
             val entry = Entry(
                 id = request.id, date = open?.businessDate ?: today(), type = request.type, branch = branch.key, category = request.category,
                 item = request.item.trim(), note = request.note.trim(), createdBy = by, createdAt = now, updatedAt = now, deleted = false,
-                tenders = tenders, slips = slipFiles.map { Slip(it.file, sha256Hex(it.bytes)) }, session = open?.id,
+                tenders = tenders, slips = slipFiles.mapIndexed { i, new -> Slip(new.file, sha256Hex(new.bytes), codes[i]) }, session = open?.id,
             )
             store.create(NewEntry(entry, slipFiles.associate { it.file to it.bytes }, HistoryItem(now, by, "create", emptyList())))
             entry to true
@@ -191,6 +195,12 @@ internal class DefaultEntryService(
         }
     }
 
+    override fun slipUses(principal: Principal, code: String): List<SlipUseDto> {
+        access.require(principal, ENTRY_CREATE_NODE)
+        if (!isSlipCode(code)) throw badRequest("A slip code is 1 to $SLIP_CODE_MAX characters without control characters.", ErrorReasons.ENTRY_SLIP_CODE_INVALID)
+        return store.slipUses(code).map { SlipUseDto(it.id, it.date.toString(), it.branch, it.createdBy, it.createdAt) }
+    }
+
     // --- change ---
 
     override fun update(principal: Principal, date: String, id: String, request: UpdateEntryRequest, newSlips: List<ByteArray>): EntryDto {
@@ -209,10 +219,11 @@ internal class DefaultEntryService(
                 rules().let { if (unchangedCategory) EntryRules(it.exponents, it.categories, false, it.slipMaxCount) else it },
             )?.let { throw badRequest(it) }
             val added = slipFiles(newSlips, firstNumber = store.nextSlipNumber(entry))
+            val codes = slipCodes(request.addedSlipCodes, newSlips.size)
             val now = nextStamp(entry.updatedAt, clock, config)
             val changed = entry.copy(
                 type = request.type, category = request.category, item = request.item.trim(), note = request.note.trim(),
-                tenders = tenders(request.tenders), slips = kept + added.map { Slip(it.file, sha256Hex(it.bytes)) }, updatedAt = now,
+                tenders = tenders(request.tenders), slips = kept + added.mapIndexed { i, new -> Slip(new.file, sha256Hex(new.bytes), codes[i]) }, updatedAt = now,
             )
             val changes = differences(entry, changed)
             if (changes.isEmpty()) return@run entry to null
@@ -283,6 +294,14 @@ internal class DefaultEntryService(
             val extension = detectSlipExtension(bytes) ?: throw badRequest("A slip must be a JPEG or a PNG image.", ErrorReasons.ENTRY_SLIP_TYPE)
             NewSlip("slip-${firstNumber + index}.$extension", bytes)
         }
+    }
+
+    /** The code of each of [count] slips: [codes] as sent, a slip beyond them has none. More codes than slips, or a code that is not one, is refused. */
+    private fun slipCodes(codes: List<String?>, count: Int): List<String?> {
+        if (codes.size > count || codes.any { it != null && !isSlipCode(it) }) {
+            throw badRequest("A slip code must come with its slip and be 1 to $SLIP_CODE_MAX characters without control characters.", ErrorReasons.ENTRY_SLIP_CODE_INVALID)
+        }
+        return codes + List(count - codes.size) { null }
     }
 
     private fun withinWindow(date: LocalDate) = !date.isBefore(today().minusDays(config.records.editWindowDays.toLong()))

@@ -40,6 +40,7 @@ internal val REASON_WORDS: Map<String, StringResource> = mapOf(
     ErrorReasons.ENTRY_SLIP_TOO_MANY to Res.string.reason_entry_slip_too_many,
     ErrorReasons.ENTRY_SLIP_TYPE to Res.string.reason_entry_slip_type,
     ErrorReasons.ENTRY_SLIP_UNKNOWN to Res.string.reason_entry_slip_unknown,
+    ErrorReasons.ENTRY_SLIP_CODE_INVALID to Res.string.reason_entry_slip_code_invalid,
     ErrorReasons.ENTRY_CATEGORY_REQUIRED to Res.string.reason_entry_category_required,
     ErrorReasons.ENTRY_CATEGORY_UNKNOWN to Res.string.reason_entry_category_unknown,
     ErrorReasons.ENTRY_CATEGORY_ARCHIVED to Res.string.reason_entry_category_archived,

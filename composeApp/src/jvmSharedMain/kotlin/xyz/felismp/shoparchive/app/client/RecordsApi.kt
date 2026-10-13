@@ -11,6 +11,7 @@ import xyz.felismp.shoparchive.shared.NoteDto
 import xyz.felismp.shoparchive.shared.NotesUnread
 import xyz.felismp.shoparchive.shared.NotificationDto
 import xyz.felismp.shoparchive.shared.SessionPreview
+import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
 import xyz.felismp.shoparchive.shared.wire
 import io.ktor.http.encodeURLParameter
@@ -77,6 +78,9 @@ interface RecordsApi {
     suspend fun slip(date: String, id: String, n: Int): ByteArray
 
     suspend fun history(date: String, id: String): List<HistoryItem>
+
+    /** The entries, not deleted, that carry a slip with [code] (the text of its QR), oldest first. */
+    suspend fun slipUses(code: String): List<SlipUseDto>
 
     /** Closes the day session [id] of [branch] with the money counted. Answers the closed session. */
     suspend fun closeSession(branch: String, id: String, request: CloseSessionRequest): SessionDto

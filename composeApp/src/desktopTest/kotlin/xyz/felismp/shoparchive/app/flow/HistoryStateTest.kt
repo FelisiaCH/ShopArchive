@@ -29,9 +29,11 @@ import kotlin.test.assertTrue
 class HistoryStateTest {
     private val keep = SlipCompressor { raw -> raw.takeIf { it.isNotEmpty() } }
 
-    private fun TestScope.setup(policy: RecordsPolicy = RecordsPolicy()): Pair<Harness, HistoryState> {
+    private val none = SlipReader { null }
+
+    private fun TestScope.setup(policy: RecordsPolicy = RecordsPolicy(), reader: SlipReader = none): Pair<Harness, HistoryState> {
         val h = Harness(backgroundScope, ConfigState.Ready(testConfig(policy)))
-        return h to HistoryState(h.env, keep)
+        return h to HistoryState(h.env, keep, reader)
     }
 
     private fun refused(status: Int, code: ErrorCode, message: String, reason: String? = null) = ClientError.Api(status, code, message, reason = reason)
@@ -48,7 +50,7 @@ class HistoryStateTest {
 
     @Test fun nothingIsAskedForWhileHistoryIsHiddenAndTheListLoadsOnceViewAccessComes() = runTest(UnconfinedTestDispatcher()) {
         val h = Harness(backgroundScope, ConfigState.Ready(testConfig(permissions = listOf(xyz.felismp.shoparchive.shared.PermissionNodes.ENTRY_CREATE))))
-        val history = HistoryState(h.env, keep)
+        val history = HistoryState(h.env, keep, none)
         assertEquals(emptyList(), h.api.entryFilters, "no view node: no call")
         history.reload()
         assertEquals(emptyList(), h.api.entryFilters)
@@ -133,8 +135,9 @@ class HistoryStateTest {
     private fun TestScope.openEntry(
         entry: xyz.felismp.shoparchive.shared.EntryDto = testEntry(slips = listOf(SlipDto("slip-1.jpg", "x"), SlipDto("slip-2.jpg", "y"))),
         policy: RecordsPolicy = RecordsPolicy(),
+        reader: SlipReader = none,
     ): Triple<Harness, HistoryState, EntryDetailState> {
-        val (h, history) = setup(policy)
+        val (h, history) = setup(policy, reader)
         h.api.listed = listOf(entry)
         h.api.historyItems = listOf(HistoryItem("2026-10-04T09:00:00+07:00", h.api.alice, "create", emptyList()))
         history.reload()
@@ -218,6 +221,24 @@ class HistoryStateTest {
         assertEquals(listOf("slip-2.jpg"), request.keepSlips)
         assertEquals(listOf(listOf<Byte>(7, 7)), slips.map { it.toList() })
         assertEquals(listOf("slip-2.jpg", "slip-3.jpg"), d.ui.value.entry.slips.map { it.file })
+    }
+
+    @Test fun slipsAddedByAnEditCarryTheCodesReadOffThemInOrder() = runTest(UnconfinedTestDispatcher()) {
+        val entry = testEntry(tenders = listOf(TenderDto("LAK", TenderMethod.ONLINE, "5000")), slips = listOf(SlipDto("slip-1.jpg", "x", "KEPT")))
+        val reader = SlipReader { jpeg ->
+            when (jpeg[0].toInt()) {
+                1 -> SlipScan("text", "CODE-A")
+                2 -> SlipScan("text", null)
+                3 -> SlipScan("text", "bad\u0007code")
+                else -> error("no model")
+            }
+        }
+        val (h, _, d) = openEntry(entry, reader = reader)
+        d.startEdit()
+        for (n in 1..4) d.addSlip("$n.jpg", byteArrayOf(n.toByte()))
+        assertEquals(listOf("CODE-A", null, null, null), d.ui.value.edit!!.form.added.map { it.code })
+        d.saveEdit()
+        assertEquals(listOf("CODE-A", null, null, null), h.api.updates.single().second.addedSlipCodes)
     }
 
     @Test fun anOnlinePaymentNeedsAtLeastOneSlipLeftAndCashAllowsNone() = runTest(UnconfinedTestDispatcher()) {

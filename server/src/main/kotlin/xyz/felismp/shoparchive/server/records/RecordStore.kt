@@ -41,6 +41,8 @@ internal class RecordStore(
     private val clock: Clock = Clock.systemDefaultZone(),
 ) {
     private val entries = ConcurrentHashMap<String, Entry>()
+    // The ids of the entries not deleted that carry a slip with each code; kept with `entries` by hold and release.
+    private val slipCodes = ConcurrentHashMap<String, Set<String>>()
     private val broken = ConcurrentHashMap<String, BrokenEntry>()
     // The entry.yml bytes this store last wrote or took in, per id: what a hand edit is told apart from while running, even when the copy in cache/ could not be written.
     private val written = ConcurrentHashMap<String, ByteArray>()
@@ -54,6 +56,28 @@ internal class RecordStore(
     fun brokenEntry(id: String): BrokenEntry? = broken[id]
 
     fun all(): Collection<Entry> = entries.values
+
+    /** The entries, not deleted, that carry a slip with [code], oldest first. */
+    fun slipUses(code: String): List<Entry> =
+        slipCodes[code].orEmpty().mapNotNull { entries[it] }.sortedWith(compareBy({ it.createdAt }, { it.id }))
+
+    /** Puts [entry] in memory, in place of the one with its id, and in the slip code index unless it is deleted. */
+    private fun hold(entry: Entry) {
+        val before = entries.put(entry.id, entry)
+        val codes = entry.indexedCodes()
+        for (code in codes) slipCodes.merge(code, setOf(entry.id)) { ids, one -> ids + one }
+        before?.let { unindex(it.id, it.indexedCodes() - codes) }
+    }
+
+    private fun release(id: String) {
+        entries.remove(id)?.let { unindex(id, it.indexedCodes()) }
+    }
+
+    private fun unindex(id: String, codes: Set<String>) {
+        for (code in codes) slipCodes.computeIfPresent(code) { _, ids -> (ids - id).ifEmpty { null } }
+    }
+
+    private fun Entry.indexedCodes(): Set<String> = if (deleted) emptySet() else slips.mapNotNullTo(HashSet()) { it.code }
 
     fun brokenEntries(): List<BrokenEntry> = broken.values.sortedBy { it.id }
 
@@ -103,7 +127,7 @@ internal class RecordStore(
         files.rename(staging, target)
         files.fsync(target.parent)
         writeSnapshot(entry.id, entryBytes)
-        entries[entry.id] = entry
+        hold(entry)
         entry
     }
 
@@ -119,7 +143,7 @@ internal class RecordStore(
         val entryBytes = renderEntry(updated).toByteArray(Charsets.UTF_8)
         files.writeAtomic(dir.resolve("entry.yml"), entryBytes)
         writeSnapshot(updated.id, entryBytes)
-        entries[updated.id] = updated
+        hold(updated)
         updated
     }
 
@@ -147,7 +171,7 @@ internal class RecordStore(
             throw e
         }
         writeSnapshot(updated.id, entryBytes)
-        entries[updated.id] = updated
+        hold(updated)
         updated
     }
 
@@ -198,12 +222,12 @@ internal class RecordStore(
         val dir = dirOf(current.date, current.id)
         val found = read(dir, current.id, dir.parent)
         if (found.entry == null || found.error != null) {
-            entries.remove(current.id)
+            release(current.id)
             markBroken(current.id, found.error!!, listOf(dir))
             throw conflict("The file of this entry was changed by hand and cannot be read. The admin can see why on the server console (records).")
         }
         if (reconcile(dir, current, found.entry, found.bytes!!)) {
-            entries[current.id] = found.entry
+            hold(found.entry)
             throw conflict("The entry was changed by hand; load it again.")
         }
     }
@@ -220,6 +244,7 @@ internal class RecordStore(
     /** Reads every entry under `record/` and deals with what is left in `data/staging/`. Entries that cannot be used are set aside in [brokenEntries]. */
     fun load() = writer.run {
         entries.clear()
+        slipCodes.clear()
         broken.clear()
         written.clear()
         scan()
@@ -245,11 +270,11 @@ internal class RecordStore(
         for ((id, places) in found) {
             when {
                 places.size > 1 -> markBroken(id, "the entry exists in ${places.size} folders: ${places.joinToString { root.relativize(it.path).toString() }}", places.map { it.path })
-                places[0].error != null && places[0].entry != null && repairDate(places[0]) -> entries[id] = places[0].entry!!
+                places[0].error != null && places[0].entry != null && repairDate(places[0]) -> hold(places[0].entry!!)
                 places[0].error != null -> markBroken(id, places[0].error!!, listOf(places[0].path))
                 else -> {
                     reconcile(places[0].path, null, places[0].entry!!, places[0].bytes!!)
-                    entries[id] = places[0].entry!!
+                    hold(places[0].entry!!)
                 }
             }
         }
@@ -325,7 +350,7 @@ internal class RecordStore(
             files.createDirectories(target.parent, upTo = root)
             files.rename(child, target)
             files.fsync(target.parent)
-            entries[entry.id] = entry
+            hold(entry)
             log.warn("entry ${entry.id}: a save was cut short by a stop; it was whole in data/staging/ and is in place now")
         }
     }

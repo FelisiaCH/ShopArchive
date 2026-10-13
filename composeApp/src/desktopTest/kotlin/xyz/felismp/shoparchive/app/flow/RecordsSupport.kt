@@ -23,6 +23,7 @@ import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.HistoryItem
 import xyz.felismp.shoparchive.shared.SessionPreview
 import xyz.felismp.shoparchive.shared.SlipDto
+import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.LocalizedName
@@ -173,6 +174,17 @@ class FakeRecordsApi : RecordsApi {
     override suspend fun slip(date: String, id: String, n: Int): ByteArray {
         slipError?.let { throw it }
         return slipBytes[n] ?: byteArrayOf(n.toByte())
+    }
+
+    /** What `slipUses` answers for each code; every code asked is kept in [slipUseCalls]. */
+    var slipUsed: Map<String, List<SlipUseDto>> = emptyMap()
+    var slipUsesError: Exception? = null
+    val slipUseCalls = mutableListOf<String>()
+
+    override suspend fun slipUses(code: String): List<SlipUseDto> {
+        slipUseCalls += code
+        slipUsesError?.let { throw it }
+        return slipUsed[code].orEmpty()
     }
 
     override suspend fun history(date: String, id: String): List<HistoryItem> {

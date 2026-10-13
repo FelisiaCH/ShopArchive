@@ -78,6 +78,34 @@ class RecordFilesTest {
     }
 
     @Test
+    fun aSlipCodeIsWrittenUnderItsSlipOnlyWhenThereIsOneAndReadsBackExactly() {
+        val code = "00020101021133650004BCEL0108ONEPROOF0206ONEPAY0312BAGSTL8O2VVK041520260918668438563047AD6"
+        val odd = "a \"b\" \\ c: # d"
+        val original = entry().let { it.copy(slips = listOf(Slip("slip-1.jpg", "3f".repeat(32), code), Slip("slip-2.jpg", "4e".repeat(32)), Slip("slip-3.png", "5d".repeat(32), odd))) }
+
+        val text = renderEntry(original)
+
+        assertTrue(
+            "slips:\n  - file: \"slip-1.jpg\"\n    sha256: \"${"3f".repeat(32)}\"\n    code: \"$code\"\n  - file: \"slip-2.jpg\"\n    sha256: \"${"4e".repeat(32)}\"\n  - file: \"slip-3.png\"\n" in text,
+            text,
+        )
+        assertEquals(original, parseEntry(text, exponents))
+        assertEquals(listOf(code, null, odd), parseEntry(text, exponents).slips.map { it.code })
+    }
+
+    @Test
+    fun anEntryFileWrittenBeforeSlipCodesStillReadsAndAHandWrittenBadCodeIsRefused() {
+        val old = renderEntry(entry())
+
+        assertTrue("code" !in old.substringAfter("slips:"), old)
+        assertNull(parseEntry(old, exponents).slips.single().code)
+        for (bad in listOf("\"\"", "\"a\\u0007b\"", "\"" + "x".repeat(513) + "\"")) {
+            assertFailsWith<RecordFormatException>(bad) { parseEntry(old + "    code: $bad\n", exponents) }
+        }
+        assertEquals("x".repeat(512), parseEntry(old + "    code: \"" + "x".repeat(512) + "\"\n", exponents).slips.single().code)
+    }
+
+    @Test
     fun anAmountMayBeWrittenWithFewerDecimalsByHandButNotWithMore() {
         val text = renderEntry(entry())
 

@@ -18,6 +18,7 @@ import io.ktor.http.Headers
 import io.ktor.http.HttpMethod
 import io.ktor.http.content.OutgoingContent
 import io.ktor.http.content.TextContent
+import io.ktor.http.encodeURLParameter
 import io.ktor.http.encodeURLPath
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.readAvailable
@@ -41,6 +42,7 @@ import xyz.felismp.shoparchive.shared.NoteDto
 import xyz.felismp.shoparchive.shared.NotesUnread
 import xyz.felismp.shoparchive.shared.NotificationDto
 import xyz.felismp.shoparchive.shared.SessionPreview
+import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.MoveEntryRequest
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
 import xyz.felismp.shoparchive.shared.CreateEntryRequest
@@ -214,6 +216,8 @@ class ApiClient(
         exchange(HttpMethod.Get, entryPath(date, id) + "/slips/$n", Auth.Token) { null }.bytes
 
     override suspend fun history(date: String, id: String): List<HistoryItem> = get(entryPath(date, id) + "/history")
+
+    override suspend fun slipUses(code: String): List<SlipUseDto> = get("/api/v1/slips/uses?code=${code.encodeURLParameter()}")
 
     override suspend fun closeSession(branch: String, id: String, request: CloseSessionRequest): SessionDto =
         post("/api/v1/sessions/${branch.encodeURLPath()}/${id.encodeURLPath()}/close", request)

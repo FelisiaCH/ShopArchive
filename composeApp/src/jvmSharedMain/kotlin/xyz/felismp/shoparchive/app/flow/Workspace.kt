@@ -63,7 +63,7 @@ class Workspace(
     val today = TodayState(env)
     val openDay = OpenDayState(env, this.today)
     val record = RecordState(env, this.today, compressor, reader)
-    val history = HistoryState(env, compressor)
+    val history = HistoryState(env, compressor, reader)
     val closeDay = CloseDayState(env, this.today)
     val reports = ReportsState(env)
     val export = ExportState(env)

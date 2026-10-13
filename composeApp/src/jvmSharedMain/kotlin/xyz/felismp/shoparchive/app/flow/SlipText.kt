@@ -1,9 +1,24 @@
 package xyz.felismp.shoparchive.app.flow
 
-/** Reads the text on a slip photo, on this device only (no network). */
+import kotlinx.coroutines.CancellationException
+import xyz.felismp.shoparchive.shared.isSlipCode
+
+/** What one read of a slip photo found: all the [text] on it, and the [code] (the whole text of the QR the bank prints on it, trimmed). Each is null when there is none. */
+data class SlipScan(val text: String?, val code: String?)
+
+/** Reads a slip photo, on this device only (no network). */
 fun interface SlipReader {
-    /** The text on the photo, or null when this device cannot read photos. */
-    suspend fun text(jpeg: ByteArray): String?
+    /** What is on the photo, or null when this device cannot read photos. */
+    suspend fun read(jpeg: ByteArray): SlipScan?
+}
+
+/** What [SlipReader.read] finds on [jpeg], with a code that cannot be one dropped; null when this device cannot read photos or the read failed (reading only helps, it never fails a slip). */
+suspend fun SlipReader.tryRead(jpeg: ByteArray): SlipScan? = try {
+    read(jpeg)?.let { it.copy(code = it.code?.takeIf(::isSlipCode)) }
+} catch (e: CancellationException) {
+    throw e
+} catch (_: Exception) {
+    null
 }
 
 /** The platform's reader: ML Kit on Android; the desktop has none. */

@@ -9,6 +9,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import io.ktor.server.testing.ApplicationTestBuilder
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -22,6 +23,7 @@ import xyz.felismp.shoparchive.server.auth.api
 import xyz.felismp.shoparchive.server.auth.authService
 import xyz.felismp.shoparchive.server.auth.deletePath
 import xyz.felismp.shoparchive.server.auth.errorCode
+import xyz.felismp.shoparchive.server.auth.errorReason
 import xyz.felismp.shoparchive.server.auth.getPath
 import xyz.felismp.shoparchive.server.auth.parsed
 import xyz.felismp.shoparchive.server.auth.postJson
@@ -29,12 +31,14 @@ import xyz.felismp.shoparchive.shared.AppliesTo
 import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.ErrorCode
+import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.HistoryItem
 import xyz.felismp.shoparchive.shared.LocalizedName
 import xyz.felismp.shoparchive.shared.MoveEntryRequest
 import xyz.felismp.shoparchive.shared.PROTOCOL_HEADER
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.ReauthRequest
+import xyz.felismp.shoparchive.shared.SlipUseDto
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
 import java.nio.file.Files
 import java.nio.file.Path
@@ -737,6 +741,145 @@ class EntriesApiTest {
                 setBody(multipartWithoutEntry())
             }
             assertEquals(HttpStatusCode.BadRequest, noEntryPart.status, noEntryPart.bodyAsText())
+        }
+    }
+
+    // --- slip codes ---
+
+    private val bcel = "00020101021133650004BCEL0108ONEPROOF0206ONEPAY0312BAGSTL8O2VVK041520260918668438563047AD6"
+    private val trust = "FQR26267XZTK2414"
+
+    private fun paid(vararg codes: String?) = newEntry(tenders = listOf(online("THB", "10"))).copy(slipCodes = codes.toList())
+
+    private suspend fun ApplicationTestBuilder.uses(token: String, code: String) =
+        getPath("/api/v1/slips/uses?code=$code", token).parsed(ListSerializer(SlipUseDto.serializer()))
+
+    @Test
+    fun aSlipKeepsTheCodeItWasSentWithAndAResendKeepsWhatWasStored() = env().run {
+        val noy = login("noy")
+        api {
+            openDay(noy)
+            val request = paid(bcel, null)
+
+            val e = createEntry(noy, request, listOf(jpeg(1), jpeg(2))).parsed(EntryDto.serializer())
+            val again = createEntry(noy, request.copy(slipCodes = listOf(trust, trust)), listOf(jpeg(1), jpeg(2))).parsed(EntryDto.serializer())
+            val shorter = createEntry(noy, paid(trust), listOf(jpeg(3), jpeg(4))).parsed(EntryDto.serializer())
+
+            assertEquals(listOf(bcel, null), e.slips.map { it.code })
+            assertEquals(e, again)
+            assertEquals(listOf(trust, null), shorter.slips.map { it.code })
+            val text = Files.readString(root.entryDir(e).resolve("entry.yml"))
+            assertTrue("    sha256: \"${e.slips[0].sha256}\"\n    code: \"$bcel\"\n  - file: \"slip-2.jpg\"\n    sha256: \"${e.slips[1].sha256}\"\n" in text, text)
+            assertEquals(listOf(bcel, null), entries(noy).first { it.id == e.id }.slips.map { it.code })
+        }
+    }
+
+    @Test
+    fun theUsesOfACodeAreTheEntriesNotDeletedThatCarryItOldestFirst() = env().run {
+        val noy = login("noy")
+        val boss = login("boss", branches = listOf("main", "market"))
+        api {
+            openDay(noy)
+            openDay(boss, "market")
+            val first = createEntry(noy, paid(bcel), listOf(jpeg(1))).parsed(EntryDto.serializer())
+            clock.advance(Duration.ofMinutes(1))
+            val other = createEntry(boss, paid(trust), listOf(jpeg(2))).parsed(EntryDto.serializer())
+            clock.advance(Duration.ofMinutes(1))
+            val second = createEntry(boss, paid(bcel, trust).copy(branch = "market"), listOf(jpeg(3), jpeg(4))).parsed(EntryDto.serializer())
+
+            val used = uses(noy, bcel)
+            assertEquals(listOf(first.id, second.id), used.map { it.id })
+            assertEquals(listOf("main", "market"), used.map { it.branch })
+            assertEquals(listOf(first.date, second.date), used.map { it.date })
+            assertEquals(listOf(first.createdBy, second.createdBy), used.map { it.createdBy })
+            assertEquals(listOf(first.createdAt, second.createdAt), used.map { it.createdAt })
+            assertEquals(listOf(other.id, second.id), uses(noy, trust).map { it.id }, "each code has its own entries")
+            assertTrue(uses(noy, "00000000").isEmpty())
+        }
+    }
+
+    @Test
+    fun theUsesFollowASlipTakenOffOrAddedAndAnEntryDeletedAndGotBackByHand() = env().run {
+        val noy = login("noy")
+        api {
+            openDay(noy)
+            val e = createEntry(noy, paid(bcel, trust), listOf(jpeg(1), jpeg(2))).parsed(EntryDto.serializer())
+
+            val taken = updateEntry(noy, e, update(e).copy(keepSlips = listOf("slip-2.jpg"))).parsed(EntryDto.serializer())
+            assertTrue(uses(noy, bcel).isEmpty(), "the slip that carried it is off the entry")
+            assertEquals(listOf(e.id), uses(noy, trust).map { it.id })
+
+            val added = updateEntry(noy, taken, update(taken).copy(addedSlipCodes = listOf(bcel)), listOf(jpeg(3))).parsed(EntryDto.serializer())
+            assertEquals(listOf(trust, bcel), added.slips.map { it.code })
+            assertEquals(listOf(e.id), uses(noy, bcel).map { it.id })
+
+            assertEquals(HttpStatusCode.OK, deletePath("/api/v1/entries/${e.date}/${e.id}", noy).status)
+            assertTrue(uses(noy, bcel).isEmpty() && uses(noy, trust).isEmpty(), "a deleted entry is not a use")
+
+            val file = root.entryDir(e).resolve("entry.yml")
+            Files.writeString(file, Files.readString(file).replace("deleted: true", "deleted: false"))
+            records!!.store.load()
+            assertEquals(listOf(e.id), uses(noy, bcel).map { it.id }, "an entry got back by hand is a use again")
+            assertEquals(listOf(e.id), uses(noy, trust).map { it.id })
+        }
+    }
+
+    @Test
+    fun theUsesAreBuiltAgainFromTheFilesWhenTheRecordsLoad() = env().run {
+        val boss = login("boss", op = true)
+        api {
+            openDay(boss)
+            val e = createEntry(boss, paid(bcel), listOf(jpeg(1))).parsed(EntryDto.serializer())
+            postJson("/api/v1/entries/${e.date}/${e.id}/move", MoveEntryRequest.serializer(), MoveEntryRequest("2026-10-02"), boss)
+            assertEquals(listOf("2026-10-02"), uses(boss, bcel).map { it.date })
+
+            records!!.store.load()
+
+            assertEquals(listOf(e.id), uses(boss, bcel).map { it.id })
+            assertEquals(listOf("2026-10-02"), uses(boss, bcel).map { it.date })
+        }
+    }
+
+    @Test
+    fun aBadSlipCodeOrMoreCodesThanSlipsIsRefusedBeforeAnythingIsWritten() = env().run {
+        val noy = login("noy")
+        api {
+            openDay(noy)
+            val tooMany = createEntry(noy, paid(bcel, trust), listOf(jpeg(1)))
+            val control = createEntry(noy, paid("ab\u0007cd"), listOf(jpeg(2)))
+            val empty = createEntry(noy, paid(""), listOf(jpeg(3)))
+            val long = createEntry(noy, paid("x".repeat(513)), listOf(jpeg(4)))
+            assertEquals(emptyList(), root.entryFolders())
+            for (refused in listOf(tooMany, control, empty, long)) {
+                assertEquals(HttpStatusCode.BadRequest, refused.status)
+                assertEquals(ErrorReasons.ENTRY_SLIP_CODE_INVALID, refused.errorReason())
+            }
+
+            val longest = createEntry(noy, paid("x".repeat(512)), listOf(jpeg(5)))
+            assertEquals(HttpStatusCode.Created, longest.status, "512 characters is the longest")
+            val e = longest.parsed(EntryDto.serializer())
+            val badEdit = updateEntry(noy, e, update(e).copy(addedSlipCodes = listOf(bcel, trust)), listOf(jpeg(6)))
+            assertEquals(HttpStatusCode.BadRequest, badEdit.status)
+            assertEquals(ErrorReasons.ENTRY_SLIP_CODE_INVALID, badEdit.errorReason())
+            assertEquals(1, entries(noy).single().slips.size)
+        }
+    }
+
+    @Test
+    fun askingForTheUsesNeedsTheNodeToRecordAndACodeThatCanBeOne() = env().run {
+        users.addUser("nobody", "none", listOf("main"))
+        users.setUserPermission("nobody", ENTRY_CREATE_NODE, false)
+        val noy = login("noy")
+        val nobody = login("nobody")
+        api {
+            assertEquals(HttpStatusCode.Forbidden, getPath("/api/v1/slips/uses?code=$bcel", nobody).status)
+            for (code in listOf("a%07b", "x".repeat(513))) {
+                val refused = getPath("/api/v1/slips/uses?code=$code", noy)
+                assertEquals(HttpStatusCode.BadRequest, refused.status, code)
+                assertEquals(ErrorReasons.ENTRY_SLIP_CODE_INVALID, refused.errorReason())
+            }
+            assertEquals(HttpStatusCode.BadRequest, getPath("/api/v1/slips/uses", noy).status)
+            assertEquals(HttpStatusCode.Unauthorized, getPath("/api/v1/slips/uses?code=$bcel").status)
         }
     }
 
