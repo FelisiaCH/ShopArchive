@@ -239,7 +239,7 @@ class FakeRecordsApi : RecordsApi {
     var createdNoteDate = "2026-10-04"
     var unreadAnswer = NotesUnread(0)
     var markGate: CompletableDeferred<Unit>? = null
-    /** Holds a `notes` answer for that date until completed. */
+    /** Holds the next `notes` answer for that date until completed; the answer is what the list held when it was asked. */
     val notesGates = mutableMapOf<String, CompletableDeferred<Unit>>()
     var unreadError: Exception? = null
     val noteCalls = mutableListOf<Pair<String, String>>()
@@ -252,9 +252,10 @@ class FakeRecordsApi : RecordsApi {
 
     override suspend fun notes(branch: String, date: String): List<NoteDto> {
         noteCalls += branch to date
-        notesGates[date]?.await()
+        val answer = noteList.filter { it.branch == branch && it.date == date }
+        notesGates.remove(date)?.await()
         notesError?.let { throw it }
-        return noteList.filter { it.branch == branch && it.date == date }
+        return answer
     }
 
     override suspend fun createNote(request: CreateNoteRequest): NoteDto {

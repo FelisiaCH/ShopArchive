@@ -67,6 +67,8 @@ class NotesState(private val env: Env) {
     private val postFailure = MutableStateFlow<Failure?>(null)
     private val markFailure = MutableStateFlow<Failure?>(null)
     private val marking = MutableStateFlow<Set<String>>(emptySet())
+    /** Counts the loads, so only the latest one's answer is kept. */
+    private val loads = java.util.concurrent.atomic.AtomicInteger()
 
     /** Made when a post starts and kept while the same text is sent again, so a resend after a lost answer is the same note. */
     private var pendingId: String? = null
@@ -117,8 +119,10 @@ class NotesState(private val env: Env) {
         loading.value = true
         publish()
         val day = date.value
-        // Another load (a post, a reload) may run beside this one: an answer for a branch or day no longer shown is dropped.
-        fun stillShown() = env.branch.value == branch && date.value == day
+        // Another load (a post, a reload, a change of day) may run beside this one: only the latest one's answer is kept,
+        // so neither another day's list nor an older list of this day replaces what is shown.
+        val ticket = loads.incrementAndGet()
+        fun stillShown() = loads.get() == ticket && env.branch.value == branch && date.value == day
         try {
             val list = sorted(env.calls.run { env.api.notes(branch, day.toString()) })
             if (!stillShown()) return

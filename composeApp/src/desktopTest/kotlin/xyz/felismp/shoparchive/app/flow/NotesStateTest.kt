@@ -227,13 +227,27 @@ class NotesStateTest {
         val h = harness(backgroundScope)
         h.api.noteList = listOf(note("today-note"), note("yesterday-note", date = "2026-10-03"))
         val state = NotesState(h.env)
-        h.api.notesGates["2026-10-04"] = CompletableDeferred()
+        val slow = CompletableDeferred<Unit>().also { h.api.notesGates["2026-10-04"] = it }
         state.reload()
         state.previousDay()
         assertEquals(listOf("yesterday-note"), state.ui.value.notes!!.map { it.id })
-        h.api.notesGates.getValue("2026-10-04").complete(Unit)
+        slow.complete(Unit)
         assertEquals(listOf("yesterday-note"), state.ui.value.notes!!.map { it.id }, "the slow answer was for today")
         assertFalse(state.ui.value.loading)
+    }
+
+    @Test fun aSlowOlderLoadOfTheSameDayDoesNotReplaceANewerOne() = runTest(UnconfinedTestDispatcher()) {
+        val h = harness(backgroundScope)
+        h.api.noteList = listOf(note("a"))
+        val state = NotesState(h.env)
+        val slow = CompletableDeferred<Unit>().also { h.api.notesGates["2026-10-04"] = it }
+        state.reload()
+        state.previousDay()
+        h.api.noteList = h.api.noteList + note("b", "10:00")
+        state.nextDay()
+        assertEquals(listOf("b", "a"), state.ui.value.notes!!.map { it.id })
+        slow.complete(Unit)
+        assertEquals(listOf("b", "a"), state.ui.value.notes!!.map { it.id }, "the older answer did not have b")
     }
 
     @Test fun aMarkFailureForADayThatIsNoLongerShownIsNotShown() = runTest(UnconfinedTestDispatcher()) {
