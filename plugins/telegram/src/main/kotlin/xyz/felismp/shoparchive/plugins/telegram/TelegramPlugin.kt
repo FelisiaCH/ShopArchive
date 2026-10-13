@@ -1,5 +1,6 @@
 package xyz.felismp.shoparchive.plugins.telegram
 
+import xyz.felismp.shoparchive.api.NotificationImages
 import xyz.felismp.shoparchive.api.Notifier
 import xyz.felismp.shoparchive.api.plugin.ShopPlugin
 
@@ -33,7 +34,7 @@ class TelegramPlugin : ShopPlugin() {
             return
         }
         if (!registered) {
-            val notifier = TelegramNotifier({ settings }, JdkHttpTransport(), FileSentLedger(context.dataFolder.resolve("pending")), log = { context.logger.debug(it) })
+            val notifier = TelegramNotifier({ settings }, JdkHttpTransport(), FileSentLedger(context.dataFolder.resolve("pending")), images = { context.services.get(NotificationImages::class.java) }, log = { context.logger.debug(it) })
             context.services.register(Notifier::class.java, notifier, TELEGRAM_PRIORITY, context.name)
             registered = true
             context.logger.info("sending ${s.events.joinToString()} to ${s.chatIds.size} chat(s) in ${s.language}")

@@ -179,7 +179,7 @@ internal class DefaultEntryService(
         } catch (e: NoSuchFileException) {
             throw ApiError(409, ErrorCode.ENTRY_BROKEN, "The file ${slip.file} of this entry is missing. The admin can see more on the server console.")
         }
-        return SlipFile(bytes, if (slip.file.endsWith(".png")) "image/png" else "image/jpeg")
+        return SlipFile(bytes, slipContentType(slip.file))
     }
 
     override fun history(principal: Principal, date: String, id: String): List<HistoryItem> {

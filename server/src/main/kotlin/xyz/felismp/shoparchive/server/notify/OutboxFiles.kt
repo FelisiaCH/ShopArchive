@@ -94,7 +94,7 @@ internal fun parseOutboxItem(name: String, content: String): OutboxItem {
     }
     val notification = Notification(
         id = need("id"), code = need("code"), event = need("event"), createdAt = need("created"), branch = present("branch"),
-        user = optional("user").orEmpty(), locale = need("locale"), fields = fields, attempt = 1, resendOf = optional("resend-of"),
+        user = optional("user").orEmpty(), locale = need("locale"), fields = fields, attempt = 1, resendOf = optional("resend-of"), subject = optional("subject"),
     )
     return OutboxItem(notification, state, count("attempts"), count("failures"), optional("last-attempt"), next, optional("sent-at"), optional("last-error"), optional("subject"))
 }

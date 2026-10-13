@@ -8,6 +8,7 @@ import xyz.felismp.shoparchive.api.NoteCreatedEvent
 import xyz.felismp.shoparchive.api.Notification
 import xyz.felismp.shoparchive.api.ShopEvent
 import xyz.felismp.shoparchive.api.ShopEventTypes
+import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.wire
 import java.math.BigDecimal
 import java.text.DecimalFormatSymbols
@@ -49,8 +50,11 @@ private fun entryFields(event: EntryCreatedEvent, locale: Locale): Map<String, S
         "category.th" to (names?.th ?: ""),
         "category.en" to (names?.en ?: ""),
         "item" to entry.item,
+        "note" to entry.note,
         "amount" to entry.tenders.joinToString(", ") { it.amount },
         "currency" to entry.tenders.joinToString(", ") { it.currency },
+        // Read at a glance: signed by type and grouped as the app shows money, each amount with its own currency.
+        "money" to entry.tenders.joinToString(", ") { (if (entry.type == EntryType.INCOME) "+" else "-") + groupThousands(it.amount, locale) + " " + it.currency },
         "branch" to event.branchName,
         "user" to entry.createdBy.name,
         "time" to entry.createdAt,

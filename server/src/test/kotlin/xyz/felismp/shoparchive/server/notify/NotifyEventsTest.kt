@@ -61,7 +61,7 @@ class NotifyEventsTest {
             assertEquals(
                 mapOf(
                     "type" to "income", "category" to "ເຄື່ອງດື່ມ", "category.key" to "drinks", "category.lo" to "ເຄື່ອງດື່ມ", "category.th" to "เครื่องดื่ม", "category.en" to "Drinks",
-                    "item" to "coffee", "amount" to "150000", "currency" to "LAK", "branch" to "Main Shop", "user" to "noy", "time" to n.createdAt, "date" to "2026-10-03",
+                    "item" to "coffee", "note" to "", "amount" to "150000", "currency" to "LAK", "money" to "+150.000 LAK", "branch" to "Main Shop", "user" to "noy", "time" to n.createdAt, "date" to "2026-10-03",
                 ),
                 n.fields,
             )
@@ -80,6 +80,7 @@ class NotifyEventsTest {
             assertEquals("", fields["category"])
             assertEquals("1000, 20.50", fields["amount"])
             assertEquals("LAK, THB", fields["currency"])
+            assertEquals("+1.000 LAK, +20,50 THB", fields["money"])
         }
     }
 

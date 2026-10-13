@@ -7,11 +7,11 @@ interface TemplateRenderer {
     fun render(template: String, notification: Notification, language: String): String
 }
 
-/** The words `{type}` becomes, by language. */
+/** The words `{type}` becomes, by language; the coloured mark tells income from expense when a chat is only skimmed. */
 private val TYPE_WORDS = mapOf(
-    "lo" to mapOf("income" to "ລາຍຮັບ", "expense" to "ລາຍຈ່າຍ"),
-    "th" to mapOf("income" to "รายรับ", "expense" to "รายจ่าย"),
-    "en" to mapOf("income" to "Income", "expense" to "Expense"),
+    "lo" to mapOf("income" to "🟢 ລາຍຮັບ", "expense" to "🔴 ລາຍຈ່າຍ"),
+    "th" to mapOf("income" to "🟢 รายรับ", "expense" to "🔴 รายจ่าย"),
+    "en" to mapOf("income" to "🟢 Income", "expense" to "🔴 Expense"),
 )
 
 /**
@@ -42,6 +42,9 @@ class PlaceholderRenderer : TemplateRenderer {
         "code" -> n.code
         "type" -> n.fields["type"]?.let { TYPE_WORDS[language]?.get(it) ?: it } ?: ""
         "time" -> n.fields["time"]?.let(::shortTime) ?: ""
+        // A message queued by a server that did not make `money` yet still shows its amounts.
+        "money" -> n.fields["money"] ?: listOfNotNull(n.fields["amount"], n.fields["currency"]).takeIf { it.size == 2 }
+            ?.let { (amounts, currencies) -> amounts.split(", ").zip(currencies.split(", ")).joinToString(", ") { (a, c) -> "$a $c" } } ?: ""
         else -> n.fields[name] ?: ""
     }
 
