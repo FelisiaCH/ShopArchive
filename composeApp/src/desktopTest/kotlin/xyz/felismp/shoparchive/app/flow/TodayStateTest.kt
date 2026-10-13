@@ -13,6 +13,7 @@ import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.EntryCreatedMessage
 import xyz.felismp.shoparchive.shared.EntryDeletedMessage
 import xyz.felismp.shoparchive.shared.EntryUpdatedMessage
+import xyz.felismp.shoparchive.shared.NoteChangedMessage
 import xyz.felismp.shoparchive.shared.PermissionNodes
 import xyz.felismp.shoparchive.shared.SayMessage
 import xyz.felismp.shoparchive.shared.SessionStatus
@@ -195,5 +196,46 @@ class TodayStateTest {
         assertTrue(data.showStats)
         assertNull(data.mine)
         assertTrue(h.api.entryFilters.isEmpty())
+    }
+
+    // ---- slips and notes ----
+
+    @Test fun theDashboardsSlipCountIsKept() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(backgroundScope)
+        h.api.dashboard = DashboardDto("2026-10-04", "2026-10-04", emptyList(), emptyList(), slips = 7)
+        assertEquals(7, TodayState(h.env).ui.value.data!!.slips)
+    }
+
+    @Test fun aHolderOfTheReadNodeGetsTheUnreadCountOfTheDaysDateAndALiveNoteMessageAsksAgain() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(backgroundScope)
+        h.api.unreadAnswer = 3
+        val today = TodayState(h.env)
+        assertEquals(3, today.ui.value.data!!.unreadNotes)
+        assertEquals(listOf("main" to "2026-10-04"), h.api.unreadCalls)
+        h.api.unreadAnswer = 4
+        h.messages.emit(NoteChangedMessage("market", "2026-10-04"))
+        assertEquals(1, h.api.unreadCalls.size, "another branch")
+        h.messages.emit(NoteChangedMessage("main", "2026-10-04"))
+        assertEquals(4, today.ui.value.data!!.unreadNotes)
+    }
+
+    @Test fun theUnreadCountIsForTheOpenDaysDate() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(backgroundScope)
+        h.api.current = h.api.session("s0", date = "2026-10-03")
+        TodayState(h.env)
+        assertEquals(listOf("main" to "2026-10-03"), h.api.unreadCalls)
+    }
+
+    @Test fun withoutTheReadNodeNoCountIsAskedForAndAFailedCountLeavesTheRestOfTodayAlone() = runTest(UnconfinedTestDispatcher()) {
+        val plain = Harness(backgroundScope, ConfigState.Ready(testConfig(permissions = listOf(PermissionNodes.DASHBOARD_VIEW, PermissionNodes.NOTE_CREATE))))
+        assertNull(TodayState(plain.env).ui.value.data!!.unreadNotes)
+        assertTrue(plain.api.unreadCalls.isEmpty())
+
+        val failing = Harness(backgroundScope)
+        failing.api.unreadError = ClientError.Unreachable()
+        val data = TodayState(failing.env).ui.value.data!!
+        assertNull(data.unreadNotes)
+        assertNull(data.statsFailure)
+        assertTrue(data.showStats)
     }
 }

@@ -1,11 +1,13 @@
 package xyz.felismp.shoparchive.app.client
 
 import xyz.felismp.shoparchive.shared.CreateEntryRequest
+import xyz.felismp.shoparchive.shared.CreateNoteRequest
 import xyz.felismp.shoparchive.shared.DashboardDto
 import xyz.felismp.shoparchive.shared.CloseSessionRequest
 import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.HistoryItem
+import xyz.felismp.shoparchive.shared.NoteDto
 import xyz.felismp.shoparchive.shared.NotificationDto
 import xyz.felismp.shoparchive.shared.SessionPreview
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
@@ -92,6 +94,21 @@ interface RecordsApi {
 
     /** The entries of the range as a CSV or XLSX file. [format] is `csv` or `xlsx`. */
     suspend fun export(from: String, to: String, branch: String, format: String): ExportFile
+
+    /** The day notes of [branch] on [date] (`yyyy-MM-dd`) the signed-in user may see, oldest first. */
+    suspend fun notes(branch: String, date: String): List<NoteDto>
+
+    /** Leaves the note; sending the same id again returns the note already stored. */
+    suspend fun createNote(request: CreateNoteRequest): NoteDto
+
+    /** Marks one note read by the signed-in user. Needs `shoparchive.note.read`. */
+    suspend fun markNoteRead(id: String): NoteDto
+
+    /** Marks the notes of others on [date] in [branch] read; answers the day's notes. Needs `shoparchive.note.read`. */
+    suspend fun markNotesRead(branch: String, date: String): List<NoteDto>
+
+    /** How many notes of others on [date] in [branch] the signed-in user has not read. Needs `shoparchive.note.read`. */
+    suspend fun unreadNotes(branch: String, date: String): Int
 
     /** Runs [line] like the server console does and answers what it said, one entry per line. Needs the node of the command and a recent PIN or password. */
     suspend fun runCommand(line: String): List<String>

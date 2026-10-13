@@ -15,6 +15,7 @@ import xyz.felismp.shoparchive.shared.AppliesTo
 import xyz.felismp.shoparchive.shared.CategoryDto
 import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.CreateEntryRequest
+import xyz.felismp.shoparchive.shared.CreateNoteRequest
 import xyz.felismp.shoparchive.shared.CurrencyInfo
 import xyz.felismp.shoparchive.shared.DashboardDto
 import xyz.felismp.shoparchive.shared.CloseSessionRequest
@@ -25,6 +26,8 @@ import xyz.felismp.shoparchive.shared.SlipDto
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.LocalizedName
+import xyz.felismp.shoparchive.shared.NoteDto
+import xyz.felismp.shoparchive.shared.NoteRead
 import xyz.felismp.shoparchive.shared.OpenSessionRequest
 import xyz.felismp.shoparchive.shared.OpenSessionResponse
 import xyz.felismp.shoparchive.shared.RecordsPolicy
@@ -223,6 +226,61 @@ class FakeRecordsApi : RecordsApi {
         return exportFile
     }
 
+    // ---- Notes ----
+
+    /** The notes the fake "server" holds for every branch and day; `notes` answers the ones of the branch and date asked. The person is `u1`. */
+    var noteList: List<NoteDto> = emptyList()
+    var notesError: Exception? = null
+    var createNoteError: Exception? = null
+    var createNoteGate: CompletableDeferred<Unit>? = null
+    var markNoteError: Exception? = null
+    /** The business date the fake "server" puts a new note on (the open day's, which can be the day before). */
+    var createdNoteDate = "2026-10-04"
+    var unreadAnswer = 0
+    var unreadError: Exception? = null
+    val noteCalls = mutableListOf<Pair<String, String>>()
+    val createdNotes = mutableListOf<CreateNoteRequest>()
+    val noteReads = mutableListOf<String>()
+    val noteReadAlls = mutableListOf<Pair<String, String>>()
+    val unreadCalls = mutableListOf<Pair<String, String>>()
+
+    private fun readByMe(note: NoteDto) = if (note.reads.any { it.by.id == "u1" }) note else note.copy(reads = note.reads + NoteRead(alice, "2026-10-04T10:00:00+07:00"))
+
+    override suspend fun notes(branch: String, date: String): List<NoteDto> {
+        noteCalls += branch to date
+        notesError?.let { throw it }
+        return noteList.filter { it.branch == branch && it.date == date }
+    }
+
+    override suspend fun createNote(request: CreateNoteRequest): NoteDto {
+        createdNotes += request
+        createNoteGate?.await()
+        createNoteError?.let { throw it }
+        return noteList.firstOrNull { it.id == request.id }
+            ?: NoteDto(request.id, request.branch, createdNoteDate, request.text.trim(), alice, "2026-10-04T09:00:00+07:00").also { noteList = noteList + it }
+    }
+
+    override suspend fun markNoteRead(id: String): NoteDto {
+        noteReads += id
+        markNoteError?.let { throw it }
+        val done = readByMe(noteList.first { it.id == id })
+        noteList = noteList.map { if (it.id == id) done else it }
+        return done
+    }
+
+    override suspend fun markNotesRead(branch: String, date: String): List<NoteDto> {
+        noteReadAlls += branch to date
+        markNoteError?.let { throw it }
+        noteList = noteList.map { if (it.branch == branch && it.date == date && it.createdBy.id != "u1") readByMe(it) else it }
+        return noteList.filter { it.branch == branch && it.date == date }
+    }
+
+    override suspend fun unreadNotes(branch: String, date: String): Int {
+        unreadCalls += branch to date
+        unreadError?.let { throw it }
+        return unreadAnswer
+    }
+
     var commandError: Exception? = null
     var commandAnswer: (String) -> List<String> = { listOf("ran $it") }
     var completions: List<String> = emptyList()
@@ -267,7 +325,7 @@ fun testConfig(
 
 /** Every node the app looks at, held: the person the screen tests play is allowed everything unless a test says otherwise. */
 val ALL_NODES = with(xyz.felismp.shoparchive.shared.PermissionNodes) {
-    listOf(ENTRY_CREATE, ENTRY_VIEW_OWN, ENTRY_VIEW_ALL, ENTRY_EDIT_OWN, ENTRY_EDIT_ALL, ENTRY_DELETE_OWN, ENTRY_DELETE_ALL, DAY_OPEN, DAY_CLOSE, EXPORT, DASHBOARD_VIEW, NOTIFICATIONS_VIEW, NOTIFICATIONS_SEND, COMMAND_PREFIX + "status")
+    listOf(ENTRY_CREATE, ENTRY_VIEW_OWN, ENTRY_VIEW_ALL, ENTRY_EDIT_OWN, ENTRY_EDIT_ALL, ENTRY_DELETE_OWN, ENTRY_DELETE_ALL, DAY_OPEN, DAY_CLOSE, EXPORT, DASHBOARD_VIEW, NOTE_CREATE, NOTE_READ, NOTIFICATIONS_VIEW, NOTIFICATIONS_SEND, COMMAND_PREFIX + "status")
 }
 
 /** Everything a screen state holder needs, wired to fakes. */

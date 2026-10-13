@@ -350,4 +350,34 @@
     <plurals name="server_users">
         <item quantity="other">ผู้ใช้ %1$d คน</item>
     </plurals>
+    <string name="nav_notes">โน้ต</string>
+    <string name="notes_title">โน้ตถึงเจ้าของ</string>
+    <string name="notes_sub">โน้ตประจำวัน จากพนักงานถึงเจ้าของ</string>
+    <string name="notes_list_h">โน้ตประจำวัน</string>
+    <string name="notes_unread_n">ยังไม่อ่าน %1$d</string>
+    <string name="notes_unread">ยังไม่อ่าน</string>
+    <string name="notes_mark_read">ทำเครื่องหมายว่าอ่านแล้ว</string>
+    <string name="notes_mark_all">อ่านทั้งหมด</string>
+    <string name="notes_read_at">อ่านแล้ว %1$s</string>
+    <string name="notes_seen_owner">เจ้าของอ่านแล้ว %1$s</string>
+    <string name="notes_not_seen">เจ้าของยังไม่ได้อ่าน</string>
+    <string name="notes_empty_h">ยังไม่มีโน้ตประจำวัน</string>
+    <string name="notes_empty_p">พนักงานฝากโน้ตถึงเจ้าของได้ที่นี่ เขียนโน้ตแรกได้เลย</string>
+    <string name="notes_composer">เขียนโน้ต</string>
+    <string name="notes_post">โพสต์โน้ต</string>
+    <string name="notes_posting">กำลังโพสต์…</string>
+    <string name="notes_post_failed_h">โพสต์โน้ตไม่สำเร็จ</string>
+    <string name="notes_post_failed_p">ข้อความยังอยู่ ตรวจสอบการเชื่อมต่อแล้วลองใหม่</string>
+    <string name="notes_foot">โน้ตจะอยู่กับวันที่เขียน เหตุผลจึงอยู่ข้างตัวเลขเสมอ</string>
+    <string name="notes_prev_day">วันก่อนหน้า</string>
+    <string name="notes_next_day">วันถัดไป</string>
+    <string name="notes_load_failed">โหลดโน้ตไม่สำเร็จ</string>
+    <string name="notes_mark_failed">ทำเครื่องหมายว่าอ่านแล้วไม่สำเร็จ</string>
+    <string name="today_slips">สลิปที่แนบ</string>
+    <string name="today_notes">โน้ตถึงเจ้าของ</string>
+    <string name="today_notes_unread">ยังไม่ได้อ่าน</string>
+    <string name="notif_event_note">โน้ตใหม่</string>
+    <plurals name="notes_count">
+        <item quantity="other">%1$d โน้ต</item>
+    </plurals>
 </resources>

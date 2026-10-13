@@ -350,4 +350,34 @@
     <plurals name="server_users">
         <item quantity="other">ຜູ້ໃຊ້ %1$d ຄົນ</item>
     </plurals>
+    <string name="nav_notes">ບັນທຶກຫາເຈົ້າຂອງ</string>
+    <string name="notes_title">ບັນທຶກຫາເຈົ້າຂອງ</string>
+    <string name="notes_sub">ບັນທຶກປະຈຳວັນ ຈາກພະນັກງານຫາເຈົ້າຂອງ</string>
+    <string name="notes_list_h">ບັນທຶກປະຈຳວັນ</string>
+    <string name="notes_unread_n">ຍັງບໍ່ໄດ້ອ່ານ %1$d</string>
+    <string name="notes_unread">ຍັງບໍ່ໄດ້ອ່ານ</string>
+    <string name="notes_mark_read">ໝາຍວ່າອ່ານແລ້ວ</string>
+    <string name="notes_mark_all">ອ່ານທັງໝົດ</string>
+    <string name="notes_read_at">ອ່ານແລ້ວ %1$s</string>
+    <string name="notes_seen_owner">ເຈົ້າຂອງອ່ານແລ້ວ %1$s</string>
+    <string name="notes_not_seen">ເຈົ້າຂອງຍັງບໍ່ໄດ້ອ່ານ</string>
+    <string name="notes_empty_h">ຍັງບໍ່ມີບັນທຶກປະຈຳວັນ</string>
+    <string name="notes_empty_p">ພະນັກງານຝາກບັນທຶກຫາເຈົ້າຂອງໄດ້ຢູ່ນີ້. ຂຽນບັນທຶກທຳອິດໄດ້ເລີຍ</string>
+    <string name="notes_composer">ຂຽນບັນທຶກ</string>
+    <string name="notes_post">ສົ່ງບັນທຶກ</string>
+    <string name="notes_posting">ກຳລັງສົ່ງ…</string>
+    <string name="notes_post_failed_h">ສົ່ງບັນທຶກບໍ່ສຳເລັດ</string>
+    <string name="notes_post_failed_p">ຂໍ້ຄວາມຍັງຢູ່. ກວດການເຊື່ອມຕໍ່ ແລ້ວລອງໃໝ່</string>
+    <string name="notes_foot">ບັນທຶກຈະຢູ່ກັບວັນທີ່ຂຽນ ເພື່ອໃຫ້ເຫດຜົນຢູ່ຂ້າງຕົວເລກ</string>
+    <string name="notes_prev_day">ວັນກ່ອນໜ້າ</string>
+    <string name="notes_next_day">ວັນຖັດໄປ</string>
+    <string name="notes_load_failed">ໂຫຼດບັນທຶກບໍ່ສຳເລັດ</string>
+    <string name="notes_mark_failed">ໝາຍວ່າອ່ານແລ້ວບໍ່ສຳເລັດ</string>
+    <string name="today_slips">ສະລິບທີ່ຕິດ</string>
+    <string name="today_notes">ບັນທຶກຫາເຈົ້າຂອງ</string>
+    <string name="today_notes_unread">ຍັງບໍ່ໄດ້ອ່ານ</string>
+    <string name="notif_event_note">ບັນທຶກໃໝ່</string>
+    <plurals name="notes_count">
+        <item quantity="other">%1$d ບັນທຶກ</item>
+    </plurals>
 </resources>

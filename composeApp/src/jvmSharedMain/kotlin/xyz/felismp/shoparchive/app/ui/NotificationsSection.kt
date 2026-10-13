@@ -50,6 +50,7 @@ private fun Message(ws: Workspace, n: NotificationDto, canSend: Boolean, enabled
                 "day.closed" -> stringResource(Res.string.notif_event_day)
                 "entry.created" -> stringResource(Res.string.notif_event_entry)
                 "device.new" -> stringResource(Res.string.notif_event_device)
+                "note.created" -> stringResource(Res.string.notif_event_note)
                 else -> n.event
             } + if (branch.isEmpty()) "" else " · $branch", // device.new of a user with no branch has none
             TextRole.Title,

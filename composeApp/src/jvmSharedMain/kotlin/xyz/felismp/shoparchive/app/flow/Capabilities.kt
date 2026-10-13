@@ -16,6 +16,8 @@ class Capabilities(private val held: Set<String>, private val editWindowDays: In
     val closeDay: Boolean get() = PermissionNodes.DAY_CLOSE in held
     val dashboard: Boolean get() = PermissionNodes.DASHBOARD_VIEW in held
     val export: Boolean get() = PermissionNodes.EXPORT in held
+    val noteCreate: Boolean get() = PermissionNodes.NOTE_CREATE in held
+    val noteRead: Boolean get() = PermissionNodes.NOTE_READ in held
     val viewNotifications: Boolean get() = PermissionNodes.NOTIFICATIONS_VIEW in held
     val sendNotifications: Boolean get() = PermissionNodes.NOTIFICATIONS_SEND in held
 
@@ -58,6 +60,7 @@ class Capabilities(private val held: Set<String>, private val editWindowDays: In
         Destination.HISTORY -> viewEntries
         Destination.REPORTS -> reports
         Destination.CONSOLE -> console
+        Destination.NOTES -> noteCreate || noteRead
     }
 
     companion object {
