@@ -956,7 +956,7 @@ class EntriesApiTest {
             val created = createEntry(noy, request)
             assertEquals(HttpStatusCode.Created, created.status)
             val e = created.parsed(EntryDto.serializer())
-            val transfer = TransferDto(bcel, "BCEL", "850000", "LAK", "2026-09-18 19:18:42", "Go Mobile", "160-12-00-XXXXXX78-001", true, "Noy S", "010-12-00-XXXXXX12-001")
+            val transfer = TransferDto(bcel, "BCEL", "850000", "LAK", "2026-09-18 19:18:42", "Go Mobile", "160-12-00-XXXXXX78-001", true, "Noy S", "010-12-00-XXXXXX12-001", scanned = true)
             assertEquals(listOf(transfer), e.transfers)
             assertEquals(emptyList(), e.slips)
             assertEquals(listOf(transfer), entries(noy).single().transfers)
@@ -978,8 +978,8 @@ class EntriesApiTest {
             "2026-09-18T19:20:00+07:00", "2026-09-18T19:20:00+07:00", false, listOf(Tender("LAK", xyz.felismp.shoparchive.shared.TenderMethod.ONLINE, Amount(850000, 0))),
             emptyList(), null,
             listOf(
-                Transfer(bcel, "BCEL", "850000", "LAK", "2026-09-18 19:18:42", "null", "160", null, null, null),
-                Transfer(trust, "BCEL", "1", "LAK", "t", "Go \"Mobile\"", "160", false, "Noy", "010"),
+                Transfer(bcel, "BCEL", "850000", "LAK", "2026-09-18 19:18:42", "null", "160", null, null, null, false),
+                Transfer(trust, "BCEL", "1", "LAK", "t", "Go \"Mobile\"", "160", false, "Noy", "010", true),
             ),
         )
         assertEquals(entry, parseEntry(renderEntry(entry), exponents))
@@ -1046,6 +1046,24 @@ class EntriesApiTest {
             assertEquals(emptyList(), asked, "an edit that adds no slip asks the bank nothing")
             assertEquals(emptyList(), uses(noy, trust), "the removed slip's code is free again")
             assertEquals("transfers", getPath("/api/v1/entries/${after.date}/${after.id}/history", noy).parsed(ListSerializer(HistoryItem.serializer())).last().changes.last().field)
+        }
+    }
+
+    @Test
+    fun aSlipPhotoReplacedByOneWithTheSameCodeKeepsItsTransferAndAScannedTransferOutlivesAPhotoOfIt() = env().run {
+        val noy = login("noy")
+        bank(mapOf(bcel to confirmed, trust to confirmed.copy(amount = "1000")))
+        api {
+            openDay(noy)
+            val photo = createEntry(noy, paid(bcel), listOf(jpeg(1))).parsed(EntryDto.serializer())
+            val replaced = updateEntry(noy, photo, update(photo).copy(keepSlips = emptyList(), addedSlipCodes = listOf(bcel)), listOf(jpeg(2))).parsed(EntryDto.serializer())
+            assertEquals(listOf(bcel), replaced.transfers.map { it.code })
+
+            val scan = createEntry(noy, paid(trust).copy(transferCodes = listOf(bcel)), listOf(jpeg(3))).parsed(EntryDto.serializer())
+            val withPhoto = updateEntry(noy, scan, update(scan).copy(addedSlipCodes = listOf(bcel)), listOf(jpeg(4))).parsed(EntryDto.serializer())
+            val photoGone = updateEntry(noy, withPhoto, update(withPhoto).copy(keepSlips = listOf("slip-1.jpg"))).parsed(EntryDto.serializer())
+            assertEquals(listOf(trust, bcel), photoGone.transfers.map { it.code })
+            assertTrue(photoGone.transfers.last().scanned)
         }
     }
 

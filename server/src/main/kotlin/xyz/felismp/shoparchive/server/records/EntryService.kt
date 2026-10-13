@@ -234,7 +234,7 @@ internal class DefaultEntryService(
             val check = askBank(code)?.takeIf { it.known } ?: return@mapNotNull null
             Transfer(
                 code, check.source, check.amount ?: return@mapNotNull null, check.currency ?: return@mapNotNull null, check.time ?: return@mapNotNull null,
-                check.to ?: return@mapNotNull null, check.toAccount ?: return@mapNotNull null, check.toShop, check.from, check.fromAccount,
+                check.to ?: return@mapNotNull null, check.toAccount ?: return@mapNotNull null, check.toShop, check.from, check.fromAccount, code in scanned,
             )
         }
         if (scanned.any { code -> confirmed.none { it.code == code } }) {
@@ -273,9 +273,10 @@ internal class DefaultEntryService(
             val kept = request.keepSlips?.let { keep ->
                 keep.map { file -> entry.slips.firstOrNull { it.file == file } ?: throw badRequest("This entry has no slip '$file' to keep.", ErrorReasons.ENTRY_SLIP_UNKNOWN) }.distinct()
             } ?: entry.slips
-            // The transfer of a slip that is removed goes with it; a transfer scanned without a photo stays.
-            val removedCodes = entry.slips.filter { it !in kept }.mapNotNull { it.code }.toSet() - kept.mapNotNull { it.code }.toSet()
-            val transfers = entry.transfers.filter { it.code !in removedCodes } + confirmed.filter { c -> entry.transfers.none { it.code == c.code } }
+            // The transfer of a slip that is removed goes with it, unless another slip has its code; a transfer scanned without a photo stays.
+            val slipCodes = (kept.mapNotNull { it.code } + codes.filterNotNull()).toSet()
+            val stay = entry.transfers.filter { it.scanned || it.code in slipCodes }
+            val transfers = stay + confirmed.filter { c -> stay.none { it.code == c.code } }
             // An unchanged category stays acceptable even if it was archived or retyped since.
             val unchangedCategory = request.category != null && request.category == entry.category
             checkEntry(

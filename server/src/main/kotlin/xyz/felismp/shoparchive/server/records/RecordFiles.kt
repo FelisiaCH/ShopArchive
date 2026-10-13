@@ -51,9 +51,9 @@ internal data class Slip(val file: String, val sha256: String, val code: String?
 /** A transfer the bank confirmed when the entry was saved; see [TransferDto]. [amount] is in its [currency]'s format as the bank plugin wrote it. */
 internal data class Transfer(
     val code: String, val source: String, val amount: String, val currency: String, val time: String,
-    val to: String, val toAccount: String, val toShop: Boolean?, val from: String?, val fromAccount: String?,
+    val to: String, val toAccount: String, val toShop: Boolean?, val from: String?, val fromAccount: String?, val scanned: Boolean,
 ) {
-    fun toDto() = TransferDto(code, source, amount, currency, time, to, toAccount, toShop, from, fromAccount)
+    fun toDto() = TransferDto(code, source, amount, currency, time, to, toAccount, toShop, from, fromAccount, scanned)
 }
 
 internal fun sha256Hex(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
@@ -173,7 +173,7 @@ internal fun renderEntry(e: Entry): String = buildString {
     for (t in e.transfers) {
         append("  - code: ${quoted(t.code)}\n    source: ${quoted(t.source)}\n    amount: ${quoted(t.amount)}\n    currency: ${quoted(t.currency)}\n")
         append("    time: ${quoted(t.time)}\n    to: ${quoted(t.to)}\n    to-account: ${quoted(t.toAccount)}\n    to-shop: ${t.toShop ?: "null"}\n")
-        append("    from: ${t.from?.let(::quoted) ?: "null"}\n    from-account: ${t.fromAccount?.let(::quoted) ?: "null"}\n")
+        append("    from: ${t.from?.let(::quoted) ?: "null"}\n    from-account: ${t.fromAccount?.let(::quoted) ?: "null"}\n    scanned: ${t.scanned}\n")
     }
 }
 
@@ -343,7 +343,7 @@ internal fun parseEntry(text: String, exponents: Map<String, Int>): Entry {
         }
         Transfer(
             code, t.text("source"), t.text("amount"), t.text("currency"), t.text("time"), t.text("to"), t.text("to-account"),
-            toShop, t.optionalText("from"), t.optionalText("from-account"),
+            toShop, t.optionalText("from"), t.optionalText("from-account"), t.bool("scanned"),
         )
     }
     return Entry(

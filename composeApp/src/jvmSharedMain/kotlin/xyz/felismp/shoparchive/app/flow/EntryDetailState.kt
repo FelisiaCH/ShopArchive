@@ -28,6 +28,7 @@ import xyz.felismp.shoparchive.shared.TenderDto
 import xyz.felismp.shoparchive.shared.TenderMethod
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
 import xyz.felismp.shoparchive.shared.covers
+import xyz.felismp.shoparchive.shared.keptTransfers
 import xyz.felismp.shoparchive.shared.formatAmount
 import xyz.felismp.shoparchive.shared.isIsoDate
 
@@ -139,8 +140,7 @@ class EntryDetailState(
             val online = f.tenders.any { it.method == TenderMethod.ONLINE }
             val slipCount = f.keep.size + f.added.size
             // As the server does: the transfer of a slip that is removed goes with it, one scanned without a photo stays.
-            val removedCodes = s.entry.slips.filter { it !in f.keep }.mapNotNull { it.code }.toSet() - f.keep.mapNotNull { it.code }.toSet()
-            val transfers = s.entry.transfers.count { it.code !in removedCodes }
+            val transfers = keptTransfers(s.entry.transfers, (f.keep.mapNotNull { it.code } + f.added.mapNotNull { it.code }).toSet()).size
             val issues = buildList {
                 if (f.tenders.any { it.amount.isEmpty() }) add(RecordIssue.AMOUNT_MISSING)
                 if (bad.isNotEmpty()) add(RecordIssue.AMOUNT_INVALID)

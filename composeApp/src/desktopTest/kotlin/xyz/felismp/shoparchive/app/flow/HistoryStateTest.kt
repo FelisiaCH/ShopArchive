@@ -255,7 +255,7 @@ class HistoryStateTest {
     }
 
     @Test fun aScannedTransferStaysWhenSlipsGoButTheTransferOfARemovedSlipGoesWithIt() = runTest(UnconfinedTestDispatcher()) {
-        fun transfer(code: String) = TransferDto(code, "BCEL", "5000", "LAK", "2026-09-18 19:18:00", "Shop", "160")
+        fun transfer(code: String) = TransferDto(code, "BCEL", "5000", "LAK", "2026-09-18 19:18:00", "Shop", "160", scanned = code == "SCANNED")
         val online = listOf(TenderDto("LAK", TenderMethod.ONLINE, "5000"))
         val scanned = testEntry(tenders = online, slips = listOf(SlipDto("slip-1.jpg", "x", "PHOTO"))).copy(transfers = listOf(transfer("PHOTO"), transfer("SCANNED")))
         val (_, _, d) = openEntry(scanned)

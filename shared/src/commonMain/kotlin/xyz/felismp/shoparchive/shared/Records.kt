@@ -99,13 +99,18 @@ data class SlipCheckDto(
 
 /**
  * A transfer the bank confirmed when the entry was saved: the [code] of its slip's QR and what the bank said about it (see [SlipCheckDto] for each field).
- * The owner keeps the payer's name and masked account with the entry (Felisia 2026-10-13).
+ * The owner keeps the payer's name and masked account with the entry (Felisia 2026-10-13). [scanned]: its code was scanned without a photo, so it
+ * stays with the entry whatever slips are removed; any other transfer goes when no slip of the entry has its code any more.
  */
 @Serializable
 data class TransferDto(
     val code: String, val source: String, val amount: String, val currency: String, val time: String,
     val to: String, val toAccount: String, val toShop: Boolean? = null, val from: String? = null, val fromAccount: String? = null,
+    val scanned: Boolean = false,
 )
+
+/** The transfers of an entry that stay when its slips become [slipCodes] (the codes of the slips it keeps and adds): the scanned ones and those of a slip still there. */
+fun keptTransfers(transfers: List<TransferDto>, slipCodes: Set<String>): List<TransferDto> = transfers.filter { it.scanned || it.code in slipCodes }
 
 @Serializable
 data class EntryDto(
