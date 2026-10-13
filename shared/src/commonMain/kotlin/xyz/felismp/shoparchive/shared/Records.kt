@@ -97,6 +97,16 @@ data class SlipCheckDto(
     val toAccount: String? = null, val from: String? = null, val fromAccount: String? = null,
 )
 
+/**
+ * A transfer the bank confirmed when the entry was saved: the [code] of its slip's QR and what the bank said about it (see [SlipCheckDto] for each field).
+ * The owner keeps the payer's name and masked account with the entry (Felisia 2026-10-13).
+ */
+@Serializable
+data class TransferDto(
+    val code: String, val source: String, val amount: String, val currency: String, val time: String,
+    val to: String, val toAccount: String, val toShop: Boolean? = null, val from: String? = null, val fromAccount: String? = null,
+)
+
 @Serializable
 data class EntryDto(
     val id: String,
@@ -114,6 +124,8 @@ data class EntryDto(
     val slips: List<SlipDto>,
     /** The day session the entry belongs to; null when `records.require-open-day` is off and none was open. */
     val session: String? = null,
+    /** The transfers the bank confirmed for the entry's slips and scanned QR codes. */
+    val transfers: List<TransferDto> = emptyList(),
 )
 
 /** Body of `POST /api/v1/entries` (the `entry` part when slips come with it). [id] is a UUIDv7 the client makes, so a resend is the same entry. */
@@ -128,6 +140,8 @@ data class CreateEntryRequest(
     val tenders: List<TenderDto>,
     /** The code of the i-th slip sent with the request, null for a slip with none; may be shorter than the slips (the rest have none). */
     val slipCodes: List<String?> = emptyList(),
+    /** The QR codes of slips scanned without keeping a photo. Each must be a transfer the bank confirms when the entry is saved, or the entry is refused. */
+    val transferCodes: List<String> = emptyList(),
 )
 
 /** Body of `PUT /api/v1/entries/{date}/{id}`. [keepSlips] are the files (`slip-1.jpg`) that stay; null keeps all. Slips sent with the request are added. */
@@ -251,7 +265,7 @@ class EntryRules(
  * a category that exists, is not archived and fits the type (and is there at all when the rules ask for it).
  * Who may write the entry and how big a slip may be are for the server alone.
  */
-fun checkEntry(type: EntryType, category: String?, tenders: List<TenderDto>, slipCount: Int, rules: EntryRules): Refusal? {
+fun checkEntry(type: EntryType, category: String?, tenders: List<TenderDto>, slipCount: Int, rules: EntryRules, transferCount: Int = 0): Refusal? {
     if (tenders.isEmpty()) return Refusal(ErrorReasons.ENTRY_NO_AMOUNT, "An entry needs at least one amount.")
     for (tender in tenders) {
         val exponent = rules.exponents[tender.currency]
@@ -265,8 +279,8 @@ fun checkEntry(type: EntryType, category: String?, tenders: List<TenderDto>, sli
         }
     }
     val online = tenders.any { it.method == TenderMethod.ONLINE }
-    if (online && slipCount == 0) return Refusal(ErrorReasons.ENTRY_SLIP_REQUIRED, "A payment made online needs a slip.")
-    if (!online && slipCount > 0) return Refusal(ErrorReasons.ENTRY_SLIP_NOT_ALLOWED, "Slips are for payments made online only.")
+    if (online && slipCount == 0 && transferCount == 0) return Refusal(ErrorReasons.ENTRY_SLIP_REQUIRED, "A payment made online needs a slip.")
+    if (!online && slipCount + transferCount > 0) return Refusal(ErrorReasons.ENTRY_SLIP_NOT_ALLOWED, "Slips are for payments made online only.")
     if (slipCount > rules.slipMaxCount) return Refusal(ErrorReasons.ENTRY_SLIP_TOO_MANY, "An entry takes at most ${rules.slipMaxCount} slips.")
     if (category == null) return if (rules.requireCategory) Refusal(ErrorReasons.ENTRY_CATEGORY_REQUIRED, "A category is needed.") else null
     val rule = rules.categories[category] ?: return Refusal(ErrorReasons.ENTRY_CATEGORY_UNKNOWN, "The category '$category' does not exist.")

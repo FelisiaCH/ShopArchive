@@ -55,12 +55,23 @@ private fun entryFields(event: EntryCreatedEvent, locale: Locale): Map<String, S
         "currency" to entry.tenders.joinToString(", ") { it.currency },
         // Read at a glance: signed by type and grouped as the app shows money, each amount with its own currency.
         "money" to entry.tenders.joinToString(", ") { (if (entry.type == EntryType.INCOME) "+" else "-") + groupThousands(it.amount, locale) + " " + it.currency },
+        // What the bank confirmed, e.g. "BCEL ✓ 850,000 LAK · 18/09 19:18 · payer → shop"; a payment to an account that is not the shop's is marked.
+        "transfer" to entry.transfers.joinToString("; ") { t ->
+            listOfNotNull(
+                "${t.source} ✓ ${groupThousands(t.amount, locale)} ${t.currency}", shortBankTime(t.time),
+                listOfNotNull(t.from, t.to + if (t.toShop == false) " ⚠" else "").joinToString(" → "),
+            ).joinToString(" · ")
+        },
         "branch" to event.branchName,
         "user" to entry.createdBy.name,
         "time" to entry.createdAt,
         "date" to entry.date,
     )
 }
+
+/** A bank's `2026-09-18 19:18:00` as `18/09 19:18`; anything else as it is. */
+private fun shortBankTime(time: String): String =
+    Regex("\\d{4}-(\\d{2})-(\\d{2})[ T](\\d{2}:\\d{2}).*").matchEntire(time)?.destructured?.let { (month, day, hm) -> "$day/$month $hm" } ?: time
 
 private fun dayFields(event: DayClosedEvent, locale: Locale): Map<String, String> {
     val close = event.session.close

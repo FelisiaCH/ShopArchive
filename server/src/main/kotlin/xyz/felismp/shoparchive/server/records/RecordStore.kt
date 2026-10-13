@@ -41,7 +41,7 @@ internal class RecordStore(
     private val clock: Clock = Clock.systemDefaultZone(),
 ) {
     private val entries = ConcurrentHashMap<String, Entry>()
-    // The ids of the entries not deleted that carry a slip with each code; kept with `entries` by hold and release.
+    // The ids of the entries not deleted that carry a slip or a transfer with each code; kept with `entries` by hold and release.
     private val slipCodes = ConcurrentHashMap<String, Set<String>>()
     private val broken = ConcurrentHashMap<String, BrokenEntry>()
     // The entry.yml bytes this store last wrote or took in, per id: what a hand edit is told apart from while running, even when the copy in cache/ could not be written.
@@ -57,7 +57,7 @@ internal class RecordStore(
 
     fun all(): Collection<Entry> = entries.values
 
-    /** The entries, not deleted, that carry a slip with [code], oldest first. */
+    /** The entries, not deleted, that carry a slip or a transfer with [code], oldest first. */
     fun slipUses(code: String): List<Entry> =
         slipCodes[code].orEmpty().mapNotNull { entries[it] }.sortedWith(compareBy({ it.createdAt }, { it.id }))
 
@@ -77,7 +77,7 @@ internal class RecordStore(
         for (code in codes) slipCodes.computeIfPresent(code) { _, ids -> (ids - id).ifEmpty { null } }
     }
 
-    private fun Entry.indexedCodes(): Set<String> = if (deleted) emptySet() else slips.mapNotNullTo(HashSet()) { it.code }
+    private fun Entry.indexedCodes(): Set<String> = if (deleted) emptySet() else slips.mapNotNullTo(HashSet()) { it.code } + transfers.map { it.code }
 
     fun brokenEntries(): List<BrokenEntry> = broken.values.sortedBy { it.id }
 

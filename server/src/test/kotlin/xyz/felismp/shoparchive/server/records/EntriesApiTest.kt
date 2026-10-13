@@ -41,6 +41,7 @@ import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.ReauthRequest
 import xyz.felismp.shoparchive.shared.SlipCheckDto
 import xyz.felismp.shoparchive.shared.SlipUseDto
+import xyz.felismp.shoparchive.shared.TransferDto
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
 import java.nio.file.Files
 import java.nio.file.Path
@@ -930,6 +931,133 @@ class EntriesApiTest {
             assertEquals(HttpStatusCode.BadRequest, getPath("/api/v1/slips/check", noy).status)
             assertEquals(HttpStatusCode.Unauthorized, getPath("/api/v1/slips/check?code=$bcel").status)
             assertEquals(emptyList(), asked, "the bank is asked about nothing that was refused")
+        }
+    }
+
+    // --- transfers the bank confirms ---
+
+    private val confirmed = SlipCheckDto("BCEL", true, "850000", "LAK", "2026-09-18 19:18:42", "Go Mobile", toShop = true, toAccount = "160-12-00-XXXXXX78-001", from = "Noy S", fromAccount = "010-12-00-XXXXXX12-001")
+
+    private fun AuthEnv.bank(answers: Map<String, SlipCheckDto>): MutableList<String> {
+        val asked = mutableListOf<String>()
+        services.register(SlipChecker::class.java, SlipChecker { code -> asked += code; answers[code] }, 10, "test")
+        return asked
+    }
+
+    private fun scanned(vararg codes: String) = newEntry(tenders = listOf(online("LAK", "850000"))).copy(transferCodes = codes.toList())
+
+    @Test
+    fun aScannedTransferTheBankConfirmsIsSavedWithoutAPhotoAndKept() = env().run {
+        val noy = login("noy")
+        val asked = bank(mapOf(bcel to confirmed))
+        api {
+            openDay(noy)
+            val request = scanned(bcel)
+            val created = createEntry(noy, request)
+            assertEquals(HttpStatusCode.Created, created.status)
+            val e = created.parsed(EntryDto.serializer())
+            val transfer = TransferDto(bcel, "BCEL", "850000", "LAK", "2026-09-18 19:18:42", "Go Mobile", "160-12-00-XXXXXX78-001", true, "Noy S", "010-12-00-XXXXXX12-001")
+            assertEquals(listOf(transfer), e.transfers)
+            assertEquals(emptyList(), e.slips)
+            assertEquals(listOf(transfer), entries(noy).single().transfers)
+            assertEquals(listOf(e.id), uses(noy, bcel).map { it.id }, "a scanned code is a used slip too")
+
+            assertEquals(e, createEntry(noy, request).parsed(EntryDto.serializer()))
+            assertEquals(listOf(bcel), asked, "a resend does not ask the bank again")
+            val text = Files.readString(root.entryDir(e).resolve("entry.yml"))
+            assertTrue("transfers:\n  - code: \"$bcel\"\n    source: \"BCEL\"\n" in text, text)
+            assertTrue("    to-shop: true\n    from: \"Noy S\"\n" in text, text)
+        }
+    }
+
+    @Test
+    fun aTransferIsReadBackFromItsFileAsItWasWritten() {
+        val exponents = mapOf("LAK" to 0)
+        val entry = Entry(
+            newUuid7(), java.time.LocalDate.of(2026, 9, 18), EntryType.INCOME, "main", null, "coffee", "", xyz.felismp.shoparchive.shared.UserRef("u1", "noy"),
+            "2026-09-18T19:20:00+07:00", "2026-09-18T19:20:00+07:00", false, listOf(Tender("LAK", xyz.felismp.shoparchive.shared.TenderMethod.ONLINE, Amount(850000, 0))),
+            emptyList(), null,
+            listOf(
+                Transfer(bcel, "BCEL", "850000", "LAK", "2026-09-18 19:18:42", "null", "160", null, null, null),
+                Transfer(trust, "BCEL", "1", "LAK", "t", "Go \"Mobile\"", "160", false, "Noy", "010"),
+            ),
+        )
+        assertEquals(entry, parseEntry(renderEntry(entry), exponents))
+        assertEquals(entry.copy(transfers = emptyList()), parseEntry(renderEntry(entry.copy(transfers = emptyList())), exponents))
+        assertTrue("transfers" !in renderEntry(entry.copy(transfers = emptyList())), "an entry without transfers is written as before")
+    }
+
+    @Test
+    fun aScannedTransferTheBankDoesNotConfirmIsRefusedAndNothingIsStored() = env().run {
+        val noy = login("noy")
+        api {
+            openDay(noy)
+            val noChecker = createEntry(noy, scanned(bcel))
+            assertEquals(HttpStatusCode.BadRequest, noChecker.status)
+            assertEquals(ErrorReasons.ENTRY_TRANSFER_UNCONFIRMED, noChecker.errorReason())
+            bank(mapOf(bcel to SlipCheckDto("BCEL", false)))
+            val unknown = createEntry(noy, scanned(bcel))
+            assertEquals(ErrorReasons.ENTRY_TRANSFER_UNCONFIRMED, unknown.errorReason())
+            assertEquals(emptyList(), entries(noy))
+        }
+    }
+
+    @Test
+    fun aSlipPhotoTheBankConfirmsGetsItsTransferAndOneItDoesNotIsStillSaved() = env().run {
+        val noy = login("noy")
+        bank(mapOf(bcel to confirmed, trust to SlipCheckDto("BCEL", false)))
+        api {
+            openDay(noy)
+            val e = createEntry(noy, paid(bcel, trust, null), listOf(jpeg(1), jpeg(2), jpeg(3))).parsed(EntryDto.serializer())
+            assertEquals(3, e.slips.size)
+            assertEquals(listOf(bcel), e.transfers.map { it.code })
+            val both = createEntry(noy, paid(bcel).copy(transferCodes = listOf(bcel)), listOf(jpeg(4))).parsed(EntryDto.serializer())
+            assertEquals(listOf(bcel), both.transfers.map { it.code }, "one transfer for a code that is both on a photo and scanned")
+        }
+    }
+
+    @Test
+    fun scannedCodesFollowTheRulesOfSlips() = env().run {
+        val noy = login("noy")
+        bank(mapOf(bcel to confirmed))
+        api {
+            openDay(noy)
+            val cash = createEntry(noy, newEntry().copy(transferCodes = listOf(bcel)))
+            assertEquals(ErrorReasons.ENTRY_SLIP_NOT_ALLOWED, cash.errorReason())
+            assertEquals(ErrorReasons.ENTRY_SLIP_CODE_INVALID, createEntry(noy, scanned("a\u0007b")).errorReason())
+            assertEquals(ErrorReasons.ENTRY_SLIP_TOO_MANY, createEntry(noy, scanned(*Array(6) { "code-$it" })).errorReason())
+            assertEquals(ErrorReasons.ENTRY_SLIP_REQUIRED, createEntry(noy, scanned()).errorReason())
+        }
+    }
+
+    @Test
+    fun removingASlipTakesItsTransferAlongAndAScannedOneStays() = env().run {
+        val noy = login("noy")
+        val asked = bank(mapOf(bcel to confirmed, trust to confirmed.copy(amount = "1000")))
+        api {
+            openDay(noy)
+            val e = createEntry(noy, paid(trust).copy(transferCodes = listOf(bcel)), listOf(jpeg(1))).parsed(EntryDto.serializer())
+            assertEquals(listOf(trust, bcel), e.transfers.map { it.code })
+            asked.clear()
+            val edited = updateEntry(noy, e, update(e).copy(keepSlips = emptyList()))
+            assertEquals(HttpStatusCode.OK, edited.status, "the scanned transfer still shows the payment")
+            val after = edited.parsed(EntryDto.serializer())
+            assertEquals(listOf(bcel), after.transfers.map { it.code })
+            assertEquals(emptyList(), asked, "an edit that adds no slip asks the bank nothing")
+            assertEquals(emptyList(), uses(noy, trust), "the removed slip's code is free again")
+            assertEquals("transfers", getPath("/api/v1/entries/${after.date}/${after.id}/history", noy).parsed(ListSerializer(HistoryItem.serializer())).last().changes.last().field)
+        }
+    }
+
+    @Test
+    fun aSlipAddedByAnEditGetsItsTransfer() = env().run {
+        val noy = login("noy")
+        bank(mapOf(bcel to confirmed))
+        api {
+            openDay(noy)
+            val e = createEntry(noy, paid(null), listOf(jpeg(1))).parsed(EntryDto.serializer())
+            val after = updateEntry(noy, e, update(e).copy(addedSlipCodes = listOf(bcel)), listOf(jpeg(2))).parsed(EntryDto.serializer())
+            assertEquals(listOf(bcel), after.transfers.map { it.code })
         }
     }
 
