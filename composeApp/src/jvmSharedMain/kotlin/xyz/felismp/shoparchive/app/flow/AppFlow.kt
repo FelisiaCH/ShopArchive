@@ -88,6 +88,8 @@ class AppFlow(
     private val now: () -> Long = System::currentTimeMillis,
     private val io: CoroutineDispatcher = Dispatchers.IO,
     private val compressor: SlipCompressor = SlipCompressor { it },
+    /** What reads the amount off a slip photo; the default reads nothing. */
+    private val reader: SlipReader = SlipReader { null },
     /** Milliseconds that only move forward, for spacing the live socket's searches; injected so tests can move time. A wrong wall clock does not matter. */
     private val monotonicMs: () -> Long = { System.nanoTime() / 1_000_000 },
     /** Finds the server on the local network when none of its saved addresses answers (its address changed). */
@@ -761,7 +763,7 @@ class AppFlow(
             sessionScope, opened.api, calls, canWrite, connection.refetch, connection.messages,
             onConfig = { saveEndpoints(opened.api, it.endpoints); savePolicy(it.auth) },
             savedBranch = try { prefs.load().branch } catch (_: Exception) { null },
-            saveBranch = ::saveBranch, compressor = compressor,
+            saveBranch = ::saveBranch, compressor = compressor, reader = reader,
             today = { Instant.ofEpochMilli(now()).atZone(ZoneId.systemDefault()).toLocalDate() }, now = now,
             updater = updater, ownVersion = ownVersion,
         )

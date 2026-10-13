@@ -26,14 +26,20 @@ class RecordStateTest {
     /** A compressor that keeps the bytes; an empty file is "not a picture". */
     private val keep = SlipCompressor { raw -> raw.takeIf { it.isNotEmpty() } }
 
+    /** A reader that finds no text on any photo. */
+    private val none = SlipReader { null }
+
+    private fun saying(text: String) = SlipReader { text }
+
     private fun TestScope.setup(
         policy: RecordsPolicy = RecordsPolicy(),
         compressor: SlipCompressor = keep,
+        reader: SlipReader = none,
         dayOpen: Boolean = true,
     ): Pair<Harness, RecordState> {
         val h = Harness(backgroundScope, ConfigState.Ready(testConfig(policy)))
         if (dayOpen) h.api.current = h.api.session("s1")
-        return h to RecordState(h.env, TodayState(h.env), compressor)
+        return h to RecordState(h.env, TodayState(h.env), compressor, reader)
     }
 
     private fun RecordState.fillCash(amount: String = "1500") {
@@ -280,7 +286,7 @@ class RecordStateTest {
         val h = Harness(backgroundScope, ConfigState.Ready(testConfig()))
         h.api.current = h.api.session("s1")
         val today = TodayState(h.env)
-        val record = RecordState(h.env, today, keep)
+        val record = RecordState(h.env, today, keep, none)
         h.api.createFails = { n -> if (n == 1) ClientError.Unreachable() else null }
         record.fillCash()
         record.save()
@@ -363,7 +369,7 @@ class RecordStateTest {
 
     @Test fun saveWaitsForTheConfigAndForABranch() = runTest(UnconfinedTestDispatcher()) {
         val h = Harness(backgroundScope, ConfigState.Loading, branch = null)
-        val record = RecordState(h.env, TodayState(h.env), keep)
+        val record = RecordState(h.env, TodayState(h.env), keep, none)
         assertEquals(SaveBlock.LOADING, record.ui.value.block)
         h.config.value = ConfigState.Ready(testConfig())
         assertEquals(SaveBlock.NO_BRANCH, record.ui.value.block)
@@ -380,5 +386,111 @@ class RecordStateTest {
         assertEquals(listOf("Rice", "Rice paper"), record.ui.value.suggestions)
         record.setItem("Rice")
         assertEquals(listOf("Rice paper"), record.ui.value.suggestions)
+    }
+
+    private val slipText = "ຈຳນວນຊຳລະ : 850,000 LAK ຄ່າທຳນຽມ : 1,000 LAK"
+
+    private fun RecordState.makeOnline(): Int {
+        val row = ui.value.draft.tenders.first().key
+        setMethod(row, TenderMethod.ONLINE)
+        return row
+    }
+
+    @Test fun aSlipFillsTheEmptyOnlineLineAndMarksItAsRead() = runTest(UnconfinedTestDispatcher()) {
+        val (_, record) = setup(reader = saying(slipText))
+        val row = record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        assertEquals("850000", record.ui.value.draft.tenders.single().amount)
+        assertEquals(setOf(row), record.ui.value.amountFromSlip)
+        assertEquals(1, record.ui.value.draft.slips.size)
+        assertTrue(record.ui.value.canSave)
+    }
+
+    @Test fun anAmountTypedBeforeTheReadFinishedIsNotReplaced() = runTest(UnconfinedTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val (_, record) = setup(reader = SlipReader { gate.await(); slipText })
+        val row = record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        assertEquals(1, record.ui.value.draft.slips.size)
+        record.setAmount(row, "700000")
+        gate.complete(Unit)
+        assertEquals("700000", record.ui.value.draft.tenders.single().amount)
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
+    }
+
+    @Test fun aCashLineIsNeverFilled() = runTest(UnconfinedTestDispatcher()) {
+        val (_, record) = setup(reader = saying(slipText))
+        record.addSlip("a.jpg", byteArrayOf(1))
+        assertEquals("", record.ui.value.draft.tenders.single().amount)
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
+    }
+
+    @Test fun aSlipInAnotherCurrencyFillsNothing() = runTest(UnconfinedTestDispatcher()) {
+        val (_, record) = setup(reader = saying(slipText))
+        val row = record.makeOnline()
+        record.setCurrency(row, "THB")
+        record.addSlip("a.jpg", byteArrayOf(1))
+        assertEquals("", record.ui.value.draft.tenders.single().amount)
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
+    }
+
+    @Test fun aReaderThatFindsNothingOrFailsLeavesTheSlipAttachedAndTheAmountAlone() = runTest(UnconfinedTestDispatcher()) {
+        for (reader in listOf(none, SlipReader { error("no model") })) {
+            val (_, record) = setup(reader = reader)
+            record.makeOnline()
+            record.addSlip("a.jpg", byteArrayOf(1))
+            assertEquals(1, record.ui.value.draft.slips.size)
+            assertEquals("", record.ui.value.draft.tenders.single().amount)
+            assertEquals(emptySet(), record.ui.value.amountFromSlip)
+            assertNull(record.ui.value.slipNotice)
+        }
+    }
+
+    @Test fun staffChangingTheFilledAmountOrRemovingItsLineClearsTheMark() = runTest(UnconfinedTestDispatcher()) {
+        val (_, record) = setup(reader = saying(slipText))
+        val row = record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        assertEquals(setOf(row), record.ui.value.amountFromSlip)
+        record.setAmount(row, "850001")
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
+        record.setAmount(row, "")
+        record.addSlip("b.jpg", byteArrayOf(2))
+        assertEquals(setOf(row), record.ui.value.amountFromSlip)
+        record.addTender()
+        record.removeTender(row)
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
+    }
+
+    @Test fun theMarkEndsWithTheDraft() = runTest(UnconfinedTestDispatcher()) {
+        val (_, record) = setup(reader = saying(slipText))
+        record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.save()
+        assertIs<SavePhase.Saved>(record.ui.value.phase)
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
+    }
+
+    @Test fun aSlipRemovedWhileItWasReadFillsNothing() = runTest(UnconfinedTestDispatcher()) {
+        val gate = CompletableDeferred<Unit>()
+        val (_, record) = setup(reader = SlipReader { gate.await(); slipText })
+        record.makeOnline()
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.removeSlip(record.ui.value.draft.slips.single().key)
+        gate.complete(Unit)
+        assertEquals("", record.ui.value.draft.tenders.single().amount)
+        assertEquals(emptySet(), record.ui.value.amountFromSlip)
+    }
+
+    @Test fun twoSlipsFillTwoLinesAndBothAreMarked() = runTest(UnconfinedTestDispatcher()) {
+        val (_, record) = setup(reader = saying(slipText))
+        val first = record.makeOnline()
+        record.addTender()
+        val second = record.ui.value.draft.tenders.last().key
+        record.setCurrency(second, "LAK")
+        record.setMethod(second, TenderMethod.ONLINE)
+        record.addSlip("a.jpg", byteArrayOf(1))
+        record.addSlip("b.jpg", byteArrayOf(2))
+        assertEquals(listOf("850000", "850000"), record.ui.value.draft.tenders.map { it.amount })
+        assertEquals(setOf(first, second), record.ui.value.amountFromSlip)
     }
 }

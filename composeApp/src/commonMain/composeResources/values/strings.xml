@@ -132,6 +132,7 @@
     <string name="slip_file">Choose file</string>
     <string name="slip_remove">Remove %1$s</string>
     <string name="slip_preparing">Preparing photo…</string>
+    <string name="amount_from_slip">Read from the slip — check it before saving</string>
     <string name="notice_too_many">You can add at most %1$s slips.</string>
     <string name="notice_too_big">That photo is still over %1$s KB after compressing.</string>
     <string name="notice_unreadable">That file is not a picture this device can read.</string>
