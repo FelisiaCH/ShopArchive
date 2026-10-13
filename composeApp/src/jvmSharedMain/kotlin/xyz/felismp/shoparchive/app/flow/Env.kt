@@ -9,6 +9,7 @@ import xyz.felismp.shoparchive.shared.EntryCreatedMessage
 import xyz.felismp.shoparchive.shared.EntryDeletedMessage
 import xyz.felismp.shoparchive.shared.EntryMovedMessage
 import xyz.felismp.shoparchive.shared.EntryUpdatedMessage
+import xyz.felismp.shoparchive.shared.NoteChangedMessage
 import xyz.felismp.shoparchive.shared.SessionClosedMessage
 import xyz.felismp.shoparchive.shared.SessionOpenedMessage
 import xyz.felismp.shoparchive.shared.WsMessage
@@ -42,7 +43,7 @@ class Env(
     val can: Capabilities get() = config.value.capabilities()
 }
 
-/** The branch a live message is about, or null for messages that are not about a branch's records. */
+/** The branch a live message is about, or null for messages that are not about a branch's records or notes. */
 internal fun WsMessage.recordBranch(): String? = when (this) {
     is EntryCreatedMessage -> branch
     is EntryUpdatedMessage -> branch
@@ -50,5 +51,6 @@ internal fun WsMessage.recordBranch(): String? = when (this) {
     is EntryMovedMessage -> branch
     is SessionOpenedMessage -> branch
     is SessionClosedMessage -> branch
+    is NoteChangedMessage -> branch
     else -> null
 }

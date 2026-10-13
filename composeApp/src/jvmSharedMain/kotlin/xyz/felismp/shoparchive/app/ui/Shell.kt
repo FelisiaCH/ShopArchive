@@ -39,6 +39,7 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
     val record = stringResource(Res.string.nav_record)
     val history = stringResource(Res.string.nav_history)
     val reports = stringResource(Res.string.nav_reports)
+    val notes = stringResource(Res.string.nav_notes)
     val more = stringResource(Res.string.nav_more)
     val console = stringResource(Res.string.nav_console)
     val settingsLabel = stringResource(Res.string.nav_settings)
@@ -50,12 +51,12 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
             if (settings != null) flow.closeSettings()
             ws.go(to)
         }
-        // Reports sit under More when the navigation is a bottom bar and in the pane or strip on the left otherwise. Before the config has loaded (or when it failed) only More
+        // Reports and Notes sit under More when the navigation is a bottom bar and in the pane or strip on the left otherwise. Before the config has loaded (or when it failed) only More
         // is offered, so no entry is there that the workspace would ignore; the screen itself says it is loading, or offers a retry. Windows has no More: Today stays,
         // so there is always a way out of Settings back to that screen.
         val folded = navigationBottomBar && !wide
-        val items = listOf(Destination.TODAY to today, Destination.RECORD to record, Destination.HISTORY to history, Destination.REPORTS to reports)
-            .filter { (d, _) -> (config is ConfigState.Ready || (d == Destination.TODAY && !navigationBottomBar)) && can.allows(d) && (d != Destination.REPORTS || !folded) }
+        val items = listOf(Destination.TODAY to today, Destination.RECORD to record, Destination.HISTORY to history, Destination.REPORTS to reports, Destination.NOTES to notes)
+            .filter { (d, _) -> (config is ConfigState.Ready || (d == Destination.TODAY && !navigationBottomBar)) && can.allows(d) && ((d != Destination.REPORTS && d != Destination.NOTES) || !folded) }
             .let { if (navigationBottomBar) it + (Destination.MORE to more) else it }
         // Windows has no More: the console, Settings and Lock now sit at the foot of the pane.
         val footer = if (navigationBottomBar) emptyList() else listOfNotNull(
@@ -66,7 +67,7 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
         val selected = when {
             settings != null -> null
             destination == Destination.OPEN_DAY -> Destination.TODAY
-            destination == Destination.REPORTS && folded -> Destination.MORE
+            (destination == Destination.REPORTS || destination == Destination.NOTES) && folded -> Destination.MORE
             destination == Destination.CONSOLE -> Destination.MORE
             else -> destination
         }
@@ -103,6 +104,7 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
                     destination == Destination.RECORD -> RecordScreen(ws)
                     destination == Destination.HISTORY -> HistoryScreen(ws)
                     destination == Destination.REPORTS -> ReportsScreen(ws)
+                    destination == Destination.NOTES -> NotesScreen(ws)
                 }
             }
         }
@@ -115,6 +117,7 @@ private fun Destination.icon() = when (this) {
     Destination.RECORD -> ShopIcon.Record
     Destination.HISTORY -> ShopIcon.History
     Destination.REPORTS -> ShopIcon.Reports
+    Destination.NOTES -> ShopIcon.Notes
     Destination.CONSOLE -> ShopIcon.Console
     Destination.MORE -> ShopIcon.More
 }
@@ -127,6 +130,7 @@ private fun MoreScreen(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, can: 
         can.reportsTabs.firstOrNull()?.let { first ->
             ShopButton(stringResource(Res.string.nav_reports), { ws.openReports(first) }, Modifier.fillWidthOnPhone(), primary = false, icon = ShopIcon.Reports)
         }
+        if (can.allows(Destination.NOTES)) ShopButton(stringResource(Res.string.nav_notes), { ws.go(Destination.NOTES) }, Modifier.fillWidthOnPhone(), primary = false, icon = ShopIcon.Notes)
         if (can.console) ShopButton(stringResource(Res.string.nav_console), { ws.go(Destination.CONSOLE) }, Modifier.fillWidthOnPhone(), primary = false, icon = ShopIcon.Console)
         ShopButton(stringResource(Res.string.nav_settings), flow::openSettings, Modifier.fillWidthOnPhone(), primary = false, icon = ShopIcon.Settings)
         ShopButton(stringResource(Res.string.lock_now), { flow.lockNow() }, Modifier.fillWidthOnPhone(), icon = ShopIcon.LockNow)

@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
 
 /** The icons the screens use. Each platform draws them from its own icon set (Fluent on Windows, Material Symbols on Android). */
-enum class ShopIcon { Today, Record, History, More, OpenDay, CloseDay, Save, AddPayment, Reports, Console, Settings, LockNow }
+enum class ShopIcon { Today, Record, History, More, OpenDay, CloseDay, Save, AddPayment, Reports, Console, Settings, LockNow, Notes }
 
 /**
  * One icon from an SVG's path data as given in the set. The grid is [grid] units square and starts at y = [top] (-960 for Material Symbols,

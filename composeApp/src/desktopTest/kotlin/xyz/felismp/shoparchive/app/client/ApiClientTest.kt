@@ -2,6 +2,8 @@ package xyz.felismp.shoparchive.app.client
 
 import kotlinx.coroutines.runBlocking
 import xyz.felismp.shoparchive.shared.ConfigResponse
+import xyz.felismp.shoparchive.shared.CreateNoteRequest
+import xyz.felismp.shoparchive.shared.NotesUnread
 import xyz.felismp.shoparchive.shared.DeviceMode
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
@@ -290,6 +292,34 @@ class ApiClientTest {
             assertEquals("POST", s.requests[1].method)
             assertEquals("/api/v1/command/complete", s.requests[2].target)
             assertEquals("Bearer TOKEN-1", s.requests[2].headers["Authorization"])
+            api.close()
+        }
+    }
+
+    @Test fun noteCallsAskTheNotesRoutesAndAnswerTheirData() = runBlocking {
+        val note = """{"id":"n1","branch":"main","date":"2026-10-04","text":"hi","createdBy":{"id":"u2","name":"bob"},"createdAt":"2026-10-04T09:00:00+07:00"}"""
+        TlsServer { r ->
+            when {
+                r.target == "/api/v1/unlock" -> json(unlockOk)
+                r.target.startsWith("/api/v1/notes/unread") -> json("""{"unread":3,"oldest":"2026-10-03"}""")
+                r.target == "/api/v1/notes/read" -> json("[$note]")
+                r.target.startsWith("/api/v1/notes?") -> json("[$note]")
+                else -> json(note)
+            }
+        }.use { s ->
+            val api = ApiClient("sid", s.pin, listOf(s.endpoint))
+            api.unlock(unlockReq)
+            assertEquals("n1", api.notes("main", "2026-10-04").single().id)
+            assertEquals("hi", api.createNote(CreateNoteRequest("n1", "main", "hi")).text)
+            assertEquals("n1", api.markNoteRead("n1").id)
+            assertEquals(1, api.markNotesRead("main", "2026-10-04").size)
+            assertEquals(NotesUnread(3, "2026-10-03"), api.unreadNotes("main"))
+            assertEquals(
+                listOf("GET /api/v1/notes?branch=main&date=2026-10-04", "POST /api/v1/notes", "POST /api/v1/notes/n1/read", "POST /api/v1/notes/read", "GET /api/v1/notes/unread?branch=main"),
+                s.requests.drop(1).map { it.method + " " + it.target },
+            )
+            assertEquals("""{"id":"n1","branch":"main","text":"hi"}""", s.requests[2].body?.utf8())
+            assertEquals("""{"branch":"main","date":"2026-10-04"}""", s.requests[4].body?.utf8())
             api.close()
         }
     }

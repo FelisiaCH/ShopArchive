@@ -351,4 +351,35 @@
         <item quantity="one">%1$d user</item>
         <item quantity="other">%1$d users</item>
     </plurals>
+    <string name="nav_notes">Notes</string>
+    <string name="notes_title">Notes</string>
+    <string name="notes_sub">Day notes, staff to owner</string>
+    <string name="notes_list_h">Notes for this day</string>
+    <string name="notes_unread_n">%1$d unread</string>
+    <string name="notes_unread">Unread</string>
+    <string name="notes_mark_read">Mark as read</string>
+    <string name="notes_mark_all">Mark all read</string>
+    <string name="notes_read_at">Read %1$s</string>
+    <string name="notes_seen_owner">Seen by owner %1$s</string>
+    <string name="notes_not_seen">Not seen by owner yet</string>
+    <string name="notes_empty_h">No notes for this day</string>
+    <string name="notes_empty_p">Staff can leave a note for the owner here. Write the first one.</string>
+    <string name="notes_composer">Leave a note</string>
+    <string name="notes_post">Post the note</string>
+    <string name="notes_posting">Posting…</string>
+    <string name="notes_post_failed_h">Could not post the note.</string>
+    <string name="notes_post_failed_p">Your text is kept. Check the connection and try again.</string>
+    <string name="notes_foot">Notes stay with the day they were written, so the reason sits beside the numbers.</string>
+    <string name="notes_prev_day">Previous day</string>
+    <string name="notes_next_day">Next day</string>
+    <string name="notes_load_failed">The notes could not be loaded.</string>
+    <string name="notes_mark_failed">Could not mark the notes as read.</string>
+    <string name="today_slips">Slips attached</string>
+    <string name="today_notes">Notes for the owner</string>
+    <string name="today_notes_unread">unread from the counter</string>
+    <string name="notif_event_note">New note</string>
+    <plurals name="notes_count">
+        <item quantity="one">%1$d note</item>
+        <item quantity="other">%1$d notes</item>
+    </plurals>
 </resources>

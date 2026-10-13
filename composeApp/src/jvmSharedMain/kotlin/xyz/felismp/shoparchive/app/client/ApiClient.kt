@@ -35,6 +35,10 @@ import xyz.felismp.shoparchive.shared.CompleteResponse
 import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.HistoryItem
 import xyz.felismp.shoparchive.shared.LoginResponse
+import xyz.felismp.shoparchive.shared.CreateNoteRequest
+import xyz.felismp.shoparchive.shared.MarkNotesReadRequest
+import xyz.felismp.shoparchive.shared.NoteDto
+import xyz.felismp.shoparchive.shared.NotesUnread
 import xyz.felismp.shoparchive.shared.NotificationDto
 import xyz.felismp.shoparchive.shared.SessionPreview
 import xyz.felismp.shoparchive.shared.MoveEntryRequest
@@ -231,6 +235,17 @@ class ApiClient(
         val name = reply.disposition?.let { ContentDisposition.parse(it).parameter(ContentDisposition.Parameters.FileName) }
         return ExportFile(name ?: "shoparchive-$from-$to.$format", reply.bytes)
     }
+
+    override suspend fun notes(branch: String, date: String): List<NoteDto> = get("/api/v1/notes?branch=${branch.encodeURLPath()}&date=$date")
+
+    override suspend fun createNote(request: CreateNoteRequest): NoteDto = post("/api/v1/notes", request)
+
+    override suspend fun markNoteRead(id: String): NoteDto =
+        decode(send(HttpMethod.Post, "/api/v1/notes/${id.encodeURLPath()}/read", null, Auth.Token))
+
+    override suspend fun markNotesRead(branch: String, date: String): List<NoteDto> = post("/api/v1/notes/read", MarkNotesReadRequest(branch, date))
+
+    override suspend fun unreadNotes(branch: String): NotesUnread = get("/api/v1/notes/unread?branch=${branch.encodeURLPath()}")
 
     override suspend fun runCommand(line: String): List<String> = post<CommandRequest, CommandResponse>("/api/v1/command", CommandRequest(line)).lines
 

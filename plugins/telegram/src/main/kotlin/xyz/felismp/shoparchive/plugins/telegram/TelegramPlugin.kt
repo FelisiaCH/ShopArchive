@@ -26,7 +26,7 @@ class TelegramPlugin : ShopPlugin() {
     override fun onConfigReload() = refresh(first = false)
 
     private fun refresh(first: Boolean) {
-        settings = TelegramSettings.read(context.config) { context.logger.warn(it) }
+        settings = TelegramSettings.read(context.config, info = { context.logger.info(it) }) { context.logger.warn(it) }
         val s = settings
         if (s == null) {
             if (registered) context.logger.warn("the settings are incomplete now; messages wait in the outbox until they are put right (restart the server to hand over to the next channel)")

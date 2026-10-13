@@ -93,6 +93,14 @@ class DashboardTest {
     }
 
     @Test
+    fun slipsAreCountedOnceAcrossCurrenciesAndNotForTheDeletedOrThePreviousPeriod() {
+        fun slipped(e: Entry, n: Int) = e.copy(slips = (1..n).map { Slip("slip-$it.jpg", "x") })
+        val dash = of(listOf(slipped(A, 2), slipped(B, 1), C, slipped(F, 1)), listOf(slipped(P, 5)))
+        assertEquals(4, dash.slips)
+        assertEquals(0, of(emptyList()).slips)
+    }
+
+    @Test
     fun thePreviousPeriodIsTheSameNumberOfDaysBeforeAndEmptyIsZeroWithDecimals() {
         val dash = of(listOf(A, B, C, D, E, F, H, I), listOf(P))
         assertEquals(totals("12000", "0", "12000", "12000", "0", "12000", 1), dash.currency("LAK").previous)

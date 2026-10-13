@@ -16,6 +16,8 @@ object PermissionNodes {
     const val DAY_CLOSE = "shoparchive.day.close"
     const val EXPORT = "shoparchive.export"
     const val DASHBOARD_VIEW = "shoparchive.dashboard.view"
+    const val NOTE_CREATE = "shoparchive.note.create"
+    const val NOTE_READ = "shoparchive.note.read"
     const val NOTIFICATIONS_VIEW = "shoparchive.notifications.view"
     const val NOTIFICATIONS_SEND = "shoparchive.notifications.send"
 

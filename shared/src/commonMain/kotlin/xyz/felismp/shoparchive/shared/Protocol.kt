@@ -290,6 +290,11 @@ data class SessionOpenedMessage(val id: String, val branch: String, val business
 @SerialName("session.closed")
 data class SessionClosedMessage(val id: String, val branch: String, val businessDate: String) : WsMessage
 
+/** A day note was written or read; pushed to the users who may see it, so an open Notes screen or Today card asks again. [date] is the note's business date. */
+@Serializable
+@SerialName("note.changed")
+data class NoteChangedMessage(val branch: String, val date: String) : WsMessage
+
 /** Body of `POST /api/v1/command`: one line as typed in the app's console. */
 @Serializable
 data class CommandRequest(val line: String)

@@ -121,7 +121,7 @@ internal fun dashboardOf(
             expenseItems = items(list, EntryType.EXPENSE, exponent),
         )
     }
-    return DashboardDto(from.toString(), to.toString(), currencies, recent)
+    return DashboardDto(from.toString(), to.toString(), currencies, recent, slips = rows.sumOf { it.slips.size })
 }
 
 /** `GET /api/v1/dashboard` and the recent items: worked out per request from the entries the [RecordStore] holds, nothing kept in between. */

@@ -16,8 +16,8 @@ class NotifyConfigTest {
     @BeforeTest
     fun setUp() = prepareRoot(root)
 
-    private fun loaded(notify: String? = null): NotifySettings {
-        if (notify != null) root.write("config/shoparchive.yml", "config-version: 1\n\nnotify:\n$notify")
+    private fun loaded(notify: String? = null, version: Int = 2): NotifySettings {
+        if (notify != null) root.write("config/shoparchive.yml", "config-version: $version\n\nnotify:\n$notify")
         return ConfigService(root, log = log, clock = FIXED_CLOCK).also { it.load() }.notify
     }
 
@@ -25,7 +25,7 @@ class NotifyConfigTest {
     fun theDefaultsAreThePlansAndAreWrittenUnderNotify() {
         val notify = loaded()
 
-        assertEquals(listOf("day.closed", "device.new", "entry.created"), notify.events)
+        assertEquals(listOf("day.closed", "device.new", "entry.created", "note.created"), notify.events)
         assertEquals(30, notify.timeoutSeconds)
         assertEquals(10, notify.maxAttempts)
         assertEquals(30, notify.backoffBaseSeconds)
@@ -34,9 +34,9 @@ class NotifyConfigTest {
         val text = root.text("config/shoparchive.yml")
         val tail = text.substring(text.indexOf("\nnotify:\n"))
         for (line in listOf(
-            "notify:\n", "  events: [day.closed, device.new, entry.created]\n", "  timeout-seconds: 30\n", "  max-attempts: 10\n", "  backoff:\n",
+            "notify:\n", "  events: [day.closed, device.new, entry.created, note.created]\n", "  timeout-seconds: 30\n", "  max-attempts: 10\n", "  backoff:\n",
             "    base-seconds: 30\n", "    max-seconds: 3600\n", "  reconcile-days: 2\n", "# Allowed: integer from 0 to 31. Default: 2", "# Allowed: integer from 1 to 600. Default: 30", "# Allowed: integer from 1 to 1000. Default: 10",
-            "# The events that put a message into the outbox for the channel plugin: entry.created, day.closed, device.new.",
+            "# The events that put a message into the outbox for the channel plugin: entry.created, day.closed, device.new, note.created.",
         )) assertTrue(line in tail, "missing ${line.trim()} in:\n$tail")
         assertEquals(emptyList(), log.warnings)
     }
@@ -66,6 +66,40 @@ class NotifyConfigTest {
         assertEquals(30, notify.timeoutSeconds)
         assertEquals(10, notify.maxAttempts)
         assertEquals(2, log.warningsWith("invalid value").size, log.warnings.toString())
+    }
+
+    // --- the upgrade of a file written before note.created existed (config-version 1) ---
+
+    @Test
+    fun aVersionOneListWithEventsGetsNoteCreatedAndTheFileIsRewrittenAsVersionTwoWithTheOldCopySaved() {
+        val notify = loaded("  events: [day.closed, entry.created]\n  max-attempts: 7\n", version = 1)
+
+        assertEquals(listOf("day.closed", "entry.created", "note.created"), notify.events)
+        assertEquals(7, notify.maxAttempts)
+        val text = root.text("config/shoparchive.yml")
+        assertTrue("config-version: 2" in text && "  events: [day.closed, entry.created, note.created]\n" in text && "  max-attempts: 7\n" in text, text)
+        assertTrue("# Allowed: integer from 1 to 1000. Default: 10" in text, "the comments come back from the template")
+        assertEquals(1, root.backups().size)
+        assertEquals(emptyList(), log.warnings)
+    }
+
+    @Test
+    fun aVersionOneListThatHasItOrIsEmptyOrIsAbsentIsLeftAsItIs() {
+        assertEquals(listOf("note.created", "day.closed"), loaded("  events: [note.created, day.closed]\n", version = 1).events)
+        assertEquals(emptyList(), loaded("  events: []\n", version = 1).events)
+        assertTrue("  events: []\n" in root.text("config/shoparchive.yml"), "messages the admin turned off stay off")
+        assertEquals(listOf("day.closed", "device.new", "entry.created", "note.created"), loaded("  timeout-seconds: 20\n", version = 1).events)
+    }
+
+    @Test
+    fun theDottedFormOfTheKeyIsUpgradedToo() {
+        root.write("config/shoparchive.yml", "config-version: 1\nnotify.events: [entry.created]\n")
+        assertEquals(listOf("entry.created", "note.created"), loaded().events)
+    }
+
+    @Test
+    fun aVersionTwoListIsNotTouched() {
+        assertEquals(listOf("day.closed"), loaded("  events: [day.closed]\n").events)
     }
 
     @Test

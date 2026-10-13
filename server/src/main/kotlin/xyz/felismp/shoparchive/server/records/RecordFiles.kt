@@ -119,6 +119,16 @@ internal data class Session(
     )
 }
 
+/** A note staff left for the owner on [date], the business date of the branch's day it was written on. Written once, never changed. */
+internal data class Note(
+    val id: String,
+    val branch: String,
+    val date: LocalDate,
+    val text: String,
+    val createdBy: UserRef,
+    val createdAt: String,
+)
+
 // --- writing: text values are always quoted, so a name like "null" or "1e3" is still text to every YAML reader ---
 
 private fun ref(user: UserRef) = "{ id: ${quoted(user.id)}, name: ${quoted(user.name)} }"
@@ -171,6 +181,16 @@ internal fun renderSession(s: Session): String = buildString {
         append("online-in: ${amounts(it.onlineIn)}\n")
         append("online-out: ${amounts(it.onlineOut)}\n")
     }
+}
+
+internal fun renderNote(n: Note): String = buildString {
+    append("file-version: $RECORD_FILE_VERSION\n")
+    append("id: ${n.id}\n")
+    append("branch: ${quoted(n.branch)}\n")
+    append("date: ${n.date}\n")
+    append("text: ${quoted(n.text)}\n")
+    append("created-by: ${ref(n.createdBy)}\n")
+    append("created-at: ${quoted(n.createdAt)}\n")
 }
 
 private const val HISTORY_HEAD = "file-version: $RECORD_FILE_VERSION\nhistory:\n"
@@ -319,6 +339,15 @@ internal fun parseSession(text: String, exponents: Map<String, Int>): Session {
         else -> throw RecordFormatException("session: status is not open or closed")
     }
     return Session(id, branch, LocalDate.parse(date), f.userRef("opened-by"), f.text("opened-at"), f.amounts("float", exponents, "session"), closed)
+}
+
+/** @throws RecordFormatException the file is not a valid note file */
+internal fun parseNote(text: String): Note {
+    val f = readYaml("note", text)
+    val id = f.text("id").also { if (!isUuidV7(it)) throw RecordFormatException("note: id '$it' is not a lower case UUIDv7") }
+    val date = f.text("date").also { if (!isIsoDate(it)) throw RecordFormatException("note: date '$it' is not a date like 2026-09-27") }
+    val branch = f.text("branch").also { if (!isSlug(it)) throw RecordFormatException("note: branch '$it' is not a branch key") }
+    return Note(id, branch, LocalDate.parse(date), f.text("text"), f.userRef("created-by"), f.text("created-at"))
 }
 
 /** The items of a `history.yml`. */

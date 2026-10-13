@@ -18,7 +18,7 @@ import xyz.felismp.shoparchive.shared.WsMessage
 import java.time.LocalDate
 
 /** Where the shell is. Open day is under Today in the navigation, the console under More. */
-enum class Destination { TODAY, OPEN_DAY, RECORD, HISTORY, REPORTS, CONSOLE, MORE }
+enum class Destination { TODAY, OPEN_DAY, RECORD, HISTORY, REPORTS, NOTES, CONSOLE, MORE }
 
 /**
  * Everything the signed-in person's screens keep: the shop's lists, the chosen branch, where they are in the app and the Record draft.
@@ -67,6 +67,7 @@ class Workspace(
     val reports = ReportsState(env)
     val export = ExportState(env)
     val notifications = NotificationsState(env)
+    val notes = NotesState(env)
     val console = ConsoleState(env)
 
     /** Looks for a newer app once now (so at every unlock) and when asked; null where the platform cannot install updates. */
@@ -117,6 +118,13 @@ class Workspace(
         if (tab !in env.can.reportsTabs) return
         _reportsTab.value = tab
         _destination.value = Destination.REPORTS
+    }
+
+    /** Opens Notes on [day] (`yyyy-MM-dd`), e.g. the oldest day Today counts an unread note on; on the day it showed last when null. */
+    fun openNotes(day: String? = null) {
+        if (!env.can.allows(Destination.NOTES)) return
+        day?.let(notes::show)
+        _destination.value = Destination.NOTES
     }
 
     fun selectBranch(key: String) {

@@ -34,7 +34,7 @@ private class MapConfig(private val v: Map<String, Any>) : PluginConfig {
 
 private fun config(vararg overrides: Pair<String, Any>): PluginConfig {
     val base = mutableMapOf<String, Any>(
-        "bot-token" to TOKEN, "chat-ids" to listOf("111", "-100222"), "language" to "en", "events" to listOf("entry.created", "day.closed"),
+        "config-version" to "2", "bot-token" to TOKEN, "chat-ids" to listOf("111", "-100222"), "language" to "en", "events" to listOf("entry.created", "day.closed"),
         "templates.entry-created.lo" to "LO {type} {category} {item} {code}", "templates.entry-created.th" to "TH {type}", "templates.entry-created.en" to "EN {type} {amount} {currency} {category} {item}\n{user} {time} #{code}",
         "templates.day-closed.lo" to "lo", "templates.day-closed.th" to "th", "templates.day-closed.en" to "Closed {date} float {float} handover {handover} {note}",
     )
@@ -229,7 +229,7 @@ class TelegramTest {
         val warns = mutableListOf<String>()
         assertNull(TelegramSettings.read(config("bot-token" to " ")) { warns += it })
         assertNull(TelegramSettings.read(config("chat-ids" to emptyList<String>())) { warns += it })
-        assertNull(TelegramSettings.read(config("templates.entry-created.en" to "")) { warns += it })
+        assertNull(TelegramSettings.read(config("templates.entry-created.en" to ""), shipped = null) { warns += it })
         assertEquals(3, warns.size)
         assertNotNull(TelegramSettings.read(config("language" to "xx")) { warns += it })
     }
@@ -311,6 +311,116 @@ class TelegramTest {
         val t = FakeTransport()
         assertTrue(notifier(t, cfg = cfg).deliver(n) is DeliveryResult.Sent)
         assertTrue(t.posted[0].second.contains("New device: noy logged in on Phone of noy (android)"), t.posted[0].second)
+    }
+
+    @Test
+    fun theShippedNoteTemplateRendersTheNoteAndAConfigListingItIsAcceptedWithoutAWarning() {
+        val n = note(
+            event = "note.created",
+            fields = mapOf("branch" to "Main Shop", "user" to "noy", "time" to "2026-10-03T15:00:12+07:00", "date" to "2026-10-03", "text" to "Bl168 held until Friday\nwill collect tonight"),
+        )
+        val r = PlaceholderRenderer()
+        assertEquals(
+            "📝 Note for the owner · Main Shop\nBl168 held until Friday\nwill collect tonight\nnoy · 2026-10-03 15:00\nCode 20261003-A3F9C",
+            r.render(shippedTemplate("note.created", "en"), n, "en"),
+        )
+        for (language in LANGUAGES) {
+            val text = r.render(shippedTemplate("note.created", language), n, language)
+            assertTrue(text.startsWith("📝") && "Main Shop" in text && "Bl168 held until Friday" in text && "noy · 2026-10-03 15:00" in text && "20261003-A3F9C" in text, "$language: $text")
+        }
+        assertTrue("note.created" in shippedEvents(), shippedEvents().toString())
+
+        val warns = mutableListOf<String>()
+        val templates = LANGUAGES.map { "templates.note-created.$it" to shippedTemplate("note.created", it) }.toTypedArray()
+        val cfg = config("events" to listOf("entry.created", "note.created"), *templates)
+        assertEquals(setOf("entry.created", "note.created"), TelegramSettings.read(cfg) { warns += it }!!.events)
+        assertEquals(emptyList(), warns)
+        val t = FakeTransport()
+        assertTrue(notifier(t, cfg = cfg).deliver(n) is DeliveryResult.Sent)
+        assertTrue(t.posted[0].second.contains("Note for the owner · Main Shop"), t.posted[0].second)
+    }
+
+    // --- a config.yml from an older jar is read as the jar's defaults fill it in; the file is never changed ---
+
+    private val oldEntryTemplates = mapOf(
+        "lo" to "{type} · {branch}\n{amount} {currency}\n{category} {item}\n{user} · {time}\nລະຫັດ {code}",
+        "th" to "{type} · {branch}\n{amount} {currency}\n{category} {item}\n{user} · {time}\nรหัส {code}",
+        "en" to "{type} · {branch}\n{amount} {currency}\n{category} {item}\n{user} · {time}\nCode {code}",
+    )
+
+    private fun read(cfg: PluginConfig, infos: MutableList<String> = mutableListOf(), warns: MutableList<String> = mutableListOf()) =
+        TelegramSettings.read(cfg, info = { infos += it }) { warns += it }
+
+    @Test
+    fun aConfigWithoutAVersionGetsNoteCreatedAndTheShippedNoteTemplateInMemoryAndTheAdminIsToldOnce() {
+        val infos = mutableListOf<String>()
+        val s = read(config("config-version" to "1", "events" to listOf("entry.created", "day.closed")), infos)!!
+
+        assertEquals(setOf("entry.created", "day.closed", "note.created"), s.events)
+        for (language in LANGUAGES) assertEquals(shippedTemplate("note.created", language), s.templates.getValue("note.created").getValue(language))
+        assertEquals(1, infos.size, infos.toString())
+        assertTrue("events: note.created" in infos[0] && "templates.note-created.en" in infos[0], infos[0])
+        assertTrue("without changing the file" in infos[0], infos[0])
+    }
+
+    @Test
+    fun anEmptyEventsListStaysEmptyAndANoteCreatedAlreadyThereIsNotListedTwice() {
+        val warns = mutableListOf<String>()
+        assertNull(read(config("config-version" to "1", "events" to emptyList<String>()), warns = warns))
+        assertTrue(warns.any { "events lists nothing" in it }, warns.toString())
+
+        val s = read(config("config-version" to "1", "events" to listOf("note.created", "day.closed")))!!
+        assertEquals(setOf("note.created", "day.closed"), s.events)
+    }
+
+    @Test
+    fun aVersionTwoConfigKeepsItsEventsAsTheyAre() {
+        assertEquals(setOf("entry.created"), read(config("events" to listOf("entry.created")))!!.events)
+    }
+
+    @Test
+    fun anEditedTemplateIsKeptAndTheOldShippedEntryTemplateBecomesTheNewOne() {
+        val infos = mutableListOf<String>()
+        val s = read(
+            config(
+                "config-version" to "1",
+                "templates.entry-created.lo" to oldEntryTemplates.getValue("lo"),
+                "templates.entry-created.th" to oldEntryTemplates.getValue("th").replace("\n", "\r\n"), // the file may have been saved with Windows line ends
+                "templates.entry-created.en" to oldEntryTemplates.getValue("en") + "\nMy own last line",
+            ),
+            infos,
+        )!!
+
+        val entry = s.templates.getValue("entry.created")
+        assertEquals(shippedTemplate("entry.created", "lo"), entry.getValue("lo"))
+        assertEquals(shippedTemplate("entry.created", "th"), entry.getValue("th"))
+        assertEquals(oldEntryTemplates.getValue("en") + "\nMy own last line", entry.getValue("en"), "an edited template is the admin's")
+        assertTrue(shippedTemplate("entry.created", "lo") != oldEntryTemplates.getValue("lo"), "the shipped entry template really moved on")
+        assertTrue("templates.entry-created.lo" in infos.single() && "templates.entry-created.th" in infos.single() && "templates.entry-created.en" !in infos.single(), infos.toString())
+    }
+
+    @Test
+    fun theOldEntryTemplateIsReplacedAtAnyVersionAndAMissingTemplateIsFilledFromTheJarAtAnyVersion() {
+        val infos = mutableListOf<String>()
+        val s = read(
+            config(
+                "templates.entry-created.en" to oldEntryTemplates.getValue("en"),
+                "templates.day-closed.lo" to "", "templates.day-closed.th" to "", "templates.day-closed.en" to "",
+            ),
+            infos,
+        )!!
+
+        assertEquals(shippedTemplate("entry.created", "en"), s.templates.getValue("entry.created").getValue("en"))
+        for (language in LANGUAGES) assertEquals(shippedTemplate("day.closed", language), s.templates.getValue("day.closed").getValue(language))
+        assertEquals(setOf("entry.created", "day.closed"), s.events, "version 2 events are not touched")
+        assertEquals(1, infos.size)
+    }
+
+    @Test
+    fun aCurrentConfigWithItsOwnTemplatesSaysNothing() {
+        val infos = mutableListOf<String>()
+        assertNotNull(read(config(), infos))
+        assertEquals(emptyList(), infos)
     }
 
     @Test

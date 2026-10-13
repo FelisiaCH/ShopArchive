@@ -1,5 +1,6 @@
 package xyz.felismp.shoparchive.app.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,14 +39,14 @@ fun TodayScreen(ws: Workspace) {
             data == null -> ShopText(stringResource(Res.string.working), muted = true)
             else -> {
                 ui.failure?.let { ShopBanner(stringResource(Res.string.today_failed) + " " + it.text(), Tone.Error) }
-                TodayContent(data, canWrite, can, { ws.go(Destination.OPEN_DAY) }, { ws.openReports(ReportsTab.CLOSE_DAY) })
+                TodayContent(data, canWrite, can, { ws.go(Destination.OPEN_DAY) }, { ws.openReports(ReportsTab.CLOSE_DAY) }, { ws.go(Destination.HISTORY) }, { ws.openNotes(data.oldestUnreadNote ?: data.date) })
             }
         }
     }
 }
 
 @Composable
-private fun TodayContent(data: TodayData, canWrite: Boolean, can: Capabilities, openDay: () -> Unit, closeDay: () -> Unit) {
+private fun TodayContent(data: TodayData, canWrite: Boolean, can: Capabilities, openDay: () -> Unit, closeDay: () -> Unit, openHistory: () -> Unit, openNotes: () -> Unit) {
     when (val status = data.status) {
         DayStatus.NotOpened -> ShopCard {
             ShopText(stringResource(Res.string.openday_card_title), TextRole.Title)
@@ -64,6 +65,7 @@ private fun TodayContent(data: TodayData, canWrite: Boolean, can: Capabilities, 
         }
         is DayStatus.Closed -> ShopChip(stringResource(Res.string.day_closed), Tone.Info)
     }
+    TodayCounts(data, can, openHistory, openNotes)
     if (!data.showStats) {
         data.statsFailure?.let { ShopBanner(stringResource(Res.string.today_mine_failed) + " " + it.text(), Tone.Error) }
         data.mine?.let { mine ->
@@ -79,6 +81,28 @@ private fun TodayContent(data: TodayData, canWrite: Boolean, can: Capabilities, 
     } else {
         ShopText(stringResource(Res.string.today_latest), TextRole.Title)
         ShopCard { data.recent.take(10).forEach { RecentLine(it) } }
+    }
+}
+
+/** The slips attached today (with the dashboard; opens History) and the notes for the owner that are unread (with the read node; opens Notes). */
+@Composable
+private fun TodayCounts(data: TodayData, can: Capabilities, openHistory: () -> Unit, openNotes: () -> Unit) {
+    val unread = data.unreadNotes
+    if (!data.showStats && unread == null) return
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (data.showStats) {
+            ShopCard(Modifier.weight(1f).then(if (can.viewEntries) Modifier.clickable(onClick = openHistory) else Modifier)) {
+                ShopText(stringResource(Res.string.today_slips), TextRole.Caption, muted = true)
+                ShopText(data.slips.toString(), TextRole.Title)
+            }
+        }
+        if (unread != null) {
+            ShopCard(Modifier.weight(1f).clickable(onClick = openNotes)) {
+                ShopText(stringResource(Res.string.today_notes), TextRole.Caption, muted = true)
+                ShopText(unread.toString(), TextRole.Title)
+                ShopText(stringResource(Res.string.today_notes_unread), TextRole.Caption, muted = true)
+            }
+        }
     }
 }
 
