@@ -93,6 +93,16 @@ class SlipTextTest {
         400_000,
     )
 
+    // What ML Kit read off a real BCEL One slip of 850,000, its big amount then misread as 650,000: the watermark outvotes it.
+    @Test fun theBcelWatermarkOutvotesAMisreadAmount() = lak(
+        "7:18 +**|BCEL One|nount 8o000|650,000 LA|19:18:42 o from|0R to Snu Thuuno.anount 850000 LAK Rer|850000 LAK Ref 202 6091 8668 4385|" +
+            "130-12-xXXXX408TAK anont 850000-EAK Ref 202|uns amount 850000-LAK Ref 202|Šu huUns amount 850000 LAK Ref 202 6091 8668 4385-tiny|" +
+            "o Šu Ihluune amount 850000 LAK Ref 202|oo0408 to \$au hluuno anount 85",
+        850_000,
+    )
+
+    @Test fun aWatermarkCutBeforeItsCodeIsNotCounted() = lak("amount 85|amount 8500|1,000 LAK|1,500 LAK", 1_500)
+
     // A real slip with a rubber band across the amount: only the fee in a European form is left, which is not taken for the amount.
     @Test fun aSlipWhoseAmountWasNotReadGivesNoAnswer() {
         assertNull(slipAmount("2026-09-24 21:02:09|LAK|Umoney LA1011 **** **** 3023|kLAK 1909|LAK 199|* 19|),000.00|LAK|K1.000,00|230300", kip))
