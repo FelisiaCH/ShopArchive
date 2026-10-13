@@ -53,12 +53,13 @@ internal class Records(
     private val branchService = DefaultBranchService(branches, access)
     private val entryService = DefaultEntryService(config, branches, categories, store, sessions, access, services, clock)
     private val sessionService = DefaultSessionService(config, branches, store, sessions, access, services, clock)
+    private val noteService = DefaultNoteService(config, branches, writer, notes, noteReads, sessions, access, services, clock)
 
     init {
         services.register(BranchService::class.java, branchService, CORE_SERVICE_PRIORITY, "core")
         services.register(CategoryService::class.java, DefaultCategoryService(categories, access), CORE_SERVICE_PRIORITY, "core")
         services.register(SessionService::class.java, sessionService, CORE_SERVICE_PRIORITY, "core")
-        services.register(NoteService::class.java, DefaultNoteService(config, branches, writer, notes, noteReads, sessions, access, services, clock), CORE_SERVICE_PRIORITY, "core")
+        services.register(NoteService::class.java, noteService, CORE_SERVICE_PRIORITY, "core")
         services.register(EntryService::class.java, entryService, CORE_SERVICE_PRIORITY, "core")
         services.register(ExportService::class.java, DefaultExportService(config, access, services), CORE_SERVICE_PRIORITY, "core")
         services.register(DashboardService::class.java, DefaultDashboardService(config, store, access, services, clock), CORE_SERVICE_PRIORITY, "core")
@@ -122,7 +123,8 @@ internal class Records(
         fun at(text: String) = runCatching { java.time.OffsetDateTime.parse(text).toInstant() }.getOrNull()
         val entries = store.all().filter { !it.deleted && at(it.createdAt)?.let { t -> !t.isBefore(since) } == true }.sortedBy { it.createdAt }.map { entryService.createdEvent(it) }
         val days = sessions.all().filter { s -> s.closed?.let { c -> at(c.closedAt)?.let { t -> !t.isBefore(since) } } == true }.sortedBy { it.closed!!.closedAt }.mapNotNull { sessionService.closedDay(it.branch, it.id) }
-        entries + days
+        val noteEvents = notes.all().filter { at(it.createdAt)?.let { t -> !t.isBefore(since) } == true }.sortedBy { it.createdAt }.map { noteService.createdEvent(it) }
+        entries + days + noteEvents
     }
 
     /**

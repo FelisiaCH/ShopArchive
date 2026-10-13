@@ -53,7 +53,7 @@ internal class DefaultNoteService(
         }
         if (isNew) {
             push(stored.branch, stored.date, setOf(stored.createdBy.id))
-            publishEvent(NoteCreatedEvent(dto(stored), branch.displayName))
+            publishEvent(createdEvent(stored))
         }
         return CreatedNote(dto(stored), isNew)
     }
@@ -110,6 +110,9 @@ internal class DefaultNoteService(
         note.id, note.branch, note.date.toString(), note.text, note.createdBy, note.createdAt,
         reads.readers(note.id).map { (reader, at) -> NoteRead(UserRef(reader.id, reader.name), at) },
     )
+
+    /** The event of [note] being written, with the branch's name as it is now. */
+    fun createdEvent(note: Note) = NoteCreatedEvent(dto(note), branches.find(note.branch)?.displayName ?: note.branch)
 
     /** Tells the users of the branch who hold `note.read`, and the [authors] (their note's reads changed): an open Notes screen or Today card asks again. */
     private fun push(branch: String, date: LocalDate, authors: Set<String>) {

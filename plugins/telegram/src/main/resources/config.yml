@@ -16,11 +16,13 @@ chat-ids: []
 language: lo
 
 # Which events are sent. The server's own notify.events decides which events reach any channel at all; this lists what this channel sends of them.
-# entry.created = a line was recorded, day.closed = the day was closed, device.new = someone logged in on a device they were not on before.
+# entry.created = a line was recorded, day.closed = the day was closed, device.new = someone logged in on a device they were not on before,
+# note.created = staff left a day note for the owner.
 events:
   - day.closed
   - device.new
   - entry.created
+  - note.created
 
 # Where the Bot API lives. Change it only for a self-hosted Bot API server. Must be https (http only for localhost); otherwise the plugin is not used.
 api-url: https://api.telegram.org
@@ -38,6 +40,7 @@ ledger-keep-days: 7
 #   day.closed also has {closedBy} {entries} {slips} {note} and, per currency (one text, e.g. "LAK 150000; THB 20.50"):
 #   {income} {expense} {net} {cashIn} {cashOut} {onlineIn} {onlineOut} {float} {counted} {expected} {variance} {kept} {handover}
 #   device.new has only {user} {device} (the device's name) {platform} {deviceId} and {code}.
+#   note.created has only {text} (the note) {branch} {user} {time} {date} and {code}.
 # A line whose words are all empty (no {category}, no {note}) is left out. An unknown word becomes empty.
 # {code} names the entry, the day or the device: a message that arrives twice has the same code both times.
 templates:
@@ -113,3 +116,19 @@ templates:
       อุปกรณ์ใหม่: {user} เข้าสู่ระบบบน {device} ({platform})
     en: |-
       New device: {user} logged in on {device} ({platform})
+  note-created:
+    lo: |-
+      📝 ບັນທຶກຫາເຈົ້າຂອງ · {branch}
+      {text}
+      {user} · {time}
+      ລະຫັດ {code}
+    th: |-
+      📝 โน้ตถึงเจ้าของ · {branch}
+      {text}
+      {user} · {time}
+      รหัส {code}
+    en: |-
+      📝 Note for the owner · {branch}
+      {text}
+      {user} · {time}
+      Code {code}

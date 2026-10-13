@@ -288,6 +288,33 @@ class TelegramTest {
     }
 
     @Test
+    fun theShippedNoteTemplateRendersTheNoteAndAConfigListingItIsAcceptedWithoutAWarning() {
+        val n = note(
+            event = "note.created",
+            fields = mapOf("branch" to "Main Shop", "user" to "noy", "time" to "2026-10-03T15:00:12+07:00", "date" to "2026-10-03", "text" to "Bl168 held until Friday\nwill collect tonight"),
+        )
+        val r = PlaceholderRenderer()
+        assertEquals(
+            "📝 Note for the owner · Main Shop\nBl168 held until Friday\nwill collect tonight\nnoy · 2026-10-03 15:00\nCode 20261003-A3F9C",
+            r.render(shippedTemplate("note.created", "en"), n, "en"),
+        )
+        for (language in LANGUAGES) {
+            val text = r.render(shippedTemplate("note.created", language), n, language)
+            assertTrue(text.startsWith("📝") && "Main Shop" in text && "Bl168 held until Friday" in text && "noy · 2026-10-03 15:00" in text && "20261003-A3F9C" in text, "$language: $text")
+        }
+        assertTrue("note.created" in shippedEvents(), shippedEvents().toString())
+
+        val warns = mutableListOf<String>()
+        val templates = LANGUAGES.map { "templates.note-created.$it" to shippedTemplate("note.created", it) }.toTypedArray()
+        val cfg = config("events" to listOf("entry.created", "note.created"), *templates)
+        assertEquals(setOf("entry.created", "note.created"), TelegramSettings.read(cfg) { warns += it }!!.events)
+        assertEquals(emptyList(), warns)
+        val t = FakeTransport()
+        assertTrue(notifier(t, cfg = cfg).deliver(n) is DeliveryResult.Sent)
+        assertTrue(t.posted[0].second.contains("Note for the owner · Main Shop"), t.posted[0].second)
+    }
+
+    @Test
     fun theFileLedgerSurvivesAndClears() {
         val dir = Files.createTempDirectory(java.nio.file.Path.of(System.getProperty("java.io.tmpdir")).also { Files.createDirectories(it) }, "ledger")
         val l = FileSentLedger(dir.resolve("pending"))

@@ -4,6 +4,7 @@ import xyz.felismp.shoparchive.api.CurrencyDay
 import xyz.felismp.shoparchive.api.DayClosedEvent
 import xyz.felismp.shoparchive.api.EntryCreatedEvent
 import xyz.felismp.shoparchive.api.NewDeviceEvent
+import xyz.felismp.shoparchive.api.NoteCreatedEvent
 import xyz.felismp.shoparchive.api.Notification
 import xyz.felismp.shoparchive.api.ShopEvent
 import xyz.felismp.shoparchive.api.ShopEventTypes
@@ -20,8 +21,17 @@ internal fun notificationFields(event: ShopEvent, locale: Locale): Map<String, S
     is EntryCreatedEvent -> entryFields(event, locale)
     is DayClosedEvent -> dayFields(event, locale)
     is NewDeviceEvent -> linkedMapOf("user" to event.username, "device" to event.deviceLabel, "platform" to event.platform, "deviceId" to event.deviceId)
+    is NoteCreatedEvent -> noteFields(event)
     else -> null
 }
+
+private fun noteFields(event: NoteCreatedEvent): Map<String, String> = linkedMapOf(
+    "branch" to event.branchName,
+    "user" to event.note.createdBy.name,
+    "time" to event.note.createdAt,
+    "date" to event.note.date,
+    "text" to event.note.text,
+)
 
 private fun entryFields(event: EntryCreatedEvent, locale: Locale): Map<String, String> {
     val entry = event.entry
@@ -114,6 +124,7 @@ internal fun describe(n: Notification): String {
         ShopEventTypes.DAY_CLOSED ->
             "[${n.code}] ${f["branch"]} ${f["date"]}: day closed by ${n.user}; net ${f["net"]}; counted ${f["counted"]}; variance ${f["variance"]}; handover ${f["handover"]}; ${f["entries"]} entries" +
                 if (f["recomputed"] == "true") " (figures added up from the entries as they are now: the day was closed before they were kept)" else ""
+        ShopEventTypes.NOTE_CREATED -> "[${n.code}] ${f["branch"]} ${f["time"]}: ${n.user} left a note: ${f["text"]}"
         ShopEventTypes.DEVICE_NEW -> "[${n.code}] New device: ${n.user} on ${f["device"]} (${f["platform"]})"
         else -> "[${n.code}] ${n.event} ${f["branch"] ?: n.branch}"
     }
@@ -127,6 +138,7 @@ internal fun draftFor(event: ShopEvent, locale: Locale, createdAt: String, resen
         is DayClosedEvent -> notificationCode(event.session.businessDate, event.session.id) to event.session.id
         // Not a record: reconciling never makes it again, so there is no subject to look for.
         is NewDeviceEvent -> notificationCode(event.at.take(10), event.deviceId) to null
+        is NoteCreatedEvent -> notificationCode(event.note.date, event.note.id) to event.note.id
         else -> return null
     }
     return Draft(code, event.type, createdAt, event.branch, fields.getValue("user"), locale.toLanguageTag(), fields, resendOf, subject)
