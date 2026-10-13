@@ -90,16 +90,16 @@ internal class DefaultNoteService(
         return list(principal, request.branch, request.date)
     }
 
-    override fun unread(principal: Principal, branch: String, date: String): NotesUnread {
+    override fun unread(principal: Principal, branch: String): NotesUnread {
         access.require(principal, NOTE_READ_NODE)
-        val day = day(date)
         access.requireBranch(principal, branch)
-        return NotesUnread(unreadOf(principal, branch, day).size)
+        val unread = unreadOf(principal, branch)
+        return NotesUnread(unread.size, unread.minOfOrNull { it.date }?.toString())
     }
 
-    /** The notes of others on the day that [principal] has not read. */
-    private fun unreadOf(principal: Principal, branch: String, day: LocalDate) =
-        notes.onDay(branch, day).filter { it.createdBy.id != principal.userId && reads.readAt(principal.userId, it.id) == null }
+    /** The notes of others in [branch] (on [day] only, if given) that [principal] has not read. */
+    private fun unreadOf(principal: Principal, branch: String, day: LocalDate? = null) =
+        notes.all().filter { it.branch == branch && (day == null || it.date == day) && it.createdBy.id != principal.userId && reads.readAt(principal.userId, it.id) == null }
 
     private fun day(text: String): LocalDate {
         if (!isIsoDate(text)) throw badRequest("'$text' is not a date like 2026-09-27.", ErrorReasons.DATE_INVALID)

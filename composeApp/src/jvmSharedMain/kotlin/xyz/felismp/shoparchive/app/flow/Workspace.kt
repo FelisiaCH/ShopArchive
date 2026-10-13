@@ -120,7 +120,7 @@ class Workspace(
         _destination.value = Destination.REPORTS
     }
 
-    /** Opens Notes on [day] (`yyyy-MM-dd`), e.g. the day Today counted the unread notes of; on the day it showed last when null. */
+    /** Opens Notes on [day] (`yyyy-MM-dd`), e.g. the oldest day Today counts an unread note on; on the day it showed last when null. */
     fun openNotes(day: String? = null) {
         if (!env.can.allows(Destination.NOTES)) return
         day?.let(notes::show)

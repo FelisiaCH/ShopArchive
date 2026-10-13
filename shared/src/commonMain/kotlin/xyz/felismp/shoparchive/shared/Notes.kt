@@ -28,6 +28,6 @@ data class CreateNoteRequest(val id: String, val branch: String, val text: Strin
 @Serializable
 data class MarkNotesReadRequest(val branch: String, val date: String)
 
-/** Answer of `GET /api/v1/notes/unread`: the notes of others on one day that the caller has not read. */
+/** Answer of `GET /api/v1/notes/unread?branch=`: the notes of others, on any day of the branch, that the caller has not read; [oldest] is the date of the oldest of them, null when there are none. */
 @Serializable
-data class NotesUnread(val unread: Int)
+data class NotesUnread(val unread: Int, val oldest: String? = null)

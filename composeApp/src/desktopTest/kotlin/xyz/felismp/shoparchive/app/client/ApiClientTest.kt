@@ -3,6 +3,7 @@ package xyz.felismp.shoparchive.app.client
 import kotlinx.coroutines.runBlocking
 import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.CreateNoteRequest
+import xyz.felismp.shoparchive.shared.NotesUnread
 import xyz.felismp.shoparchive.shared.DeviceMode
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
@@ -300,7 +301,7 @@ class ApiClientTest {
         TlsServer { r ->
             when {
                 r.target == "/api/v1/unlock" -> json(unlockOk)
-                r.target.startsWith("/api/v1/notes/unread") -> json("""{"unread":3}""")
+                r.target.startsWith("/api/v1/notes/unread") -> json("""{"unread":3,"oldest":"2026-10-03"}""")
                 r.target == "/api/v1/notes/read" -> json("[$note]")
                 r.target.startsWith("/api/v1/notes?") -> json("[$note]")
                 else -> json(note)
@@ -312,9 +313,9 @@ class ApiClientTest {
             assertEquals("hi", api.createNote(CreateNoteRequest("n1", "main", "hi")).text)
             assertEquals("n1", api.markNoteRead("n1").id)
             assertEquals(1, api.markNotesRead("main", "2026-10-04").size)
-            assertEquals(3, api.unreadNotes("main", "2026-10-04"))
+            assertEquals(NotesUnread(3, "2026-10-03"), api.unreadNotes("main"))
             assertEquals(
-                listOf("GET /api/v1/notes?branch=main&date=2026-10-04", "POST /api/v1/notes", "POST /api/v1/notes/n1/read", "POST /api/v1/notes/read", "GET /api/v1/notes/unread?branch=main&date=2026-10-04"),
+                listOf("GET /api/v1/notes?branch=main&date=2026-10-04", "POST /api/v1/notes", "POST /api/v1/notes/n1/read", "POST /api/v1/notes/read", "GET /api/v1/notes/unread?branch=main"),
                 s.requests.drop(1).map { it.method + " " + it.target },
             )
             assertEquals("""{"id":"n1","branch":"main","text":"hi"}""", s.requests[2].body?.utf8())

@@ -28,6 +28,7 @@ import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.LocalizedName
 import xyz.felismp.shoparchive.shared.NoteDto
 import xyz.felismp.shoparchive.shared.NoteRead
+import xyz.felismp.shoparchive.shared.NotesUnread
 import xyz.felismp.shoparchive.shared.OpenSessionRequest
 import xyz.felismp.shoparchive.shared.OpenSessionResponse
 import xyz.felismp.shoparchive.shared.RecordsPolicy
@@ -236,13 +237,14 @@ class FakeRecordsApi : RecordsApi {
     var markNoteError: Exception? = null
     /** The business date the fake "server" puts a new note on (the open day's, which can be the day before). */
     var createdNoteDate = "2026-10-04"
-    var unreadAnswer = 0
+    var unreadAnswer = NotesUnread(0)
+    var markGate: CompletableDeferred<Unit>? = null
     var unreadError: Exception? = null
     val noteCalls = mutableListOf<Pair<String, String>>()
     val createdNotes = mutableListOf<CreateNoteRequest>()
     val noteReads = mutableListOf<String>()
     val noteReadAlls = mutableListOf<Pair<String, String>>()
-    val unreadCalls = mutableListOf<Pair<String, String>>()
+    val unreadCalls = mutableListOf<String>()
 
     private fun readByMe(note: NoteDto) = if (note.reads.any { it.by.id == "u1" }) note else note.copy(reads = note.reads + NoteRead(alice, "2026-10-04T10:00:00+07:00"))
 
@@ -270,13 +272,14 @@ class FakeRecordsApi : RecordsApi {
 
     override suspend fun markNotesRead(branch: String, date: String): List<NoteDto> {
         noteReadAlls += branch to date
+        markGate?.await()
         markNoteError?.let { throw it }
         noteList = noteList.map { if (it.branch == branch && it.date == date && it.createdBy.id != "u1") readByMe(it) else it }
         return noteList.filter { it.branch == branch && it.date == date }
     }
 
-    override suspend fun unreadNotes(branch: String, date: String): Int {
-        unreadCalls += branch to date
+    override suspend fun unreadNotes(branch: String): NotesUnread {
+        unreadCalls += branch
         unreadError?.let { throw it }
         return unreadAnswer
     }

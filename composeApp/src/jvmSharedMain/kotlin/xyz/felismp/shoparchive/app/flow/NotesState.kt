@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import xyz.felismp.shoparchive.shared.CreateNoteRequest
@@ -76,7 +77,8 @@ class NotesState(private val env: Env) {
     init {
         env.scope.launch {
             merge(
-                env.branch.filterNotNull().map { },
+                // Another branch's notes are not shown, nor acted on, while its own are on the way.
+                env.branch.filterNotNull().onEach { clearDay() }.map { },
                 date.map { }.drop(1), // the first value is the day the first load already sees
                 env.refetch,
                 env.config.map { env.can.noteCreate to env.can.noteRead }.distinctUntilChanged().drop(1).map { },
@@ -146,10 +148,17 @@ class NotesState(private val env: Env) {
 
     private fun show(day: LocalDate) {
         if (day == date.value) return
-        notes.value = null // the other day's notes are not this day's
+        clearDay()
+        date.value = day // after the clearing: it starts the load
+        publish()
+    }
+
+    /** Forgets what was shown of the branch and day that were: its notes, what went wrong with them and what was being marked. */
+    private fun clearDay() {
+        notes.value = null
         failure.value = null
         markFailure.value = null
-        date.value = day // last: it starts the load
+        marking.value = emptySet()
         publish()
     }
 
@@ -205,17 +214,21 @@ class NotesState(private val env: Env) {
         mark(notes.value.orEmpty().map { it.id }.toSet().ifEmpty { return }) { env.api.markNotesRead(branch, day) }
     }
 
+    /** The answer is the day's notes as they are now; it is kept only if the branch and day it is about are still the ones shown, else the screen is asked again. */
     private fun mark(ids: Set<String>, call: suspend () -> List<NoteDto>) {
+        val branch = env.branch.value
+        val day = date.value
         marking.value = marking.value + ids
         markFailure.value = null
         publish()
         env.scope.launch {
             try {
-                notes.value = sorted(env.calls.run { call() })
+                val answer = env.calls.run { call() }
+                if (env.branch.value == branch && date.value == day) notes.value = sorted(answer) else load()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                markFailure.value = e.toFailure()
+                if (env.branch.value == branch && date.value == day) markFailure.value = e.toFailure()
             }
             marking.value = marking.value - ids
             publish()

@@ -170,6 +170,6 @@ interface NoteService {
     /** Marks every note of others that the caller has not read, on one day of a branch; answers the day's notes as [list] does. @throws ApiError 400; 403 without `shoparchive.note.read` or the branch */
     fun markAllRead(principal: Principal, request: MarkNotesReadRequest): List<NoteDto>
 
-    /** How many notes of others on [date] the caller has not read. @throws ApiError 400; 403 without `shoparchive.note.read` or the branch */
-    fun unread(principal: Principal, branch: String, date: String): NotesUnread
+    /** How many notes of others, on any day of [branch], the caller has not read, and the date of the oldest. @throws ApiError 403 without `shoparchive.note.read` or the branch */
+    fun unread(principal: Principal, branch: String): NotesUnread
 }

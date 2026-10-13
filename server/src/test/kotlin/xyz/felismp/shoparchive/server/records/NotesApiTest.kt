@@ -57,11 +57,9 @@ class NotesApiTest {
     private suspend fun ApplicationTestBuilder.notes(token: String, branch: String = "main", date: String = "2026-10-03") =
         getPath("/api/v1/notes?branch=$branch&date=$date", token).parsed(ListSerializer(NoteDto.serializer()))
 
-    private suspend fun ApplicationTestBuilder.unread(token: String, branch: String = "main", date: String = "2026-10-03") =
-        getPath("/api/v1/notes/unread?branch=$branch&date=$date", token)
+    private suspend fun ApplicationTestBuilder.unread(token: String, branch: String = "main") = getPath("/api/v1/notes/unread?branch=$branch", token)
 
-    private suspend fun ApplicationTestBuilder.unreadCount(token: String, branch: String = "main", date: String = "2026-10-03") =
-        unread(token, branch, date).parsed(NotesUnread.serializer()).unread
+    private suspend fun ApplicationTestBuilder.unreadCount(token: String, branch: String = "main") = unread(token, branch).parsed(NotesUnread.serializer())
 
     private suspend fun ApplicationTestBuilder.readAll(token: String, branch: String = "main", date: String = "2026-10-03") =
         postJson("/api/v1/notes/read", MarkNotesReadRequest.serializer(), MarkNotesReadRequest(branch, date), token)
@@ -196,7 +194,7 @@ class NotesApiTest {
         val owner = login("owner", grant = listOf(NOTE_READ_NODE))
         api {
             val note = write(noy, "hello").parsed(NoteDto.serializer())
-            assertEquals(1, unreadCount(owner))
+            assertEquals(NotesUnread(1, "2026-10-03"), unreadCount(owner))
 
             val read = readOne(owner, note.id)
             clock.advance(Duration.ofHours(1))
@@ -208,7 +206,7 @@ class NotesApiTest {
             assertEquals("2026-10-03T15:00:00+07:00", reads.at)
             assertEquals(reads, twice.parsed(NoteDto.serializer()).reads.single(), "read again: still the first time")
             assertEquals(listOf(reads), notes(login("noy")).single().reads, "the writer sees who read it")
-            assertEquals(0, unreadCount(login("owner")))
+            assertEquals(NotesUnread(0, null), unreadCount(login("owner")))
             val file = Files.list(root.resolve("data/notes-read")).use { it.toList().single() }
             assertTrue(note.id in Files.readString(file))
         }
@@ -229,6 +227,7 @@ class NotesApiTest {
             assertEquals(HttpStatusCode.Forbidden, readAll(other).status, "another branch")
             assertEquals(HttpStatusCode.Forbidden, unread(noy).status)
             assertEquals(HttpStatusCode.Forbidden, unread(other).status)
+            assertEquals(HttpStatusCode.Forbidden, unread(noy, branch = "market").status)
             assertEquals(HttpStatusCode.BadRequest, readAll(other, branch = "market", date = "tomorrow").status)
             assertEquals(emptyList(), notes(noy).single().reads)
             assertTrue(!Files.exists(root.resolve("data/notes-read")))
@@ -249,18 +248,35 @@ class NotesApiTest {
             val owner = login("owner")
             val lead = login("lead")
 
-            assertEquals(2, unreadCount(owner), "the owner's own note is not unread")
-            assertEquals(3, unreadCount(lead))
-            assertEquals(1, unreadCount(owner, date = "2026-10-04"))
+            assertEquals(NotesUnread(3, "2026-10-03"), unreadCount(owner), "all days of the branch, and the owner's own note is not unread")
+            assertEquals(NotesUnread(4, "2026-10-03"), unreadCount(lead), "the lead did not write the owner's note")
 
             val marked = readAll(owner).parsed(ListSerializer(NoteDto.serializer()))
 
             assertEquals(3, marked.size)
             assertEquals(listOf(true, true, false), marked.map { n -> n.reads.any { it.by.name == "owner" } }, "the owner's own note is not marked")
             assertEquals(own.id, marked.last().id)
-            assertEquals(0, unreadCount(owner))
-            assertEquals(3, unreadCount(lead), "marks are per user")
-            assertEquals(1, unreadCount(owner, date = "2026-10-04"))
+            assertEquals(NotesUnread(1, "2026-10-04"), unreadCount(owner), "the other day is still unread")
+            assertEquals(NotesUnread(4, "2026-10-03"), unreadCount(lead), "marks are per user")
+        }
+    }
+
+    @Test
+    fun theUnreadCountCoversEveryDayOfTheBranchAndNamesTheOldestUnreadDay() = env().run {
+        val noy = login("noy")
+        login("owner", grant = listOf(NOTE_READ_NODE))
+        login("mai", branches = listOf("market"), grant = listOf(NOTE_READ_NODE))
+        api {
+            val evening = write(noy, "yesterday evening").parsed(NoteDto.serializer())
+            write(login("mai"), "other branch", branch = "market")
+            clock.advance(Duration.ofHours(20))
+            write(login("noy"), "this morning")
+            val owner = login("owner")
+
+            assertEquals(NotesUnread(2, "2026-10-03"), unreadCount(owner))
+
+            readOne(owner, evening.id)
+            assertEquals(NotesUnread(1, "2026-10-04"), unreadCount(owner))
         }
     }
 

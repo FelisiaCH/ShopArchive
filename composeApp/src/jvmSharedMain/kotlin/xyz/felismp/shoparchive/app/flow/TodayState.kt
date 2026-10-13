@@ -20,6 +20,7 @@ import xyz.felismp.shoparchive.shared.DashboardCurrency
 import xyz.felismp.shoparchive.shared.DashboardDto
 import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.ErrorCode
+import xyz.felismp.shoparchive.shared.NotesUnread
 import xyz.felismp.shoparchive.shared.SessionDto
 
 sealed interface DayStatus {
@@ -47,8 +48,10 @@ data class TodayData(
     val mine: List<EntryDto>? = null,
     /** With [showStats]: the slips attached to the entries of [date]. */
     val slips: Int = 0,
-    /** For a person who holds `shoparchive.note.read`: the notes of others on [date] they have not read; null when they do not hold it or it could not be read. */
+    /** For a person who holds `shoparchive.note.read`: the notes of others, on any day of the branch, they have not read; null when they do not hold it or it could not be read. */
     val unreadNotes: Int? = null,
+    /** The date of the oldest of them, null when there are none (or [unreadNotes] is null). */
+    val oldestUnreadNote: String? = null,
 )
 
 /** [loading] only before the first answer; a reload keeps showing the last [data]. [failure] is set when the day itself could not be read. */
@@ -95,7 +98,7 @@ class TodayState(private val env: Env) {
             var statsFailure: Failure? = null
             val can = env.can
             val showStats = can.dashboard
-            val unreadNotes = if (can.noteRead) unreadNotes(branch, date) else null
+            val unread = if (can.noteRead) unreadNotes(branch) else null
             try {
                 if (showStats) stats = env.calls.run { env.api.dashboard(date, date, branch) }
                 else if (can.viewEntries) {
@@ -114,7 +117,7 @@ class TodayState(private val env: Env) {
                 data = TodayData(
                     branch, date, status, staleFrom = open?.businessDate?.takeIf { it != today },
                     currencies = stats?.currencies, recent = stats?.recent.orEmpty(), statsFailure = statsFailure, showStats = showStats, mine = mine,
-                    slips = stats?.slips ?: 0, unreadNotes = unreadNotes,
+                    slips = stats?.slips ?: 0, unreadNotes = unread?.unread, oldestUnreadNote = unread?.oldest,
                 ),
             )
         } catch (e: CancellationException) {
@@ -125,8 +128,8 @@ class TodayState(private val env: Env) {
     }
 
     /** Null when the count cannot be read: the card is left out, the rest of Today still shows. */
-    private suspend fun unreadNotes(branch: String, date: String): Int? = try {
-        env.calls.run { env.api.unreadNotes(branch, date) }
+    private suspend fun unreadNotes(branch: String): NotesUnread? = try {
+        env.calls.run { env.api.unreadNotes(branch) }
     } catch (e: CancellationException) {
         throw e
     } catch (_: Exception) {

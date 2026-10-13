@@ -8,6 +8,7 @@ import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.HistoryItem
 import xyz.felismp.shoparchive.shared.NoteDto
+import xyz.felismp.shoparchive.shared.NotesUnread
 import xyz.felismp.shoparchive.shared.NotificationDto
 import xyz.felismp.shoparchive.shared.SessionPreview
 import xyz.felismp.shoparchive.shared.UpdateEntryRequest
@@ -107,8 +108,8 @@ interface RecordsApi {
     /** Marks the notes of others on [date] in [branch] read; answers the day's notes. Needs `shoparchive.note.read`. */
     suspend fun markNotesRead(branch: String, date: String): List<NoteDto>
 
-    /** How many notes of others on [date] in [branch] the signed-in user has not read. Needs `shoparchive.note.read`. */
-    suspend fun unreadNotes(branch: String, date: String): Int
+    /** How many notes of others in [branch], on any day, the signed-in user has not read, and the date of the oldest. Needs `shoparchive.note.read`. */
+    suspend fun unreadNotes(branch: String): NotesUnread
 
     /** Runs [line] like the server console does and answers what it said, one entry per line. Needs the node of the command and a recent PIN or password. */
     suspend fun runCommand(line: String): List<String>

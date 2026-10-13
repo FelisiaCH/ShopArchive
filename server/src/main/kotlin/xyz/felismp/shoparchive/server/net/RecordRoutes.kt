@@ -195,7 +195,7 @@ internal fun Route.recordRoutes(services: ServiceRegistry) {
 
     get("/notes") { call.respond(blocking { services.require<NoteService>().list(call.principal, call.query("branch").orEmpty(), call.query("date").orEmpty()) }) }
 
-    get("/notes/unread") { call.respond(blocking { services.require<NoteService>().unread(call.principal, call.query("branch").orEmpty(), call.query("date").orEmpty()) }) }
+    get("/notes/unread") { call.respond(blocking { services.require<NoteService>().unread(call.principal, call.query("branch").orEmpty()) }) }
 
     post("/notes/read") {
         val body = call.receive<MarkNotesReadRequest>()

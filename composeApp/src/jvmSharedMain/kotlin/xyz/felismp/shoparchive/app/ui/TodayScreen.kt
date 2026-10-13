@@ -39,7 +39,7 @@ fun TodayScreen(ws: Workspace) {
             data == null -> ShopText(stringResource(Res.string.working), muted = true)
             else -> {
                 ui.failure?.let { ShopBanner(stringResource(Res.string.today_failed) + " " + it.text(), Tone.Error) }
-                TodayContent(data, canWrite, can, { ws.go(Destination.OPEN_DAY) }, { ws.openReports(ReportsTab.CLOSE_DAY) }, { ws.go(Destination.HISTORY) }, { ws.openNotes(data.date) })
+                TodayContent(data, canWrite, can, { ws.go(Destination.OPEN_DAY) }, { ws.openReports(ReportsTab.CLOSE_DAY) }, { ws.go(Destination.HISTORY) }, { ws.openNotes(data.oldestUnreadNote ?: data.date) })
             }
         }
     }

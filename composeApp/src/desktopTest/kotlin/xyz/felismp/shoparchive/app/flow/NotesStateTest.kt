@@ -209,6 +209,58 @@ class NotesStateTest {
         assertFalse(state.ui.value.connected)
     }
 
+    @Test fun aMarkAllAnswerForADayThatIsNoLongerShownIsNotKept() = runTest(UnconfinedTestDispatcher()) {
+        val h = harness(backgroundScope)
+        h.api.noteList = listOf(note("today-note"), note("yesterday-note", date = "2026-10-03"))
+        val state = NotesState(h.env)
+        h.api.markGate = CompletableDeferred()
+        state.markAllRead()
+        state.previousDay()
+        assertEquals(listOf("yesterday-note"), state.ui.value.notes!!.map { it.id })
+        h.api.markGate!!.complete(Unit)
+        assertEquals(listOf("yesterday-note"), state.ui.value.notes!!.map { it.id }, "the answer was for today")
+        assertEquals("2026-10-03", state.ui.value.date)
+        assertTrue(state.ui.value.marking.isEmpty())
+    }
+
+    @Test fun aMarkFailureForADayThatIsNoLongerShownIsNotShown() = runTest(UnconfinedTestDispatcher()) {
+        val h = harness(backgroundScope)
+        h.api.noteList = listOf(note("a"))
+        val state = NotesState(h.env)
+        h.api.markGate = CompletableDeferred()
+        h.api.markNoteError = ClientError.Unreachable()
+        state.markAllRead()
+        state.previousDay()
+        h.api.markGate!!.complete(Unit)
+        assertNull(state.ui.value.markFailure)
+    }
+
+    @Test fun afterABranchChangeTheOldBranchsNotesAreGoneEvenWhenTheNewLoadFails() = runTest(UnconfinedTestDispatcher()) {
+        val h = harness(backgroundScope)
+        h.api.noteList = listOf(note("a"), note("m", branch = "market"))
+        val state = NotesState(h.env)
+        assertEquals(listOf("a"), state.ui.value.notes!!.map { it.id })
+        h.api.notesError = ClientError.Unreachable()
+        h.branch.value = "market"
+        val ui = state.ui.value
+        assertEquals("market", ui.branch)
+        assertNull(ui.notes, "branch A's notes, and their buttons, are not shown for branch B")
+        assertEquals(Failure.Unreachable, ui.failure)
+        assertTrue(ui.marking.isEmpty())
+    }
+
+    @Test fun aMarkInFlightWhenTheBranchChangesDoesNotLandOnTheNewBranch() = runTest(UnconfinedTestDispatcher()) {
+        val h = harness(backgroundScope)
+        h.api.noteList = listOf(note("a"), note("m", branch = "market"))
+        val state = NotesState(h.env)
+        h.api.markGate = CompletableDeferred()
+        state.markAllRead()
+        h.branch.value = "market"
+        h.api.markGate!!.complete(Unit)
+        assertEquals(listOf("m"), state.ui.value.notes!!.map { it.id })
+        assertEquals("market", state.ui.value.branch)
+    }
+
     // ---- posting ----
 
     @Test fun postingSendsTheTextOnceClearsTheDraftAndShowsTheNote() = runTest(UnconfinedTestDispatcher()) {

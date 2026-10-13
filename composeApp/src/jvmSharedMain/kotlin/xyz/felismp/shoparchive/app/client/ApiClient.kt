@@ -245,8 +245,7 @@ class ApiClient(
 
     override suspend fun markNotesRead(branch: String, date: String): List<NoteDto> = post("/api/v1/notes/read", MarkNotesReadRequest(branch, date))
 
-    override suspend fun unreadNotes(branch: String, date: String): Int =
-        get<NotesUnread>("/api/v1/notes/unread?branch=${branch.encodeURLPath()}&date=$date").unread
+    override suspend fun unreadNotes(branch: String): NotesUnread = get("/api/v1/notes/unread?branch=${branch.encodeURLPath()}")
 
     override suspend fun runCommand(line: String): List<String> = post<CommandRequest, CommandResponse>("/api/v1/command", CommandRequest(line)).lines
 

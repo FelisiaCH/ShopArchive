@@ -14,6 +14,7 @@ import xyz.felismp.shoparchive.shared.EntryCreatedMessage
 import xyz.felismp.shoparchive.shared.EntryDeletedMessage
 import xyz.felismp.shoparchive.shared.EntryUpdatedMessage
 import xyz.felismp.shoparchive.shared.NoteChangedMessage
+import xyz.felismp.shoparchive.shared.NotesUnread
 import xyz.felismp.shoparchive.shared.PermissionNodes
 import xyz.felismp.shoparchive.shared.SayMessage
 import xyz.felismp.shoparchive.shared.SessionStatus
@@ -206,24 +207,28 @@ class TodayStateTest {
         assertEquals(7, TodayState(h.env).ui.value.data!!.slips)
     }
 
-    @Test fun aHolderOfTheReadNodeGetsTheUnreadCountOfTheDaysDateAndALiveNoteMessageAsksAgain() = runTest(UnconfinedTestDispatcher()) {
+    @Test fun aHolderOfTheReadNodeGetsTheUnreadCountOfTheBranchAndItsOldestDayAndALiveNoteMessageAsksAgain() = runTest(UnconfinedTestDispatcher()) {
         val h = Harness(backgroundScope)
-        h.api.unreadAnswer = 3
+        h.api.unreadAnswer = NotesUnread(3, "2026-10-03")
         val today = TodayState(h.env)
         assertEquals(3, today.ui.value.data!!.unreadNotes)
-        assertEquals(listOf("main" to "2026-10-04"), h.api.unreadCalls)
-        h.api.unreadAnswer = 4
+        assertEquals("2026-10-03", today.ui.value.data!!.oldestUnreadNote)
+        assertEquals(listOf("main"), h.api.unreadCalls)
+        h.api.unreadAnswer = NotesUnread(4, "2026-10-03")
         h.messages.emit(NoteChangedMessage("market", "2026-10-04"))
         assertEquals(1, h.api.unreadCalls.size, "another branch")
-        h.messages.emit(NoteChangedMessage("main", "2026-10-04"))
+        h.messages.emit(NoteChangedMessage("main", "2026-10-02"))
         assertEquals(4, today.ui.value.data!!.unreadNotes)
     }
 
-    @Test fun theUnreadCountIsForTheOpenDaysDate() = runTest(UnconfinedTestDispatcher()) {
+    @Test fun theCountIsOfEveryDayNotOnlyTheOpenDaysDate() = runTest(UnconfinedTestDispatcher()) {
         val h = Harness(backgroundScope)
         h.api.current = h.api.session("s0", date = "2026-10-03")
-        TodayState(h.env)
-        assertEquals(listOf("main" to "2026-10-03"), h.api.unreadCalls)
+        h.api.unreadAnswer = NotesUnread(0)
+        val data = TodayState(h.env).ui.value.data!!
+        assertEquals(listOf("main"), h.api.unreadCalls)
+        assertEquals(0, data.unreadNotes)
+        assertNull(data.oldestUnreadNote)
     }
 
     @Test fun withoutTheReadNodeNoCountIsAskedForAndAFailedCountLeavesTheRestOfTodayAlone() = runTest(UnconfinedTestDispatcher()) {
