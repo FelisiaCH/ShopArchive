@@ -22,18 +22,6 @@ import javax.net.ssl.X509TrustManager
  * the CA chain and the host name are not trusted, only the key is.
  */
 
-/** 32 bytes from [pin] (hex, any case; spaces tolerated), or null when it is not exactly that. */
-internal fun decodePin(pin: String): ByteArray? {
-    val hex = pin.filterNot { it.isWhitespace() }
-    if (hex.length != 64) return null
-    return ByteArray(32) { i ->
-        val hi = Character.digit(hex[i * 2], 16)
-        val lo = Character.digit(hex[i * 2 + 1], 16)
-        if (hi < 0 || lo < 0) return null
-        ((hi shl 4) or lo).toByte()
-    }
-}
-
 /** `publicKey.encoded` is the X.509 SubjectPublicKeyInfo DER, exactly what the server hashes. */
 private fun spkiSha256(cert: X509Certificate): ByteArray = MessageDigest.getInstance("SHA-256").digest(cert.publicKey.encoded)
 
