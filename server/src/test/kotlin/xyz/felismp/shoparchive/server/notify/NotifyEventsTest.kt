@@ -82,7 +82,7 @@ class NotifyEventsTest {
             createEntry(noy, newEntry(tenders = listOf(online("LAK", "851000"))).copy(transferCodes = listOf("a", "b")))
 
             val fields = notify!!.outbox.items().single().notification.fields
-            assertEquals("BCEL ✓ 850.000 LAK · 18/09 19:18 · Noy S → Go Mobile; BCEL ✓ 1.000 LAK · soon · Someone ⚠", fields["transfer"])
+            assertEquals("BCEL ✓ 850.000 LAK · 18/09 19:18\nNoy S → Go Mobile\nBCEL ✓ 1.000 LAK · soon\nSomeone ⚠", fields["transfer"])
         }
     }
 
