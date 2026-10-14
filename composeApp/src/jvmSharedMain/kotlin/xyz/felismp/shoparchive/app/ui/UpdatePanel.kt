@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.stringResource
 import xyz.felismp.shoparchive.app.flow.UpdateProblem
-import xyz.felismp.shoparchive.app.flow.UpdateState
+import xyz.felismp.shoparchive.app.flow.AppUpdates
 import xyz.felismp.shoparchive.app.flow.UpdateUi
 import xyz.felismp.shoparchive.app.resources.*
 import java.util.Locale
@@ -20,7 +20,7 @@ import java.util.Locale
  * shows the answers to a check the person started in Settings (checking, nothing newer, could not check).
  */
 @Composable
-fun UpdatePanel(update: UpdateState, asked: Boolean = false, modifier: Modifier = Modifier) {
+fun UpdatePanel(update: AppUpdates, asked: Boolean = false, modifier: Modifier = Modifier) {
     val ui by update.ui.collectAsState()
     when (val now = ui) {
         UpdateUi.Idle -> Unit
@@ -49,7 +49,7 @@ fun UpdatePanel(update: UpdateState, asked: Boolean = false, modifier: Modifier 
 }
 
 @Composable
-private fun Choices(update: UpdateState, modifier: Modifier) {
+private fun Choices(update: AppUpdates, modifier: Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         ShopButton(stringResource(Res.string.update_install), update::install)
         ShopButton(stringResource(Res.string.update_later), update::later, primary = false)

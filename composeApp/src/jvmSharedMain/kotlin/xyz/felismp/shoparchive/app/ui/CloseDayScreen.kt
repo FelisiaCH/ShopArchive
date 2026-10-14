@@ -62,7 +62,7 @@ private fun CurrencyCount(ws: Workspace, row: CloseRow, enabled: Boolean) {
         ShopText(code, TextRole.Title)
         ShopTextField(row.text, { ws.closeDay.setCounted(code, it) }, stringResource(Res.string.closeday_counted, code), kind = FieldKind.Amount, enabled = enabled)
         if (row.invalid) ShopText(stringResource(Res.string.openday_invalid, code), TextRole.Caption)
-        if (row.expected != null) Line(stringResource(Res.string.closeday_expected), money(row.expected))
+        row.expected?.let { Line(stringResource(Res.string.closeday_expected), money(it)) }
         row.variance?.let { v ->
             val words = when {
                 v == 0L -> stringResource(Res.string.closeday_matches)
