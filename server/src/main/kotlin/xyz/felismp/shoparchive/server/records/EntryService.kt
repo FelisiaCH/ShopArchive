@@ -90,7 +90,10 @@ internal fun differences(old: Entry, new: Entry): List<HistoryChange> = buildLis
     if (old.note != new.note) add(HistoryChange("note", old.note, new.note))
     if (old.tenders != new.tenders) add(HistoryChange("tenders", describe(old.tenders), describe(new.tenders)))
     if (old.slips != new.slips) add(HistoryChange("slips", old.slips.joinToString("; ") { it.file }, new.slips.joinToString("; ") { it.file }))
+    if (old.transfers != new.transfers) add(HistoryChange("transfers", describeTransfers(old.transfers), describeTransfers(new.transfers)))
 }
+
+private fun describeTransfers(transfers: List<Transfer>) = transfers.joinToString("; ") { "${it.source} ${it.amount} ${it.currency}" }
 
 private fun describe(tenders: List<Tender>) = tenders.joinToString("; ") { "${it.currency} ${it.method.wire()} ${it.amount.text}" }
 
@@ -119,10 +122,13 @@ internal class DefaultEntryService(
         if (!isUuidV7(request.id)) throw badRequest("The id must be a UUID version 7 in lower case.", ErrorReasons.ENTRY_ID_INVALID)
         access.requireBranch(principal, request.branch)
         val branch = branches.find(request.branch) ?: throw badRequest("There is no branch '${request.branch}'.", ErrorReasons.BRANCH_UNKNOWN)
-        checkEntry(request.type, request.category, request.tenders, slips.size, rules())?.let { throw badRequest(it) }
+        checkEntry(request.type, request.category, request.tenders, slips.size, rules(), request.transferCodes.size)?.let { throw badRequest(it) }
         val slipFiles = slipFiles(slips, firstNumber = 1)
         val codes = slipCodes(request.slipCodes, slips.size)
+        checkTransferCodes(request.transferCodes)
         val tenders = tenders(request.tenders)
+        // The bank is asked before the lock (it may take seconds), and not for a resend: what was stored the first time is answered.
+        val transfers = if (store.find(request.id) != null) emptyList() else confirmTransfers(codes.filterNotNull(), request.transferCodes)
 
         val (stored, isNew) = store.writer.run {
             store.find(request.id)?.let { existing ->
@@ -141,6 +147,7 @@ internal class DefaultEntryService(
                 id = request.id, date = open?.businessDate ?: today(), type = request.type, branch = branch.key, category = request.category,
                 item = request.item.trim(), note = request.note.trim(), createdBy = by, createdAt = now, updatedAt = now, deleted = false,
                 tenders = tenders, slips = slipFiles.mapIndexed { i, new -> Slip(new.file, sha256Hex(new.bytes), codes[i]) }, session = open?.id,
+                transfers = transfers,
             )
             store.create(NewEntry(entry, slipFiles.associate { it.file to it.bytes }, HistoryItem(now, by, "create", emptyList())))
             entry to true
@@ -204,6 +211,11 @@ internal class DefaultEntryService(
 
     override fun slipCheck(principal: Principal, code: String): SlipCheckDto? {
         requireSlipCode(principal, code)
+        return askBank(code)
+    }
+
+    /** What the bank plugin says about [code]; null when there is none, it does not know that kind of slip, or it failed. */
+    private fun askBank(code: String): SlipCheckDto? {
         val checker = services.get(SlipChecker::class.java) ?: return null
         return try {
             checker.check(code)
@@ -211,6 +223,32 @@ internal class DefaultEntryService(
             Log.debug("the slip checker failed: ${e.javaClass.simpleName}")
             null
         }
+    }
+
+    /**
+     * The transfers the bank confirms for [slipCodes] (the codes of the slips sent with a photo) and [scanned] (codes sent without one), each code once.
+     * A slip with a photo the bank does not confirm is kept without a transfer; a scanned code it does not confirm refuses the entry, since nothing else shows the payment.
+     */
+    private fun confirmTransfers(slipCodes: List<String>, scanned: List<String>): List<Transfer> {
+        val confirmed = (slipCodes + scanned).distinct().mapNotNull { code ->
+            val check = askBank(code)?.takeIf { it.known } ?: return@mapNotNull null
+            Transfer(
+                code, check.source, check.amount ?: return@mapNotNull null, check.currency ?: return@mapNotNull null, check.time ?: return@mapNotNull null,
+                check.to ?: return@mapNotNull null, check.toAccount ?: return@mapNotNull null, check.toShop, check.from, check.fromAccount, code in scanned,
+            )
+        }
+        if (scanned.any { code -> confirmed.none { it.code == code } }) {
+            throw badRequest("The bank did not confirm a scanned slip. Attach a photo of the slip instead.", ErrorReasons.ENTRY_TRANSFER_UNCONFIRMED)
+        }
+        return confirmed
+    }
+
+    /** The codes scanned without a photo: each a slip code, at most as many as the slips an entry may have. */
+    private fun checkTransferCodes(codes: List<String>) {
+        if (codes.any { !isSlipCode(it) }) {
+            throw badRequest("A slip code must be 1 to $SLIP_CODE_MAX characters without control characters.", ErrorReasons.ENTRY_SLIP_CODE_INVALID)
+        }
+        if (codes.size > config.records.slipMaxCount) throw badRequest("An entry takes at most ${config.records.slipMaxCount} slips.", ErrorReasons.ENTRY_SLIP_TOO_MANY)
     }
 
     private fun requireSlipCode(principal: Principal, code: String) {
@@ -221,6 +259,12 @@ internal class DefaultEntryService(
     // --- change ---
 
     override fun update(principal: Principal, date: String, id: String, request: UpdateEntryRequest, newSlips: List<ByteArray>): EntryDto {
+        val codes = slipCodes(request.addedSlipCodes, newSlips.size)
+        // Asked before the lock, like on create, and only for someone who may change the entry.
+        val confirmed = if (codes.all { it == null }) emptyList() else {
+            requireChange(principal, lookup(principal, date, id), ENTRY_EDIT_OWN_NODE, ENTRY_EDIT_ALL_NODE)
+            confirmTransfers(codes.filterNotNull(), emptyList())
+        }
         val result = store.writer.run {
             val entry = lookup(principal, date, id)
             requireChange(principal, entry, ENTRY_EDIT_OWN_NODE, ENTRY_EDIT_ALL_NODE)
@@ -229,18 +273,22 @@ internal class DefaultEntryService(
             val kept = request.keepSlips?.let { keep ->
                 keep.map { file -> entry.slips.firstOrNull { it.file == file } ?: throw badRequest("This entry has no slip '$file' to keep.", ErrorReasons.ENTRY_SLIP_UNKNOWN) }.distinct()
             } ?: entry.slips
+            // The transfer of a slip that is removed goes with it, unless another slip has its code; a transfer scanned without a photo stays.
+            val slipCodes = (kept.mapNotNull { it.code } + codes.filterNotNull()).toSet()
+            val stay = entry.transfers.filter { it.scanned || it.code in slipCodes }
+            val transfers = stay + confirmed.filter { c -> stay.none { it.code == c.code } }
             // An unchanged category stays acceptable even if it was archived or retyped since.
             val unchangedCategory = request.category != null && request.category == entry.category
             checkEntry(
                 request.type, request.category.takeUnless { unchangedCategory }, request.tenders, kept.size + newSlips.size,
-                rules().let { if (unchangedCategory) EntryRules(it.exponents, it.categories, false, it.slipMaxCount) else it },
+                rules().let { if (unchangedCategory) EntryRules(it.exponents, it.categories, false, it.slipMaxCount) else it }, transfers.size,
             )?.let { throw badRequest(it) }
             val added = slipFiles(newSlips, firstNumber = store.nextSlipNumber(entry))
-            val codes = slipCodes(request.addedSlipCodes, newSlips.size)
             val now = nextStamp(entry.updatedAt, clock, config)
             val changed = entry.copy(
                 type = request.type, category = request.category, item = request.item.trim(), note = request.note.trim(),
                 tenders = tenders(request.tenders), slips = kept + added.mapIndexed { i, new -> Slip(new.file, sha256Hex(new.bytes), codes[i]) }, updatedAt = now,
+                transfers = transfers,
             )
             val changes = differences(entry, changed)
             if (changes.isEmpty()) return@run entry to null

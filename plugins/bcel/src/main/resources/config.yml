@@ -2,8 +2,10 @@
 # `reload BCEL` in the server console reads this file again.
 #
 # When staff attach the photo of a BCEL OneProof slip, the server asks BCEL whether it knows the slip and shows the answer
-# (and the amount BCEL has) under the slip on the Record screen. Nothing is blocked: it is a hint for the person recording.
-# Slips of other banks are ignored. The payer's name and account are never kept, logged or shown.
+# (and the amount BCEL has) under the slip on the Record screen. A slip with a photo is never blocked: the answer is a hint.
+# Staff can also scan a slip's QR code without keeping the photo; then the entry is saved only if BCEL confirms the transfer.
+# What BCEL confirms is kept with the entry (amount, time, who was paid, and the payer's name and account as BCEL hides them)
+# and shown in the app and in the Telegram message. It is never written to the log. Slips of other banks are ignored.
 #
 # Careful: this uses the check behind BCEL's OneProof QR code. BCEL does not publish it as an API for shops, so it may change or stop working
 # without notice. When BCEL does not answer, the Record screen shows nothing.

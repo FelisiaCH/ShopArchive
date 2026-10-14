@@ -103,7 +103,7 @@ class TelegramSettings(
                     val text = when {
                         event !in events -> own // only what this channel sends is looked after
                         own == null -> fromJar?.also { upgraded += path }
-                        event == "entry.created" && own == ShippedConfig.OLD_ENTRY_TEMPLATES[lang] -> (fromJar ?: own).also { if (it != own) upgraded += path }
+                        event == "entry.created" && own in ShippedConfig.OLD_ENTRY_TEMPLATES[lang].orEmpty() -> (fromJar ?: own).also { if (it != own) upgraded += path }
                         else -> own
                     }
                     text?.let { lang to it }

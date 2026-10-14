@@ -8,6 +8,7 @@ import xyz.felismp.shoparchive.api.EntryCreatedEvent
 import xyz.felismp.shoparchive.api.Notifier
 import xyz.felismp.shoparchive.api.ShopEventListener
 import xyz.felismp.shoparchive.api.ShopEventTypes
+import xyz.felismp.shoparchive.api.SlipChecker
 import xyz.felismp.shoparchive.server.auth.AuthEnv
 import xyz.felismp.shoparchive.server.auth.NO_BACKOFF
 import xyz.felismp.shoparchive.server.auth.api
@@ -22,6 +23,7 @@ import xyz.felismp.shoparchive.server.records.online
 import xyz.felismp.shoparchive.server.records.openDay
 import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.NotificationState
+import xyz.felismp.shoparchive.shared.SlipCheckDto
 import java.nio.file.Path
 import java.util.Locale
 import kotlin.test.Test
@@ -61,11 +63,26 @@ class NotifyEventsTest {
             assertEquals(
                 mapOf(
                     "type" to "income", "category" to "ເຄື່ອງດື່ມ", "category.key" to "drinks", "category.lo" to "ເຄື່ອງດື່ມ", "category.th" to "เครื่องดื่ม", "category.en" to "Drinks",
-                    "item" to "coffee", "note" to "", "amount" to "150000", "currency" to "LAK", "money" to "+150.000 LAK", "branch" to "Main Shop", "user" to "noy", "time" to n.createdAt, "date" to "2026-10-03",
+                    "item" to "coffee", "note" to "", "amount" to "150000", "currency" to "LAK", "money" to "+150.000 LAK", "transfer" to "", "branch" to "Main Shop", "user" to "noy", "time" to n.createdAt, "date" to "2026-10-03",
                 ),
                 n.fields,
             )
             assertTrue(n.createdAt.startsWith("2026-10-03T15:00:00"), n.createdAt)
+        }
+    }
+
+    @Test
+    fun theTransfersTheBankConfirmedAreOneWordWithTheAccountThatIsNotTheShopsMarked() = env().run {
+        val noy = login("noy")
+        val paid = SlipCheckDto("BCEL", true, "850000", "LAK", "2026-09-18 19:18:42", "Go Mobile", toShop = true, toAccount = "160", from = "Noy S", fromAccount = "010")
+        val elsewhere = paid.copy(amount = "1000", time = "soon", to = "Someone", toShop = false, from = null)
+        services.register(SlipChecker::class.java, SlipChecker { code -> if (code == "a") paid else elsewhere }, 10, "test")
+        api {
+            openDay(noy)
+            createEntry(noy, newEntry(tenders = listOf(online("LAK", "851000"))).copy(transferCodes = listOf("a", "b")))
+
+            val fields = notify!!.outbox.items().single().notification.fields
+            assertEquals("BCEL ✓ 850.000 LAK · 18/09 19:18 · Noy S → Go Mobile; BCEL ✓ 1.000 LAK · soon · Someone ⚠", fields["transfer"])
         }
     }
 

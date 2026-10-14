@@ -12,6 +12,7 @@ import xyz.felismp.shoparchive.shared.SessionDto
 import xyz.felismp.shoparchive.shared.SessionStatus
 import xyz.felismp.shoparchive.shared.SLIP_CODE_MAX
 import xyz.felismp.shoparchive.shared.SlipDto
+import xyz.felismp.shoparchive.shared.TransferDto
 import xyz.felismp.shoparchive.shared.TenderDto
 import xyz.felismp.shoparchive.shared.TenderMethod
 import xyz.felismp.shoparchive.shared.UserRef
@@ -47,6 +48,14 @@ internal data class Slip(val file: String, val sha256: String, val code: String?
     val number: Int get() = file.removePrefix("slip-").substringBefore('.').toInt()
 }
 
+/** A transfer the bank confirmed when the entry was saved; see [TransferDto]. [amount] is in its [currency]'s format as the bank plugin wrote it. */
+internal data class Transfer(
+    val code: String, val source: String, val amount: String, val currency: String, val time: String,
+    val to: String, val toAccount: String, val toShop: Boolean?, val from: String?, val fromAccount: String?, val scanned: Boolean,
+) {
+    fun toDto() = TransferDto(code, source, amount, currency, time, to, toAccount, toShop, from, fromAccount, scanned)
+}
+
 internal fun sha256Hex(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
 internal val SLIP_FILE = Regex("slip-([1-9][0-9]{0,3})\\.(jpg|png)")
@@ -66,10 +75,11 @@ internal data class Entry(
     val tenders: List<Tender>,
     val slips: List<Slip>,
     val session: String?,
+    val transfers: List<Transfer> = emptyList(),
 ) {
     fun toDto() = EntryDto(
         id, date.toString(), type, branch, category, item, note, createdBy, createdAt, updatedAt, deleted,
-        tenders.map { it.toDto() }, slips.map { it.toDto() }, session,
+        tenders.map { it.toDto() }, slips.map { it.toDto() }, session, transfers.map { it.toDto() },
     )
 }
 
@@ -157,6 +167,13 @@ internal fun renderEntry(e: Entry): String = buildString {
     for (s in e.slips) {
         append("  - file: ${quoted(s.file)}\n    sha256: ${quoted(s.sha256)}\n")
         s.code?.let { append("    code: ${quoted(it)}\n") }
+    }
+    // Only written when there are some, so an entry without one reads the same to a server from before transfers.
+    if (e.transfers.isNotEmpty()) append("transfers:\n")
+    for (t in e.transfers) {
+        append("  - code: ${quoted(t.code)}\n    source: ${quoted(t.source)}\n    amount: ${quoted(t.amount)}\n    currency: ${quoted(t.currency)}\n")
+        append("    time: ${quoted(t.time)}\n    to: ${quoted(t.to)}\n    to-account: ${quoted(t.toAccount)}\n    to-shop: ${t.toShop ?: "null"}\n")
+        append("    from: ${t.from?.let(::quoted) ?: "null"}\n    from-account: ${t.fromAccount?.let(::quoted) ?: "null"}\n    scanned: ${t.scanned}\n")
     }
 }
 
@@ -316,11 +333,24 @@ internal fun parseEntry(text: String, exponents: Map<String, Int>): Entry {
         val code = s.optionalText("code")?.also { if (!isSlipCode(it)) throw RecordFormatException("entry.yml: the code of $file is not 1 to $SLIP_CODE_MAX characters without control characters") }
         Slip(file, sha, code)
     }
+    val transfers = if (!f.has("transfers")) emptyList() else f.items("transfers").map { t ->
+        val code = t.text("code").also { if (!isSlipCode(it)) throw RecordFormatException("entry.yml: a transfer's code is not 1 to $SLIP_CODE_MAX characters without control characters") }
+        val toShop = when (t.optionalText("to-shop")) {
+            null -> null
+            "true" -> true
+            "false" -> false
+            else -> throw RecordFormatException("entry.yml: a transfer's to-shop is not true, false or null")
+        }
+        Transfer(
+            code, t.text("source"), t.text("amount"), t.text("currency"), t.text("time"), t.text("to"), t.text("to-account"),
+            toShop, t.optionalText("from"), t.optionalText("from-account"), t.bool("scanned"),
+        )
+    }
     return Entry(
         id = id, date = LocalDate.parse(date), type = type, branch = branch,
         category = f.optionalText("category"), item = f.text("item"), note = f.text("note"),
         createdBy = f.userRef("created-by"), createdAt = f.stamp("created-at"), updatedAt = f.stamp("updated-at"),
-        deleted = f.bool("deleted"), tenders = tenders, slips = slips, session = f.optionalText("session"),
+        deleted = f.bool("deleted"), tenders = tenders, slips = slips, session = f.optionalText("session"), transfers = transfers,
     )
 }
 

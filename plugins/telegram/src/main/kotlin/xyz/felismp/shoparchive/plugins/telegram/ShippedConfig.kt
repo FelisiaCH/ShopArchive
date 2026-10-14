@@ -24,10 +24,19 @@ internal object ShippedConfig {
         return inBlock.drop(start + 1).takeWhile { it.startsWith("      ") }.joinToString("\n") { it.removePrefix("      ") }.takeIf { it.isNotBlank() }
     }
 
-    /** What the entry template said in 0.1.1, per language. A file that still has exactly this text never changed it, so it takes the shipped one. */
-    val OLD_ENTRY_TEMPLATES: Map<String, String> = mapOf(
-        "lo" to "{type} · {branch}\n{amount} {currency}\n{category} {item}\n{user} · {time}\nລະຫັດ {code}",
-        "th" to "{type} · {branch}\n{amount} {currency}\n{category} {item}\n{user} · {time}\nรหัส {code}",
-        "en" to "{type} · {branch}\n{amount} {currency}\n{category} {item}\n{user} · {time}\nCode {code}",
+    /** What the entry template said in earlier versions, per language: 0.1.1, then before `{transfer}`. A file that still has one of these never changed it, so it takes the shipped one. */
+    val OLD_ENTRY_TEMPLATES: Map<String, List<String>> = mapOf(
+        "lo" to listOf(
+            "{type} · {branch}\n{amount} {currency}\n{category} {item}\n{user} · {time}\nລະຫັດ {code}",
+            "{type} {money}\n{category} {item}\n📝 {note}\n{branch} · {user} · {time}\nລະຫັດ {code}",
+        ),
+        "th" to listOf(
+            "{type} · {branch}\n{amount} {currency}\n{category} {item}\n{user} · {time}\nรหัส {code}",
+            "{type} {money}\n{category} {item}\n📝 {note}\n{branch} · {user} · {time}\nรหัส {code}",
+        ),
+        "en" to listOf(
+            "{type} · {branch}\n{amount} {currency}\n{category} {item}\n{user} · {time}\nCode {code}",
+            "{type} {money}\n{category} {item}\n📝 {note}\n{branch} · {user} · {time}\nCode {code}",
+        ),
     )
 }
