@@ -250,6 +250,8 @@ data class RecordsPolicy(
     val slipMaxSizeKb: Int = 5120,
     /** How many days back a person may still change or delete their own entries (`records.edit-window-days`); 0 is the same day only. */
     val editWindowDays: Int = 0,
+    /** Whether a bank plugin checks slips: without one a scanned QR code can never be confirmed, so the app offers no scan. */
+    val slipCheck: Boolean = false,
 )
 
 // --- rules shared by the server and the apps ---
