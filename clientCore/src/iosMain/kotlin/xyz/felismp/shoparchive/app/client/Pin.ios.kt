@@ -88,9 +88,9 @@ internal fun pinnedHttpClient(pin: String, connectTimeoutMs: Long): HttpClient {
                 val trust = space.serverTrust
                 when {
                     space.authenticationMethod != NSURLAuthenticationMethodServerTrust || trust == null ->
-                        completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, null)
+                        completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge.convert(), null)
                     pinAllows(trust, expected) ->
-                        completionHandler(NSURLSessionAuthChallengeUseCredential, NSURLCredential.credentialForTrust(trust))
+                        completionHandler(NSURLSessionAuthChallengeUseCredential.convert(), NSURLCredential.credentialForTrust(trust))
                     else -> throw PinMismatchException()
                 }
             }

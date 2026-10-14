@@ -6,6 +6,7 @@ import xyz.felismp.shoparchive.shared.DeviceMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.fail
 
 class PreferencesStoreIosTest {
     private val suite = "shoparchive-test-" + NSUUID().UUIDString
@@ -61,7 +62,7 @@ class KeychainCredentialStoreIosTest {
         try {
             test(store)
         } catch (e: KeychainException) {
-            if (e.status != ERR_SEC_MISSING_ENTITLEMENT) throw e
+            if (e.status != ERR_SEC_MISSING_ENTITLEMENT) fail("${e.message}")
         } finally {
             try { store.clear() } catch (_: KeychainException) { }
         }
