@@ -4,6 +4,7 @@ package xyz.felismp.shoparchive.app.client
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
+import io.ktor.client.engine.darwin.DarwinHttpRequestException
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.request.get
 import kotlinx.cinterop.BetaInteropApi
@@ -20,6 +21,7 @@ import platform.Foundation.CFBridgingRelease
 import platform.Foundation.NSData
 import platform.Foundation.NSURLAuthenticationMethodServerTrust
 import platform.Foundation.NSURLCredential
+import platform.Foundation.NSURLErrorCancelled
 import platform.Foundation.NSURLSessionAuthChallengeCancelAuthenticationChallenge
 import platform.Foundation.NSURLSessionAuthChallengeUseCredential
 import platform.Foundation.credentialForTrust
@@ -29,6 +31,7 @@ import platform.Security.SecCertificateRef
 import platform.Security.SecKeyCopyExternalRepresentation
 import platform.Security.SecTrustGetCertificateAtIndex
 import platform.Security.SecTrustRef
+import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -75,7 +78,7 @@ private class TofuDone : Exception("fingerprint recorded; connection refused on 
  * A client that talks only to a server whose leaf key hashes to [pin], whatever address it is reached at. A wrong key throws from the
  * challenge handler; the engine then cancels the connection and fails the call with that same exception. One delegate serves https:// and wss://.
  */
-internal fun pinnedHttpClient(pin: String, connectTimeoutMs: Long): HttpClient {
+internal fun pinnedHttpClient(pin: String, connectTimeoutMs: Long, onCheck: (allowed: Boolean) -> Unit = {}): HttpClient {
     val expected = decodePin(pin)
     return HttpClient(Darwin) {
         expectSuccess = false
@@ -86,12 +89,13 @@ internal fun pinnedHttpClient(pin: String, connectTimeoutMs: Long): HttpClient {
             handleChallenge { _, _, challenge, completionHandler ->
                 val space = challenge.protectionSpace
                 val trust = space.serverTrust
-                when {
-                    space.authenticationMethod != NSURLAuthenticationMethodServerTrust || trust == null ->
-                        completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge.convert(), null)
-                    pinAllows(trust, expected) ->
-                        completionHandler(NSURLSessionAuthChallengeUseCredential.convert(), NSURLCredential.credentialForTrust(trust))
-                    else -> throw PinMismatchException()
+                if (space.authenticationMethod != NSURLAuthenticationMethodServerTrust || trust == null) {
+                    completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge.convert(), null)
+                } else {
+                    val allowed = pinAllows(trust, expected)
+                    onCheck(allowed)
+                    if (!allowed) throw PinMismatchException()
+                    completionHandler(NSURLSessionAuthChallengeUseCredential.convert(), NSURLCredential.credentialForTrust(trust))
                 }
             }
         }
@@ -102,8 +106,16 @@ internal fun pinnedHttpClient(pin: String, connectTimeoutMs: Long): HttpClient {
 internal fun isPinFailure(e: Throwable): Boolean = generateSequence(e) { it.cause }.take(10).any { it is PinMismatchException }
 
 /** An [ApiClient] that talks only to a server whose key is [pin], through the Darwin engine. */
-fun ApiClient(serverId: String, pin: String, endpoints: List<String>, connectTimeoutMs: Long = 5_000): ApiClient =
-    ApiClient(serverId, endpoints, pinnedHttpClient(pin, connectTimeoutMs), ::isPinFailure)
+fun ApiClient(serverId: String, pin: String, endpoints: List<String>, connectTimeoutMs: Long = 5_000): ApiClient {
+    // Ktor hands a refused key to an HTTP call as PinMismatchException, but a WebSocket gets only the cancelled task's error:
+    // so the last check is remembered, and a cancelled connection right after a refused key is that refusal.
+    val refused = AtomicBoolean(false)
+    val http = pinnedHttpClient(pin, connectTimeoutMs) { allowed -> refused.store(!allowed) }
+    return ApiClient(serverId, endpoints, http) { e -> isPinFailure(e) || (refused.load() && e.isCancelledTask()) }
+}
+
+private fun Throwable.isCancelledTask(): Boolean =
+    generateSequence(this) { it.cause }.take(10).any { it is DarwinHttpRequestException && it.origin.code == NSURLErrorCancelled }
 
 /**
  * Trust on first use for the manual-code flow: starts a TLS handshake with [endpoint] (`host:port`), records the leaf's SPKI
