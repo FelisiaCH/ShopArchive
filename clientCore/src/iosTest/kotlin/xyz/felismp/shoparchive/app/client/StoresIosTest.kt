@@ -55,14 +55,14 @@ class KeychainCredentialStoreIosTest {
         lastServerId = "sid-1",
     )
 
-    // A command-line test process has no keychain entitlement on the simulator (status -34018 errSecMissingEntitlement); the app has one.
-    // The tests then have nothing to check here and are run on a device or in the app instead.
+    // A command-line test process on a headless simulator has no keychain: errSecNotAvailable (-25291) on the CI runner, errSecMissingEntitlement
+    // (-34018) where there is one but no entitlement. The tests then have nothing to check here; the app on a device or simulator does have one.
     private fun withStore(test: (KeychainCredentialStore) -> Unit) {
         val store = KeychainCredentialStore("xyz.felismp.shoparchive.test", "servers-" + NSUUID().UUIDString)
         try {
             test(store)
         } catch (e: KeychainException) {
-            if (e.status != ERR_SEC_MISSING_ENTITLEMENT) fail("${e.message}")
+            if (e.status !in NO_KEYCHAIN_HERE) fail("${e.message}")
         } finally {
             try { store.clear() } catch (_: KeychainException) { }
         }
@@ -94,6 +94,6 @@ class KeychainCredentialStoreIosTest {
     }
 
     private companion object {
-        const val ERR_SEC_MISSING_ENTITLEMENT = -34018
+        val NO_KEYCHAIN_HERE = setOf(-25291, -34018)
     }
 }
