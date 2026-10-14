@@ -55,12 +55,11 @@ private fun entryFields(event: EntryCreatedEvent, locale: Locale): Map<String, S
         "currency" to entry.tenders.joinToString(", ") { it.currency },
         // Read at a glance: signed by type and grouped as the app shows money, each amount with its own currency.
         "money" to entry.tenders.joinToString(", ") { (if (entry.type == EntryType.INCOME) "+" else "-") + groupThousands(it.amount, locale) + " " + it.currency },
-        // What the bank confirmed, e.g. "BCEL ✓ 850,000 LAK · 18/09 19:18 · payer → shop"; a payment to an account that is not the shop's is marked.
-        "transfer" to entry.transfers.joinToString("; ") { t ->
-            listOfNotNull(
-                "${t.source} ✓ ${groupThousands(t.amount, locale)} ${t.currency}", shortBankTime(t.time),
-                listOfNotNull(t.from, t.to + if (t.toShop == false) " ⚠" else "").joinToString(" → "),
-            ).joinToString(" · ")
+        // What the bank confirmed, two lines per transfer so a phone does not break the names: "BCEL ✓ 850,000 LAK · 18/09 19:18" then
+        // "payer → shop"; a payment to an account that is not the shop's is marked.
+        "transfer" to entry.transfers.joinToString("\n") { t ->
+            "${t.source} ✓ ${groupThousands(t.amount, locale)} ${t.currency} · ${shortBankTime(t.time)}\n" +
+                listOfNotNull(t.from, t.to + if (t.toShop == false) " ⚠" else "").joinToString(" → ")
         },
         "branch" to event.branchName,
         "user" to entry.createdBy.name,

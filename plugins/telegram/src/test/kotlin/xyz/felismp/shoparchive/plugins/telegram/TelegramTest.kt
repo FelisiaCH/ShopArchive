@@ -290,9 +290,9 @@ class TelegramTest {
         assertEquals("🟢 ລາຍຮັບ +150.000 LAK\nເຄື່ອງດື່ມ coffee\nMain Shop · noy · 2026-10-03 15:00\nລະຫັດ 20261003-A3F9C", r.render(shippedTemplate("entry.created", "lo"), income, "lo"))
         val expense = note(fields = entryFields + mapOf("type" to "expense", "money" to "-50,000 LAK, -20.50 THB", "branch" to "Main Shop", "note" to "for the cooler"))
         assertEquals("🔴 Expense -50,000 LAK, -20.50 THB\ncoffee\n📝 for the cooler\nMain Shop · noy · 2026-10-03 15:00\nCode 20261003-A3F9C", r.render(shippedTemplate("entry.created", "en"), expense, "en"))
-        val transfer = note(fields = entryFields + mapOf("money" to "+850.000 LAK", "branch" to "Main Shop", "transfer" to "BCEL ✓ 850.000 LAK · 18/09 19:18 · Noy S → Go Mobile"))
+        val transfer = note(fields = entryFields + mapOf("money" to "+850.000 LAK", "branch" to "Main Shop", "transfer" to "BCEL ✓ 850.000 LAK · 18/09 19:18\nNoy S → Go Mobile"))
         assertEquals(
-            "🟢 ລາຍຮັບ +850.000 LAK\n🏦 BCEL ✓ 850.000 LAK · 18/09 19:18 · Noy S → Go Mobile\ncoffee\nMain Shop · noy · 2026-10-03 15:00\nລະຫັດ 20261003-A3F9C",
+            "🟢 ລາຍຮັບ +850.000 LAK\n🏦 BCEL ✓ 850.000 LAK · 18/09 19:18\nNoy S → Go Mobile\ncoffee\nMain Shop · noy · 2026-10-03 15:00\nລະຫັດ 20261003-A3F9C",
             r.render(shippedTemplate("entry.created", "lo"), transfer, "lo"),
         )
     }
