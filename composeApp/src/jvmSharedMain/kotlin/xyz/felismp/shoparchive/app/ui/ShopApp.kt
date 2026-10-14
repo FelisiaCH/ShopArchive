@@ -18,6 +18,7 @@ import xyz.felismp.shoparchive.app.client.createPreferencesStore
 import xyz.felismp.shoparchive.app.client.createServerDiscovery
 import xyz.felismp.shoparchive.app.client.probeFingerprint
 import xyz.felismp.shoparchive.app.flow.AppFlow
+import xyz.felismp.shoparchive.app.flow.UpdateState
 import xyz.felismp.shoparchive.app.flow.createAppUpdater
 import xyz.felismp.shoparchive.app.flow.createSlipCompressor
 import xyz.felismp.shoparchive.app.flow.createSlipReader
@@ -37,8 +38,9 @@ fun ShopApp(context: PlatformContext) {
                     compressor = createSlipCompressor(),
                     reader = createSlipReader(),
                     discovery = createServerDiscovery(context),
-                    updater = createAppUpdater(context),
-                    ownVersion = AppBuild.version,
+                    updatesFactory = createAppUpdater(context)?.let { updater ->
+                        { scope, api, calls -> UpdateState(scope, api, calls, updater, AppBuild.version) }
+                    },
                 )
             }
             OnAppResume(flow::appResumed)

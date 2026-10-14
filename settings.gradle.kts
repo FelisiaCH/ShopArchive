@@ -28,6 +28,7 @@ dependencyResolutionManagement {
 rootProject.name = "ShopArchive"
 
 include(":shared")
+include(":clientCore")
 include(":shoparchive-api")
 include(":server-launcher")
 include(":server")

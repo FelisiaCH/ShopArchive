@@ -57,16 +57,13 @@ kotlin {
     }
 
     sourceSets {
-        // The client core (pinned OkHttp, Ktor, credential store plumbing) is plain JVM code that both targets share.
+        // The screens and the wiring of the platform pieces are plain JVM code that both targets share; the client core is :clientCore.
         named("jvmSharedMain").configure {
           kotlin.srcDir(generateAppBuild.flatMap { it.outputDir })
           dependencies {
+            implementation(project(":clientCore"))
             implementation(project(":shared"))
             implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.okhttp)
-            implementation(libs.ktor.client.websockets)
-            implementation(libs.okhttp)
           }
         }
         commonMain.dependencies {
@@ -90,13 +87,6 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.swing)
                 implementation(libs.jna.platform)
                 implementation(libs.jmdns)
-            }
-        }
-        named("desktopTest") {
-            dependencies {
-                implementation(libs.kotlinx.coroutines.test)
-                implementation(libs.okhttp.tls)
-                implementation(libs.okhttp.mockwebserver)
             }
         }
     }
