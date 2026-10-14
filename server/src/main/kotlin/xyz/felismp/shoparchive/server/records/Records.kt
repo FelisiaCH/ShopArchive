@@ -10,6 +10,7 @@ import xyz.felismp.shoparchive.api.NotificationImages
 import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.api.ServiceRegistry
 import xyz.felismp.shoparchive.api.SessionService
+import xyz.felismp.shoparchive.api.SlipChecker
 import xyz.felismp.shoparchive.server.DataBarrier
 import xyz.felismp.shoparchive.server.auth.ClientRecordsConfig
 import xyz.felismp.shoparchive.server.config.ConfigLog
@@ -34,7 +35,7 @@ internal class Records(
     private val root: Path,
     private val config: ConfigService,
     private val users: UserStore,
-    services: ServiceRegistry,
+    private val services: ServiceRegistry,
     private val log: ConfigLog = ConsoleConfigLog,
     private val clock: Clock = Clock.systemUTC(),
     private val files: FileOps = FileOps(),
@@ -148,5 +149,7 @@ internal class Records(
 
     override fun categories(): List<CategoryDto> = categories.all().map { it.toDto() }
 
-    override fun policy() = config.records.let { RecordsPolicy(it.requireOpenDay, it.requireCategory, it.slipMaxCount, it.slipMaxSizeKb, it.editWindowDays) }
+    override fun policy() = config.records.let {
+        RecordsPolicy(it.requireOpenDay, it.requireCategory, it.slipMaxCount, it.slipMaxSizeKb, it.editWindowDays, services.get(SlipChecker::class.java) != null)
+    }
 }

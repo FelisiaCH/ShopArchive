@@ -73,8 +73,8 @@ fun RecordScreen(ws: Workspace) {
                 val camera = picker.takePhoto
                 ShopButton(stringResource(if (camera != null) Res.string.slip_gallery else Res.string.slip_file), picker.pickFromLibrary, primary = false, enabled = editable)
                 if (camera != null) ShopButton(stringResource(Res.string.slip_camera), camera, primary = false, enabled = editable)
-                // Only a phone reads a QR code (the desktop app has no reader), and it scans with its camera.
-                scanner.takePhoto?.let { ShopButton(stringResource(Res.string.slip_scan), it, primary = false, enabled = editable) }
+                // Only a phone reads a QR code (the desktop app has no reader), and it scans with its camera; only a server with a bank plugin confirms one.
+                scanner.takePhoto?.takeIf { ui.policy.slipCheck }?.let { ShopButton(stringResource(Res.string.slip_scan), it, primary = false, enabled = editable) }
             }
             if (ui.compressing) ShopText(stringResource(Res.string.slip_preparing), muted = true)
             if (ui.scanning) ShopText(stringResource(Res.string.slip_scanning), muted = true)

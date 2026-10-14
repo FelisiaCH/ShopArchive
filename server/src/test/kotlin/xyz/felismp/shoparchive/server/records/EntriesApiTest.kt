@@ -49,6 +49,7 @@ import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -894,9 +895,11 @@ class EntriesApiTest {
             val none = getPath("/api/v1/slips/check?code=$bcel", noy)
             assertEquals(HttpStatusCode.NoContent, none.status)
             assertEquals("", none.bodyAsText())
+            assertFalse(records!!.policy().slipCheck)
 
             val asked = mutableListOf<String>()
             services.register(SlipChecker::class.java, SlipChecker { code -> asked += code; if (code == bcel) answer else null }, 10, "test")
+            assertTrue(records!!.policy().slipCheck)
 
             assertEquals(answer, getPath("/api/v1/slips/check?code=$bcel", noy).parsed(SlipCheckDto.serializer()))
             assertEquals(HttpStatusCode.NoContent, getPath("/api/v1/slips/check?code=$trust", noy).status)
