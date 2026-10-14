@@ -69,7 +69,7 @@ fun RecordScreen(ws: Workspace) {
         if (ui.online || d.slips.isNotEmpty() || d.transfers.isNotEmpty()) {
             ShopText(stringResource(Res.string.slips_title), TextRole.Title)
             ShopText(stringResource(Res.string.slips_count, d.slips.size.toString(), ui.policy.slipMaxCount.toString()), TextRole.Caption, muted = true)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val camera = picker.takePhoto
                 ShopButton(stringResource(if (camera != null) Res.string.slip_gallery else Res.string.slip_file), picker.pickFromLibrary, primary = false, enabled = editable)
                 if (camera != null) ShopButton(stringResource(Res.string.slip_camera), camera, primary = false, enabled = editable)
