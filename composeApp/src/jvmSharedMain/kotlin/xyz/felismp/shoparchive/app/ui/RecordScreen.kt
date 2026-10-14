@@ -88,10 +88,12 @@ fun RecordScreen(ws: Workspace) {
                 }
                 SlipCheckBanner(t.check)
             }
-            d.slips.forEach { slip ->
+            d.slips.forEachIndexed { i, slip ->
+                // Numbered like the files the server keeps (slip-1.jpg ...): a phone's photo picker only gives a number of its own as the name.
+                val label = stringResource(Res.string.detail_slip, (i + 1).toString())
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    ShopText(slip.name + " · " + (slip.bytes.size / 1024 + 1) + " KB", modifier = Modifier.weight(1f))
-                    ShopButton(stringResource(Res.string.slip_remove, slip.name), { record.removeSlip(slip.key) }, primary = false, enabled = editable)
+                    ShopText(label + " · " + (slip.bytes.size / 1024 + 1) + " KB", modifier = Modifier.weight(1f))
+                    ShopButton(stringResource(Res.string.slip_remove, label), { record.removeSlip(slip.key) }, primary = false, enabled = editable)
                 }
                 slip.uses.firstOrNull()?.let { use ->
                     ShopBanner(stringResource(Res.string.slip_used_before, use.date, ws.branchName(use.branch), use.createdBy.name), Tone.Error)

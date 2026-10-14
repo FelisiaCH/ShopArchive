@@ -303,10 +303,12 @@ private fun EditForm(ws: Workspace, state: EntryDetailState, ui: DetailUi, edit:
                 ShopButton(stringResource(Res.string.slip_remove, slip.file), { state.removeStoredSlip(slip.file) }, primary = false, enabled = !busy)
             }
         }
-        f.added.forEach { slip ->
+        f.added.forEachIndexed { i, slip ->
+            // Numbered after the slips kept, as on Record.
+            val label = stringResource(Res.string.detail_slip, (f.keep.size + i + 1).toString())
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                ShopText(slip.name + " · " + (slip.bytes.size / 1024 + 1) + " KB", modifier = Modifier.weight(1f))
-                ShopButton(stringResource(Res.string.slip_remove, slip.name), { state.removeNewSlip(slip.key) }, primary = false, enabled = !busy)
+                ShopText(label + " · " + (slip.bytes.size / 1024 + 1) + " KB", modifier = Modifier.weight(1f))
+                ShopButton(stringResource(Res.string.slip_remove, label), { state.removeNewSlip(slip.key) }, primary = false, enabled = !busy)
             }
         }
         when (edit.notice) {
