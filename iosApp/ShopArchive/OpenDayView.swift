@@ -1,7 +1,7 @@
 import SwiftUI
 import ClientCore
 
-/// The change counted in the drawer, one amount per currency (empty means 0). The way on to Close day for a day that was never closed is left out: Reports is not built yet.
+/// The change counted in the drawer, one amount per currency (empty means 0). A day that was never closed has a way on to Close day.
 struct OpenDayView: View {
     let ws: Workspace
     let can: Capabilities
@@ -90,6 +90,13 @@ struct OpenDayView: View {
                 .buttonStyle(.borderedProminent)
         case .previousOpen(let p):
             Banner(text: text("openday_previous", p.session.businessDate, p.session.openedBy.name), tone: .error)
+            if can.closeDay {
+                Button(text("closeday_btn")) {
+                    ws.openDay.reset()
+                    ws.openReports(tab: .closeDay)
+                }
+                .buttonStyle(.borderedProminent)
+            }
         case .failed(let p):
             Banner(text: failureText(p.failure), tone: .error)
         case .idle, .opened:
