@@ -278,7 +278,7 @@ struct RecordView: View {
 }
 
 /// The name in the app's language, English if that is empty.
-private func categoryName(_ name: LocalizedName) -> String {
+func categoryName(_ name: LocalizedName) -> String {
     let picked: String
     switch Language.locale.language.languageCode?.identifier {
     case "lo": picked = name.lo
@@ -288,7 +288,7 @@ private func categoryName(_ name: LocalizedName) -> String {
     return picked.trimmingCharacters(in: .whitespaces).isEmpty ? name.en : picked
 }
 
-private func issueText(_ issue: RecordIssue) -> String {
+func issueText(_ issue: RecordIssue) -> String {
     switch issue {
     case .amountMissing: return text("issue_amount_missing")
     case .amountInvalid: return text("issue_amount_invalid")

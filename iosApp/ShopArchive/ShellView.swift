@@ -2,7 +2,7 @@ import SwiftUI
 import ClientCore
 
 /// The app after unlock, as the phone layout of Compose's Shell: a tab bar, and over the current screen the connection banner and the branch choice.
-/// Only the screens built so far have a tab: Today (Open day shows under it), Record and More.
+/// Only the screens built so far have a tab: Today (Open day shows under it), Record, History and More.
 /// Today's tab is there before the config has loaded too (Compose offers only More then), since a tab bar cannot select a tab it does not have: its screen says it is loading, or offers a retry.
 struct ShellView: View {
     let state: AppStateUnlocked
@@ -42,6 +42,11 @@ struct ShellView: View {
                 page { screen { RecordView(ws: ws, can: capabilities) } }
                     .tabItem { Label(text("nav_record"), systemImage: "square.and.pencil") }
                     .tag(Destination.record)
+            }
+            if showsHistory {
+                page { screen { HistoryView(ws: ws) } }
+                    .tabItem { Label(text("nav_history"), systemImage: "clock") }
+                    .tag(Destination.history)
             }
             page { MoreView(state: state, flow: flow) }
                 .tabItem { Label(text("nav_more"), systemImage: "ellipsis") }
@@ -93,7 +98,7 @@ struct ShellView: View {
     /// The tab with the selection it shows: Open day is under Today.
     private var selected: Destination {
         switch destination {
-        case .more, .record: return destination
+        case .more, .record, .history: return destination
         default: return .today
         }
     }
@@ -101,6 +106,12 @@ struct ShellView: View {
     /// Record sits between Today and More, as in Compose's phone navigation: only once the config has loaded, and only for who may record.
     private var showsRecord: Bool {
         if case .ready = onEnum(of: config) { return capabilities.allows(destination: .record) }
+        return false
+    }
+
+    /// History follows Record, as in Compose's phone navigation: only once the config has loaded, and only for who may view entries.
+    private var showsHistory: Bool {
+        if case .ready = onEnum(of: config) { return capabilities.allows(destination: .history) }
         return false
     }
 

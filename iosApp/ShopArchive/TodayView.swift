@@ -1,7 +1,7 @@
 import SwiftUI
 import ClientCore
 
-/// The day's status, the money and the latest lines of the chosen branch. The slips and notes cards only show their counts: History and Notes are not built yet, and neither is Close day.
+/// The day's status, the money and the latest lines of the chosen branch. The slips card opens History; the notes card only shows its count: Notes is not built yet, and neither is Close day.
 struct TodayView: View {
     let ws: Workspace
     let can: Capabilities
@@ -21,7 +21,7 @@ struct TodayView: View {
                 if let failure = ui.failure {
                     Banner(text: text("today_failed") + " " + failureText(failure), tone: .error)
                 }
-                TodayContent(data: data, can: can, canWrite: canWrite) { ws.go(to: .openDay) }
+                TodayContent(data: data, can: can, canWrite: canWrite, openDay: { ws.go(to: .openDay) }, openHistory: { ws.go(to: .history) })
             } else if let failure = ui.failure {
                 Banner(text: text("today_failed") + " " + failureText(failure), tone: .error)
                 Button(text("retry")) { ws.today.reload() }
@@ -42,6 +42,7 @@ private struct TodayContent: View {
     let can: Capabilities
     let canWrite: Bool
     let openDay: () -> Void
+    let openHistory: () -> Void
 
     var body: some View {
         switch onEnum(of: data.status) {
@@ -100,16 +101,22 @@ private struct TodayContent: View {
         }
     }
 
-    /// The slips attached today (with the dashboard) and the notes for the owner that are unread (with the read node).
+    /// The slips attached today (with the dashboard; opens History) and the notes for the owner that are unread (with the read node).
     @ViewBuilder
     private var counts: some View {
         let unread = data.unreadNotes
         if data.showStats || unread != nil {
             HStack(alignment: .top, spacing: 12) {
                 if data.showStats {
-                    Card {
+                    let slips = Card {
                         Text(text("today_slips")).font(.caption).foregroundColor(.secondary)
                         Text(String(data.slips)).font(.headline)
+                    }
+                    if can.viewEntries {
+                        Button(action: openHistory) { slips }
+                            .buttonStyle(.plain)
+                    } else {
+                        slips
                     }
                 }
                 if let unread {
