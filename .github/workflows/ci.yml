@@ -60,7 +60,12 @@ jobs:
       - run: xcodegen generate
         working-directory: iosApp
       # Unsigned simulator build; its script phase builds the ClientCore framework through Gradle.
-      - run: xcodebuild -project ShopArchive.xcodeproj -scheme ShopArchive -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -configuration Debug CODE_SIGNING_ALLOWED=NO build
+      - run: xcodebuild -project ShopArchive.xcodeproj -scheme ShopArchive -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build
+        working-directory: iosApp
+      # The version numbers and the Bonjour service come from the generated AppInfo.plist: show that Xcode kept them.
+      - run: |
+          plist=build/DerivedData/Build/Products/Debug-iphonesimulator/ShopArchive.app/Info.plist
+          for key in CFBundleShortVersionString CFBundleVersion NSBonjourServices; do /usr/libexec/PlistBuddy -c "Print :$key" "$plist"; done
         working-directory: iosApp
       # Kotlin/Native links Apple binaries only on macOS: on Linux, iosApp/fetch-clientcore.sh downloads this and xtool builds the app with it.
       - run: ./gradlew :clientCore:assembleClientCoreReleaseXCFramework

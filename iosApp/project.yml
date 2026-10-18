@@ -9,9 +9,6 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    # Same as `version` in gradle.properties (0.1.1) and its appCode (see the root build.gradle.kts); set by hand until the .ipa is built.
-    MARKETING_VERSION: "0.1.1"
-    CURRENT_PROJECT_VERSION: "101999"
     # Kotlin/Native has no x86_64 simulator target; the simulator on an Apple-silicon Mac is arm64.
     ARCHS: arm64
 targets:
