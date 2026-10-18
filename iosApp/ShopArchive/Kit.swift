@@ -95,6 +95,11 @@ func displayAmount(minor: Int64, exponent: Int32) -> String {
     MoneyTextKt.displayAmount(minor: minor, exponent: exponent, grouping: MoneyText_iosKt.localeGroupingSeparator(), decimal: MoneyText_iosKt.localeDecimalSeparator())
 }
 
+/// `displayAmount` with a `+` in front of a positive amount.
+func signedAmount(minor: Int64, exponent: Int32) -> String {
+    (minor > 0 ? "+" : "") + displayAmount(minor: minor, exponent: exponent)
+}
+
 /// A pill that is on or off, for picking one of a few (a branch, a category, a currency, a suggestion).
 struct Choice: View {
     let name: String

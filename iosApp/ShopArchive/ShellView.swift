@@ -2,7 +2,7 @@ import SwiftUI
 import ClientCore
 
 /// The app after unlock, as the phone layout of Compose's Shell: a tab bar, and over the current screen the connection banner and the branch choice.
-/// Only the screens built so far have a tab: Today (Open day shows under it), Record, History and More.
+/// Only the screens built so far have a tab: Today (Open day shows under it), Record, History and More (Reports shows under it, folded away as on a phone in Compose).
 /// Today's tab is there before the config has loaded too (Compose offers only More then), since a tab bar cannot select a tab it does not have: its screen says it is loading, or offers a retry.
 struct ShellView: View {
     let state: AppStateUnlocked
@@ -48,7 +48,13 @@ struct ShellView: View {
                     .tabItem { Label(text("nav_history"), systemImage: "clock") }
                     .tag(Destination.history)
             }
-            page { MoreView(state: state, flow: flow) }
+            page {
+                if destination == .reports {
+                    screen { ReportsView(ws: ws, can: capabilities) }
+                } else {
+                    MoreView(state: state, flow: flow, ws: ws, can: capabilities)
+                }
+            }
                 .tabItem { Label(text("nav_more"), systemImage: "ellipsis") }
                 .tag(Destination.more)
         }
@@ -95,10 +101,11 @@ struct ShellView: View {
         }
     }
 
-    /// The tab with the selection it shows: Open day is under Today.
+    /// The tab with the selection it shows: Open day is under Today, Reports under More.
     private var selected: Destination {
         switch destination {
         case .more, .record, .history: return destination
+        case .reports: return .more
         default: return .today
         }
     }
@@ -136,15 +143,21 @@ struct ShellView: View {
     }
 }
 
-/// Who is signed in, and the way to Settings and to Lock now.
+/// Who is signed in, and the way to Reports, Settings and to Lock now.
 private struct MoreView: View {
     let state: AppStateUnlocked
     let flow: AppFlow
+    let ws: Workspace
+    let can: Capabilities
 
     var body: some View {
         Page {
             Text(text("more_signed_in", state.username)).foregroundColor(.secondary)
             Text(state.server).font(.caption).foregroundColor(.secondary)
+            if let first = can.reportsTabsBuilt.first {
+                Button(text("nav_reports")) { ws.openReports(tab: first) }
+                    .buttonStyle(.bordered)
+            }
             Button(text("nav_settings")) { flow.openSettings() }
                 .buttonStyle(.bordered)
             Button(text("lock_now")) { flow.lockNow(problem: nil) }

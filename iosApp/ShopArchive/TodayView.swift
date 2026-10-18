@@ -1,7 +1,7 @@
 import SwiftUI
 import ClientCore
 
-/// The day's status, the money and the latest lines of the chosen branch. The slips card opens History; the notes card only shows its count: Notes is not built yet, and neither is Close day.
+/// The day's status, the money and the latest lines of the chosen branch. The slips card opens History and the Close day button Reports; the notes card only shows its count: Notes is not built yet.
 struct TodayView: View {
     let ws: Workspace
     let can: Capabilities
@@ -21,7 +21,7 @@ struct TodayView: View {
                 if let failure = ui.failure {
                     Banner(text: text("today_failed") + " " + failureText(failure), tone: .error)
                 }
-                TodayContent(data: data, can: can, canWrite: canWrite, openDay: { ws.go(to: .openDay) }, openHistory: { ws.go(to: .history) })
+                TodayContent(data: data, can: can, canWrite: canWrite, openDay: { ws.go(to: .openDay) }, closeDay: { ws.openReports(tab: .closeDay) }, openHistory: { ws.go(to: .history) })
             } else if let failure = ui.failure {
                 Banner(text: text("today_failed") + " " + failureText(failure), tone: .error)
                 Button(text("retry")) { ws.today.reload() }
@@ -42,6 +42,7 @@ private struct TodayContent: View {
     let can: Capabilities
     let canWrite: Bool
     let openDay: () -> Void
+    let closeDay: () -> Void
     let openHistory: () -> Void
 
     var body: some View {
@@ -66,6 +67,14 @@ private struct TodayContent: View {
             Chip(text: text("day_open_by", clockTime(open.session.openedAt), open.session.openedBy.name), tone: .success)
             if let staleFrom = data.staleFrom {
                 Banner(text: text(can.closeDay ? "day_stale" : "day_stale_other", staleFrom), tone: .error)
+            }
+            if can.closeDay {
+                // Primary when the day is stale.
+                if data.staleFrom != nil {
+                    Button(text("closeday_btn"), action: closeDay).buttonStyle(.borderedProminent)
+                } else {
+                    Button(text("closeday_btn"), action: closeDay).buttonStyle(.bordered)
+                }
             }
         case .closed:
             Chip(text: text("day_closed"), tone: .info)
@@ -131,7 +140,7 @@ private struct TodayContent: View {
     }
 }
 
-private struct AmountLine: View {
+struct AmountLine: View {
     let label: String
     let shown: String
 
