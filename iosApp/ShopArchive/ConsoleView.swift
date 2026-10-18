@@ -30,7 +30,8 @@ struct ConsoleView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .onAppear { scrollToEnd(proxy) }
-                .onChange(of: ui.lines.count) { _ in scrollToEnd(proxy) }
+                // The last line, not the count: at the most lines kept, the oldest go as new ones come and the count stays.
+                .onChange(of: ui.lines.last.map { ObjectIdentifier($0 as AnyObject) }) { _ in scrollToEnd(proxy) }
             }
             if ui.blocked {
                 Text(text("needs_connection")).font(.caption).foregroundColor(.secondary)
