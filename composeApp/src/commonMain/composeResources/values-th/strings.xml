@@ -44,6 +44,8 @@
     <string name="perm_body">ShopArchive คุยกับเซิร์ฟเวอร์ของร้านผ่านเครือข่ายในพื้นที่ Android จะขออนุญาตก่อน ถ้าไม่อนุญาตแอปจะเชื่อมต่อเซิร์ฟเวอร์ไม่ได้</string>
     <!-- iOS's local network prompt (NSLocalNetworkUsageDescription in the iOS app's Info.plist). -->
     <string name="perm_body_ios">ShopArchive คุยกับเซิร์ฟเวอร์ของร้านผ่านเครือข่ายในพื้นที่ ถ้าไม่อนุญาตแอปจะเชื่อมต่อเซิร์ฟเวอร์ไม่ได้</string>
+    <!-- iOS's camera prompt (NSCameraUsageDescription in the iOS app's Info.plist). -->
+    <string name="perm_camera_ios">ShopArchive ใช้กล้องถ่ายรูปสลิปและสแกน QR ของการโอนเงิน</string>
     <string name="perm_allow">ต่อไป</string>
     <string name="perm_denied_title">การเข้าถึงเครือข่ายในพื้นที่ปิดอยู่</string>
     <string name="perm_denied_body">ถ้าไม่เปิด แอปจะเชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองอีกครั้ง หรือเปิดในการตั้งค่าแอป</string>

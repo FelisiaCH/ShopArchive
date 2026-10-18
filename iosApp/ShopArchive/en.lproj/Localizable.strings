@@ -43,6 +43,7 @@
 "perm_title" = "Allow access to your local network";
 "perm_body" = "ShopArchive talks to your shop server over your local network. Android asks for your permission first. Without it the app cannot reach the server.";
 "perm_body_ios" = "ShopArchive talks to your shop server over your local network. Without it the app cannot reach the server.";
+"perm_camera_ios" = "ShopArchive uses the camera to take photos of slips and scan the QR code of a transfer.";
 "perm_allow" = "Continue";
 "perm_denied_title" = "Local network access is off";
 "perm_denied_body" = "The app cannot reach the server without it. Try again, or turn it on in the app settings.";

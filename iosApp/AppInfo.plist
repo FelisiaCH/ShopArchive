@@ -40,5 +40,7 @@
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>ShopArchive talks to your shop server over your local network. Without it the app cannot reach the server.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ShopArchive uses the camera to take photos of slips and scan the QR code of a transfer.</string>
 </dict>
 </plist>
