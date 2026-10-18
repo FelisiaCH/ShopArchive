@@ -42,6 +42,8 @@
     <string name="err_unknown">ມີຂໍ້ຜິດພາດທີ່ບໍ່ຄາດຄິດ. ລອງອີກຄັ້ງ ຖ້າຍັງເປັນຢູ່ໃຫ້ຕິດຕໍ່ຜູ້ດູແລ.</string>
     <string name="perm_title">ອະນຸຍາດການເຂົ້າເຖິງເຄືອຂ່າຍໃນທ້ອງຖິ່ນ</string>
     <string name="perm_body">ShopArchive ເວົ້າກັບເຊີບເວີຂອງຮ້ານຜ່ານເຄືອຂ່າຍໃນທ້ອງຖິ່ນ. Android ຈະຂໍອະນຸຍາດກ່ອນ. ຖ້າບໍ່ອະນຸຍາດ ແອັບຈະເຊື່ອມຕໍ່ເຊີບເວີບໍ່ໄດ້.</string>
+    <!-- iOS's local network prompt (NSLocalNetworkUsageDescription in the iOS app's Info.plist). -->
+    <string name="perm_body_ios">ShopArchive ເວົ້າກັບເຊີບເວີຂອງຮ້ານຜ່ານເຄືອຂ່າຍໃນທ້ອງຖິ່ນ. ຖ້າບໍ່ອະນຸຍາດ ແອັບຈະເຊື່ອມຕໍ່ເຊີບເວີບໍ່ໄດ້.</string>
     <string name="perm_allow">ຕໍ່ໄປ</string>
     <string name="perm_denied_title">ການເຂົ້າເຖິງເຄືອຂ່າຍໃນທ້ອງຖິ່ນປິດຢູ່</string>
     <string name="perm_denied_body">ຖ້າບໍ່ເປີດ ແອັບຈະເຊື່ອມຕໍ່ເຊີບເວີບໍ່ໄດ້. ລອງອີກເທື່ອ ຫຼື ເປີດໃນການຕັ້ງຄ່າແອັບ.</string>

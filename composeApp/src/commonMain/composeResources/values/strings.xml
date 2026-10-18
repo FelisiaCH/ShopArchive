@@ -42,6 +42,8 @@
     <string name="err_unknown">Something went wrong. Try again; if it keeps happening, contact the administrator.</string>
     <string name="perm_title">Allow access to your local network</string>
     <string name="perm_body">ShopArchive talks to your shop server over your local network. Android asks for your permission first. Without it the app cannot reach the server.</string>
+    <!-- iOS's local network prompt (NSLocalNetworkUsageDescription in the iOS app's Info.plist). -->
+    <string name="perm_body_ios">ShopArchive talks to your shop server over your local network. Without it the app cannot reach the server.</string>
     <string name="perm_allow">Continue</string>
     <string name="perm_denied_title">Local network access is off</string>
     <string name="perm_denied_body">The app cannot reach the server without it. Try again, or turn it on in the app settings.</string>

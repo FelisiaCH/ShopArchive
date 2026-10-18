@@ -4,6 +4,8 @@ kotlin = "2.4.20"
 agp = "9.4.1"
 compose-multiplatform = "1.12.1"
 shadow = "9.6.1"
+# Flow / suspend / sealed bridge from the client core to Swift (iOS app only); 0.10.15 supports Kotlin 2.4.20
+skie = "0.10.15"
 
 # Android (Android 8 = API 26 · targetSdk 37 = Android 17)
 android-minSdk = "26"
@@ -102,3 +104,4 @@ compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-m
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-kmp-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+skie = { id = "co.touchlab.skie", version.ref = "skie" }
