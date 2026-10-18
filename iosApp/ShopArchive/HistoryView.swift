@@ -25,7 +25,7 @@ struct HistoryView: View {
     }
 }
 
-private func rangeText(_ problem: RangeProblem) -> String {
+func rangeText(_ problem: RangeProblem) -> String {
     switch problem {
     case .notADate: return text("range_not_a_date")
     case .backwards: return text("range_backwards")
@@ -38,7 +38,7 @@ private func methodText(_ method: TenderMethod) -> String {
 }
 
 /// The name of category `key` in the app's language; the key itself when the shop no longer lists it.
-private func categoryTitle(_ ws: Workspace, _ key: String?) -> String? {
+func categoryTitle(_ ws: Workspace, _ key: String?) -> String? {
     guard let key else { return nil }
     guard case .ready(let ready) = onEnum(of: ws.config.value) else { return key }
     return ready.config.categories.first { $0.key == key }.map { categoryName($0.name) } ?? key
@@ -48,7 +48,7 @@ private func branchTitle(_ ws: Workspace, _ key: String) -> String {
     ws.branches.first { $0.key == key }?.displayName ?? key
 }
 
-private func isBlank(_ s: String) -> Bool {
+func isBlank(_ s: String) -> Bool {
     s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 }
 
@@ -454,10 +454,10 @@ private struct HistoryLine: View {
 
     var body: some View {
         Card {
-            Text(item.action + " · " + String(item.at.replacingOccurrences(of: "T", with: " ").prefix(16)) + " · " + item.by.name)
+            Text(verbatim: "\(item.action) · \(item.at.replacingOccurrences(of: "T", with: " ").prefix(16)) · \(item.by.name)")
                 .font(.caption).foregroundColor(.secondary)
             ForEach(Array(item.changes.enumerated()), id: \.offset) { _, c in
-                Text(c.field + ": " + (c.from.isEmpty ? "—" : c.from) + " → " + (c.to.isEmpty ? "—" : c.to)).font(.caption)
+                Text(verbatim: "\(c.field): \(c.from.isEmpty ? "—" : c.from) → \(c.to.isEmpty ? "—" : c.to)").font(.caption)
             }
         }
     }
