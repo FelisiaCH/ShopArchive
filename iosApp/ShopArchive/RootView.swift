@@ -3,19 +3,34 @@ import UIKit.UIGestureRecognizerSubclass
 import ClientCore
 
 /// Shows the screen for the flow's current state, and the PIN prompt over it when an important action asks for one.
-/// Unlocked and Settings show only their title until their screens are built.
+/// The language chosen in Settings is set on `Language` before the screens are drawn again, each as a new view (`.id`), since a view whose inputs did not change would keep its old words.
 struct RootView: View {
     let flow: AppFlow
     @State private var state: AppState?
     @State private var reauth: ReauthPrompt?
+    @State private var language: String?
     @Environment(\.scenePhase) private var scenePhase
+
+    init(flow: AppFlow) {
+        self.flow = flow
+        let chosen = flow.language.value as String?
+        Language.choose(chosen)
+        _language = State(initialValue: chosen)
+    }
 
     var body: some View {
         content
+            .id(language)
             .background(ActivityReporter(flow: flow))
             .task {
                 for await next in flow.state {
                     state = next
+                }
+            }
+            .task {
+                for await next in flow.language {
+                    Language.choose(next as String?)
+                    language = next as String?
                 }
             }
             .task {
@@ -30,6 +45,7 @@ struct RootView: View {
             .sheet(isPresented: Binding(get: { reauth != nil }, set: { _ in })) {
                 if let reauth {
                     ReauthView(prompt: reauth, flow: flow)
+                        .id(language)
                         .interactiveDismissDisabled()
                 }
             }
@@ -43,8 +59,9 @@ struct RootView: View {
             case .servers(let s): ServersView(state: s, flow: flow)
             case .login(let s): LoginView(state: s, flow: flow)
             case .locked(let s): LockedView(state: s, flow: flow)
-            case .unlocked: title("unlocked_title")
-            case .settings: title("nav_settings")
+            case .unlocked(let s):
+                if let ws = flow.workspace { ShellView(state: s, flow: flow, ws: ws).id(ObjectIdentifier(ws)) }
+            case .settings(let s): SettingsView(state: s, flow: flow, language: language)
             case .certChanged(let s): CertChangedView(state: s, flow: flow)
             case .protocolMismatch(let s): ProtocolMismatchView(state: s)
             }
@@ -56,12 +73,8 @@ struct RootView: View {
     private var starting: some View {
         VStack {
             ProgressView()
-            Text("starting").foregroundColor(.secondary).padding(.top, 8)
+            Text(text("starting")).foregroundColor(.secondary).padding(.top, 8)
         }
-    }
-
-    private func title(_ key: LocalizedStringKey) -> some View {
-        Text(key).font(.title2).multilineTextAlignment(.center).padding()
     }
 }
 

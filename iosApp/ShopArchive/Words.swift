@@ -1,13 +1,30 @@
 import Foundation
 import ClientCore
 
+/// The language the app's text is in: the one chosen in Settings, else the system's. text() reads it; RootView draws everything again when it changes.
+enum Language {
+    private(set) static var bundle = Bundle.main
+    private(set) static var locale = Locale.current
+
+    /// `tag` is en, lo or th; nil follows the system.
+    static func choose(_ tag: String?) {
+        if let tag, let path = Bundle.main.path(forResource: tag, ofType: "lproj"), let chosen = Bundle(path: path) {
+            bundle = chosen
+            locale = Locale(identifier: tag)
+        } else {
+            bundle = .main
+            locale = .current
+        }
+    }
+}
+
 /// The text for a key of Localizable.strings, which is generated from the Android/Windows strings.xml; `args` fill its %1$@ / %1$d.
 func text(_ key: String) -> String {
-    NSLocalizedString(key, comment: "")
+    Language.bundle.localizedString(forKey: key, value: nil, table: nil)
 }
 
 func text(_ key: String, _ args: CVarArg...) -> String {
-    String(format: NSLocalizedString(key, comment: ""), locale: Locale.current, arguments: args)
+    String(format: text(key), locale: Language.locale, arguments: args)
 }
 
 /// What to tell the user about a problem; the same words as Compose's Problem.text().
@@ -34,6 +51,16 @@ func problemText(_ problem: any Problem) -> String {
     case .otherServer: return text("err_other_server")
     case .protocolMismatch: return text("proto_body")
     case .unknown: return text("err_unknown")
+    }
+}
+
+/// What to tell the user about a failed call; the same words as Compose's Failure.text().
+func failureText(_ failure: any Failure) -> String {
+    switch onEnum(of: failure) {
+    case .unreachable: return text("err_unreachable")
+    case .refused(let f): return refusalWords(code: f.code, reason: f.reason)
+    case .client(let f): return problemText(f.problem)
+    case .other: return text("err_unknown")
     }
 }
 

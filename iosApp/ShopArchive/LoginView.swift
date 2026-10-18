@@ -36,14 +36,14 @@ struct LoginView: View {
                             .keyboardType(.numberPad)
                     }
                 } footer: {
-                    if state.needsNewPin { Text("login_set_pin") }
+                    if state.needsNewPin { Text(text("login_set_pin")) }
                 }
                 .disabled(state.busy)
 
                 StatusSection(busy: state.busy, problem: state.problem)
 
                 Section {
-                    Button("login_submit") {
+                    Button(text("login_submit")) {
                         flow.login(
                             username: username, pin: pin,
                             newPin: state.needsNewPin ? newPin : nil,
@@ -51,9 +51,9 @@ struct LoginView: View {
                         )
                     }
                     if state.adding {
-                        Button("add_user_back") { flow.cancelLogin() }
+                        Button(text("add_user_back")) { flow.cancelLogin() }
                     }
-                    Button("servers_back") { flow.showServers() }
+                    Button(text("servers_back")) { flow.showServers() }
                 }
                 .disabled(state.busy)
             }

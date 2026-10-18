@@ -28,7 +28,7 @@ struct LockedView: View {
                                 .disabled(state.busy)
                         }
                     } header: {
-                        Text("lock_pick_user").textCase(nil)
+                        Text(text("lock_pick_user")).textCase(nil)
                     }
                 }
 
@@ -37,15 +37,15 @@ struct LockedView: View {
                 Section {
                     if state.username == nil || !state.shared {
                         // A personal device has no list of users to pick from: adding one starts here.
-                        Button("lock_add_user") { flow.addUser() }
+                        Button(text("lock_add_user")) { flow.addUser() }
                     } else {
-                        Button("lock_other_user") { flow.selectUser(username: nil) }
+                        Button(text("lock_other_user")) { flow.selectUser(username: nil) }
                     }
-                    Button("servers_back") { flow.showServers() }
+                    Button(text("servers_back")) { flow.showServers() }
                 }
                 .disabled(state.busy)
             }
-            .navigationTitle("locked_title")
+            .navigationTitle(text("locked_title"))
             // A new field when the server asks for the password instead, or another user is picked: what was typed is not the next secret.
             .onChange(of: state.needsPassword) { _ in secret = "" }
             .onChange(of: state.username) { _ in secret = "" }
