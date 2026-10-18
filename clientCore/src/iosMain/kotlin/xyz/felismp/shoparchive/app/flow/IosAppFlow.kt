@@ -12,7 +12,7 @@ import xyz.felismp.shoparchive.app.client.probeFingerprint
 
 /**
  * The flow of the iOS app, wired like ShopApp does on the other platforms; the Swift app calls this once and keeps the result for as long as it runs.
- * No updater (iOS updates through AltStore) and no slip reader yet.
+ * No updater: iOS updates through AltStore.
  */
 fun createIosAppFlow(): AppFlow = AppFlow(
     CoroutineScope(SupervisorJob() + Dispatchers.Main),
@@ -22,5 +22,6 @@ fun createIosAppFlow(): AppFlow = AppFlow(
     probe = { address -> probeFingerprint(address) },
     prefs = createPreferencesStore(),
     compressor = createSlipCompressor(),
+    reader = createIosSlipReader(),
     discovery = createServerDiscovery(),
 )

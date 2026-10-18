@@ -3,7 +3,7 @@ import PhotosUI
 import _PhotosUI_SwiftUI
 import ClientCore
 
-/// The entries of a date range with the filters, and one entry opened: its facts, slips and changes, and editing, moving and deleting it. The slips of an edit come from the photo library only: the camera is not built yet.
+/// The entries of a date range with the filters, and one entry opened: its facts, slips and changes, and editing, moving and deleting it. The slips of an edit come from the photo library or, where there is a camera, from a photo taken now.
 struct HistoryView: View {
     let ws: Workspace
     @State private var detail: EntryDetailState?
@@ -475,6 +475,7 @@ private struct EditFormView: View {
     @State private var note: String
     @State private var amounts: [Int32: String]
     @State private var picked: PhotosPickerItem?
+    @State private var camera = false
 
     init(ws: Workspace, state: EntryDetailState, ui: DetailUi, edit: EditUi) {
         self.ws = ws
@@ -597,15 +598,29 @@ private struct EditFormView: View {
     private var slips: some View {
         Text(text("slips_title")).font(.headline)
         Text(text("slips_count", String(f.keep.count + f.added.count), String(edit.policy.slipMaxCount))).font(.caption).foregroundColor(.secondary)
-        PhotosPicker(selection: $picked, matching: .images) {
-            Text(text("slip_gallery"))
+        FlowLayout {
+            PhotosPicker(selection: $picked, matching: .images) {
+                Text(text(cameraAvailable ? "slip_gallery" : "slip_file"))
+            }
+            .buttonStyle(.bordered)
+            .disabled(busy)
+            .onChange(of: picked) { photo in
+                guard let photo else { return }
+                picked = nil
+                add(photo)
+            }
+            if cameraAvailable {
+                Button(text("slip_camera")) { camera = true }
+                    .buttonStyle(.bordered)
+                    .disabled(busy)
+            }
         }
-        .buttonStyle(.bordered)
-        .disabled(busy)
-        .onChange(of: picked) { photo in
-            guard let photo else { return }
-            picked = nil
-            add(photo)
+        .fullScreenCover(isPresented: $camera) {
+            CameraPicker { image in
+                camera = false
+                if let image { add(image) }
+            }
+            .ignoresSafeArea()
         }
         if edit.compressing {
             Text(text("slip_preparing")).foregroundColor(.secondary)
@@ -646,6 +661,15 @@ private struct EditFormView: View {
             for (i, byte) in data.enumerated() { raw.set(index: Int32(i), value: Int8(bitPattern: byte)) }
             // Back on the main thread, as on Android: addSlip reads the form and then changes it.
             await MainActor.run { state.addSlip(name: photo.itemIdentifier ?? "slip.jpg", raw: raw) }
+        }
+    }
+
+    /// The same for a photo just taken.
+    private func add(_ image: UIImage) {
+        let state = state
+        Task.detached {
+            guard let raw = slipBytes(image) else { return }
+            await MainActor.run { state.addSlip(name: "photo.jpg", raw: raw) }
         }
     }
 }

@@ -3,7 +3,7 @@ import PhotosUI
 import _PhotosUI_SwiftUI
 import ClientCore
 
-/// One entry at a time: type, category, item and note, the payment lines, the slips for online payments, and Save. The slips come from the photo library only: the camera and the QR scan are not built yet.
+/// One entry at a time: type, category, item and note, the payment lines, the slips for online payments, and Save. The slips come from the photo library or, where there is a camera, from a photo taken now; a photo can also be scanned for the QR code of a transfer.
 struct RecordView: View {
     let ws: Workspace
     let can: Capabilities
@@ -13,6 +13,7 @@ struct RecordView: View {
     @State private var note: String
     @State private var amounts: [Int32: String]
     @State private var picked: PhotosPickerItem?
+    @State private var camera: CameraUse?
 
     init(ws: Workspace, can: Capabilities) {
         self.ws = ws
@@ -117,6 +118,13 @@ struct RecordView: View {
             picked = nil
             add(photo)
         }
+        .fullScreenCover(item: $camera) { use in
+            CameraPicker { image in
+                camera = nil
+                if let image { add(image, use) }
+            }
+            .ignoresSafeArea()
+        }
     }
 
     @ViewBuilder
@@ -170,11 +178,24 @@ struct RecordView: View {
     private var slips: some View {
         Text(text("slips_title")).font(.headline)
         Text(text("slips_count", String(draft.slips.count), String(ui.policy.slipMaxCount))).font(.caption).foregroundColor(.secondary)
-        PhotosPicker(selection: $picked, matching: .images) {
-            Text(text("slip_gallery"))
+        FlowLayout {
+            PhotosPicker(selection: $picked, matching: .images) {
+                Text(text(cameraAvailable ? "slip_gallery" : "slip_file"))
+            }
+            .buttonStyle(.bordered)
+            .disabled(!editable)
+            if cameraAvailable {
+                Button(text("slip_camera")) { camera = .photo }
+                    .buttonStyle(.bordered)
+                    .disabled(!editable)
+                // Only a server with a bank plugin confirms a QR code.
+                if ui.policy.slipCheck {
+                    Button(text("slip_scan")) { camera = .scan }
+                        .buttonStyle(.bordered)
+                        .disabled(!editable)
+                }
+            }
         }
-        .buttonStyle(.bordered)
-        .disabled(!editable)
         if ui.compressing {
             Text(text("slip_preparing")).foregroundColor(.secondary)
         }
@@ -275,6 +296,27 @@ struct RecordView: View {
             await MainActor.run { record.addSlip(name: photo.itemIdentifier ?? "slip.jpg", raw: raw) }
         }
     }
+
+    /// The same for a photo just taken: it is added as a slip, or read for its QR code.
+    private func add(_ image: UIImage, _ use: CameraUse) {
+        let record = record
+        Task.detached {
+            guard let raw = slipBytes(image) else { return }
+            await MainActor.run {
+                switch use {
+                case .photo: record.addSlip(name: "photo.jpg", raw: raw)
+                case .scan: record.scanQr(name: "photo.jpg", raw: raw)
+                }
+            }
+        }
+    }
+}
+
+/// What a photo taken on Record is for.
+private enum CameraUse: Identifiable {
+    case photo, scan
+
+    var id: Self { self }
 }
 
 /// The name in the app's language, English if that is empty.
