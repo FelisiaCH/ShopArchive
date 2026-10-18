@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit.UIGestureRecognizerSubclass
 import ClientCore
 
 /// Shows the screen for the flow's current state, and the PIN prompt over it when an important action asks for one.
@@ -11,7 +12,7 @@ struct RootView: View {
 
     var body: some View {
         content
-            .reportingActivity(to: flow)
+            .background(ActivityReporter(flow: flow))
             .task {
                 for await next in flow.state {
                     state = next
@@ -29,7 +30,6 @@ struct RootView: View {
             .sheet(isPresented: Binding(get: { reauth != nil }, set: { _ in })) {
                 if let reauth {
                     ReauthView(prompt: reauth, flow: flow)
-                        .reportingActivity(to: flow)
                         .interactiveDismissDisabled()
                 }
             }
@@ -65,10 +65,50 @@ struct RootView: View {
     }
 }
 
-private extension View {
-    /// Any touch tells the flow the user is there (else the auto-lock fires under someone using the app). The gesture runs
-    /// alongside the ones under it, so it takes no touch from the controls.
-    func reportingActivity(to flow: AppFlow) -> some View {
-        simultaneousGesture(DragGesture(minimumDistance: 0).onChanged { _ in flow.userActive() })
+/// Any touch tells the flow the user is there (else the auto-lock fires under someone using the app). It watches the whole window,
+/// sheets included, from UIKit: a SwiftUI drag gesture over a Form takes the taps from its buttons.
+private struct ActivityReporter: UIViewRepresentable {
+    let flow: AppFlow
+
+    func makeUIView(context: Context) -> UIView { WindowHook(onTouch: { [flow] in flow.userActive() }) }
+    func updateUIView(_ uiView: UIView, context: Context) {}
+}
+
+private final class WindowHook: UIView {
+    private let recognizer: TouchWatcher
+
+    init(onTouch: @escaping () -> Void) {
+        recognizer = TouchWatcher(onTouch: onTouch)
+        super.init(frame: .zero)
+        isUserInteractionEnabled = false
     }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        recognizer.view?.removeGestureRecognizer(recognizer)
+        window?.addGestureRecognizer(recognizer)
+    }
+}
+
+/// Sees each touch begin and then fails, so every other recognizer and control gets the touch as if it were not there.
+private final class TouchWatcher: UIGestureRecognizer, UIGestureRecognizerDelegate {
+    private let onTouch: () -> Void
+
+    init(onTouch: @escaping () -> Void) {
+        self.onTouch = onTouch
+        super.init(target: nil, action: nil)
+        cancelsTouchesInView = false
+        delaysTouchesBegan = false
+        delaysTouchesEnded = false
+        delegate = self
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        onTouch()
+        state = .failed
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
 }
