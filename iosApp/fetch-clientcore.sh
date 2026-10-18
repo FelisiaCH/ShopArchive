@@ -12,3 +12,8 @@ fi
 rm -rf Frameworks/ClientCore.xcframework
 gh run download "$run" --name ClientCore-xcframework --dir Frameworks
 echo "ClientCore from CI run $run ($commit)"
+# SwiftPM's build folder goes to the cache: copying the framework into it fails on NTFS, where this repo may live.
+if [ ! -e .build ]; then
+    mkdir -p "${XDG_CACHE_HOME:-$HOME/.cache}/shoparchive-ios-build"
+    ln -s "${XDG_CACHE_HOME:-$HOME/.cache}/shoparchive-ios-build" .build
+fi
