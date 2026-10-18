@@ -122,30 +122,32 @@ struct FlowLayout: Layout {
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let origins = arrange(bounds.width, subviews).origins
-        for (subview, origin) in zip(subviews, origins) {
-            subview.place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), proposal: .unspecified)
+        let frames = arrange(bounds.width, subviews).frames
+        for (subview, frame) in zip(subviews, frames) {
+            subview.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: ProposedViewSize(frame.size))
         }
     }
 
-    private func arrange(_ width: CGFloat, _ subviews: Subviews) -> (size: CGSize, origins: [CGPoint]) {
-        var origins: [CGPoint] = []
+    /// A child wider than the row gets the row's width, so its text wraps instead of running off the screen.
+    private func arrange(_ width: CGFloat, _ subviews: Subviews) -> (size: CGSize, frames: [CGRect]) {
+        var frames: [CGRect] = []
         var x: CGFloat = 0
         var y: CGFloat = 0
         var rowHeight: CGFloat = 0
         var widest: CGFloat = 0
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            var size = subview.sizeThatFits(.unspecified)
+            if size.width > width { size = subview.sizeThatFits(ProposedViewSize(width: width, height: nil)) }
             if x > 0, x + size.width > width {
                 x = 0
                 y += rowHeight + spacing
                 rowHeight = 0
             }
-            origins.append(CGPoint(x: x, y: y))
+            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
             widest = max(widest, x - spacing)
         }
-        return (CGSize(width: widest, height: y + rowHeight), origins)
+        return (CGSize(width: widest, height: y + rowHeight), frames)
     }
 }
