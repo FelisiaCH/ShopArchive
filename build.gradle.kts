@@ -10,6 +10,7 @@ plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.kmp.library) apply false
     alias(libs.plugins.shadow) apply false
+    alias(libs.plugins.skie) apply false
 }
 
 // A failing test prints its assertion message and full stack trace in the build output, so a CI log alone says what broke.

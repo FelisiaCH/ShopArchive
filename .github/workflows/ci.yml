@@ -43,7 +43,7 @@ jobs:
           path: composeApp/build/compose/binaries/main/msi/*.msi
           if-no-files-found: error
 
-  # The iOS targets of the shared code and the client core build only on macOS: tests on the simulator, plus the device build.
+  # The iOS targets of the shared code and the client core build only on macOS: tests on the simulator, plus the device build, plus the app itself.
   ios:
     runs-on: macos-latest
     steps:
@@ -56,6 +56,12 @@ jobs:
       - name: Install Android platform 37 (API level 37.0)
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0"'
       - run: ./gradlew :shared:iosSimulatorArm64Test :clientCore:iosSimulatorArm64Test :clientCore:compileKotlinIosArm64
+      - run: brew install xcodegen
+      - run: xcodegen generate
+        working-directory: iosApp
+      # Unsigned simulator build; its script phase builds the ClientCore framework through Gradle.
+      - run: xcodebuild -project ShopArchive.xcodeproj -scheme ShopArchive -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -configuration Debug CODE_SIGNING_ALLOWED=NO build
+        working-directory: iosApp
 
   # Manual only: GitHub-hosted arm64 runners may be unavailable to private repos.
   linux-arm64:

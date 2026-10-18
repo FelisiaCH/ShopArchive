@@ -1,0 +1,46 @@
+# The iOS app. `xcodegen generate` (in this folder) makes ShopArchive.xcodeproj and Info.plist; neither is committed.
+# The shared code is built by Gradle (:clientCore) as a static framework, ClientCore, before Swift is compiled.
+name: ShopArchive
+options:
+  bundleIdPrefix: xyz.felismp
+  developmentLanguage: en
+  deploymentTarget:
+    iOS: "16.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    # Same as `version` in gradle.properties (0.1.1) and its appCode (see the root build.gradle.kts); set by hand until the .ipa is built.
+    MARKETING_VERSION: "0.1.1"
+    CURRENT_PROJECT_VERSION: "101999"
+    # Kotlin/Native has no x86_64 simulator target; the simulator on an Apple-silicon Mac is arm64.
+    ARCHS: arm64
+targets:
+  ShopArchive:
+    type: application
+    platform: iOS
+    sources:
+      - ShopArchive
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: ShopArchive
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, lo, th]
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: xyz.felismp.shoparchive
+        TARGETED_DEVICE_FAMILY: "1"
+        # The script phase below runs Gradle, which Xcode's sandbox would block.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        FRAMEWORK_SEARCH_PATHS: $(SRCROOT)/../clientCore/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)
+        OTHER_LDFLAGS: $(inherited) -framework ClientCore
+    preBuildScripts:
+      - name: Build ClientCore
+        basedOnDependencyAnalysis: false
+        script: |
+          cd "$SRCROOT/.." && ./gradlew :clientCore:embedAndSignAppleFrameworkForXcode
