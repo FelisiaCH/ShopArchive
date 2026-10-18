@@ -2,7 +2,7 @@ import SwiftUI
 import ClientCore
 
 /// The app after unlock, as the phone layout of Compose's Shell: a tab bar, and over the current screen the connection banner and the branch choice.
-/// Only the screens built so far have a tab: Today (Open day shows under it) and More.
+/// Only the screens built so far have a tab: Today (Open day shows under it), Record and More.
 /// Today's tab is there before the config has loaded too (Compose offers only More then), since a tab bar cannot select a tab it does not have: its screen says it is loading, or offers a retry.
 struct ShellView: View {
     let state: AppStateUnlocked
@@ -26,10 +26,23 @@ struct ShellView: View {
     }
 
     var body: some View {
-        TabView(selection: Binding(get: { destination == .more ? Destination.more : Destination.today }, set: { ws.go(to: $0) })) {
-            page { todayScreen }
+        TabView(selection: Binding(get: { selected }, set: { ws.go(to: $0) })) {
+            page {
+                screen {
+                    if destination == .openDay {
+                        OpenDayView(ws: ws, can: capabilities)
+                    } else {
+                        TodayView(ws: ws, can: capabilities)
+                    }
+                }
+            }
                 .tabItem { Label(text("nav_today"), systemImage: "calendar") }
                 .tag(Destination.today)
+            if showsRecord {
+                page { screen { RecordView(ws: ws, can: capabilities) } }
+                    .tabItem { Label(text("nav_record"), systemImage: "square.and.pencil") }
+                    .tag(Destination.record)
+            }
             page { MoreView(state: state, flow: flow) }
                 .tabItem { Label(text("nav_more"), systemImage: "ellipsis") }
                 .tag(Destination.more)
@@ -68,7 +81,7 @@ struct ShellView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(branches, id: \.key) { b in
-                        BranchChoice(name: b.displayName, selected: b.key == branch) { ws.selectBranch(key: b.key) }
+                        Choice(name: b.displayName, selected: b.key == branch) { ws.selectBranch(key: b.key) }
                     }
                 }
                 .padding(.horizontal)
@@ -77,8 +90,23 @@ struct ShellView: View {
         }
     }
 
+    /// The tab with the selection it shows: Open day is under Today.
+    private var selected: Destination {
+        switch destination {
+        case .more, .record: return destination
+        default: return .today
+        }
+    }
+
+    /// Record sits between Today and More, as in Compose's phone navigation: only once the config has loaded, and only for who may record.
+    private var showsRecord: Bool {
+        if case .ready = onEnum(of: config) { return capabilities.allows(destination: .record) }
+        return false
+    }
+
+    /// `ready` once the config is loaded and a branch chosen; before that the screen says what is missing.
     @ViewBuilder
-    private var todayScreen: some View {
+    private func screen<Ready: View>(@ViewBuilder _ ready: () -> Ready) -> some View {
         switch onEnum(of: config) {
         case .loading:
             Page { Text(text("working")).foregroundColor(.secondary) }
@@ -90,30 +118,10 @@ struct ShellView: View {
         case .ready:
             if branch == nil {
                 Page { Banner(text: text("no_branch"), tone: .info) }
-            } else if destination == .openDay {
-                OpenDayView(ws: ws, can: capabilities)
             } else {
-                TodayView(ws: ws, can: capabilities)
+                ready()
             }
         }
-    }
-}
-
-/// A branch to work in: filled when it is the one chosen.
-private struct BranchChoice: View {
-    let name: String
-    let selected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(name)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .foregroundColor(selected ? .white : .primary)
-                .background(selected ? Color.accentColor : Color(.secondarySystemBackground), in: Capsule())
-        }
-        .buttonStyle(.plain)
     }
 }
 

@@ -94,3 +94,58 @@ func groupThousands(_ amount: String) -> String {
 func displayAmount(minor: Int64, exponent: Int32) -> String {
     MoneyTextKt.displayAmount(minor: minor, exponent: exponent, grouping: MoneyText_iosKt.localeGroupingSeparator(), decimal: MoneyText_iosKt.localeDecimalSeparator())
 }
+
+/// A pill that is on or off, for picking one of a few (a branch, a category, a currency, a suggestion).
+struct Choice: View {
+    let name: String
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(name)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .foregroundColor(selected ? .white : .primary)
+                .background(selected ? Color.accentColor : Color(.secondarySystemBackground), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Children side by side that wrap onto the next line when one is full, as Compose's FlowRow.
+struct FlowLayout: Layout {
+    private let spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        arrange(proposal.width ?? .infinity, subviews).size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let origins = arrange(bounds.width, subviews).origins
+        for (subview, origin) in zip(subviews, origins) {
+            subview.place(at: CGPoint(x: bounds.minX + origin.x, y: bounds.minY + origin.y), proposal: .unspecified)
+        }
+    }
+
+    private func arrange(_ width: CGFloat, _ subviews: Subviews) -> (size: CGSize, origins: [CGPoint]) {
+        var origins: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var widest: CGFloat = 0
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x > 0, x + size.width > width {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            origins.append(CGPoint(x: x, y: y))
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+            widest = max(widest, x - spacing)
+        }
+        return (CGSize(width: widest, height: y + rowHeight), origins)
+    }
+}
