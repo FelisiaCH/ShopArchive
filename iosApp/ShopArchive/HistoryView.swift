@@ -295,6 +295,8 @@ private func isWorking(_ action: any ActionPhase) -> Bool {
 private struct Actions: View {
     let state: EntryDetailState
     let ui: DetailUi
+    // Each tap on Move starts the card again: the flow puts the entry's own date back, and the card's typed text must show that one.
+    @State private var moveOpened = 0
 
     var body: some View {
         let busy = isWorking(ui.action)
@@ -304,7 +306,10 @@ private struct Actions: View {
                     Button(text("detail_edit")) { state.startEdit() }
                         .buttonStyle(.bordered)
                         .disabled(busy)
-                    Button(text("detail_move")) { state.openMove() }
+                    Button(text("detail_move")) {
+                        state.openMove()
+                        moveOpened += 1
+                    }
                         .buttonStyle(.bordered)
                         .disabled(busy)
                 }
@@ -332,7 +337,7 @@ private struct Actions: View {
             }
         }
         if let moveText = ui.moveText {
-            MoveCard(state: state, ui: ui, first: moveText)
+            MoveCard(state: state, ui: ui, first: moveText).id(moveOpened)
         }
         actionBanner(ui.action)
     }
