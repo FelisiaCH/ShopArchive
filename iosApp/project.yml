@@ -6,6 +6,10 @@ options:
   developmentLanguage: en
   deploymentTarget:
     iOS: "16.0"
+# The version numbers, generated from gradle.properties by :composeApp:generateIosResources.
+configFiles:
+  Debug: Version.xcconfig
+  Release: Version.xcconfig
 settings:
   base:
     SWIFT_VERSION: "5.0"
