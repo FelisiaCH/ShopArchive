@@ -12,7 +12,7 @@ struct StatusSection: View {
                 if busy {
                     HStack {
                         ProgressView()
-                        Text("working").foregroundColor(.secondary).padding(.leading, 8)
+                        Text(text("working")).foregroundColor(.secondary).padding(.leading, 8)
                     }
                 }
                 if let problem {
@@ -34,7 +34,7 @@ struct ServersView: View {
             Form {
                 Section {
                     if state.saved.isEmpty {
-                        Text("servers_none").foregroundColor(.secondary)
+                        Text(text("servers_none")).foregroundColor(.secondary)
                     }
                     ForEach(state.saved, id: \.serverId) { row in
                         Button { flow.openServer(serverId: row.serverId) } label: {
@@ -50,9 +50,9 @@ struct ServersView: View {
 
                 Section {
                     if state.searching {
-                        Text("servers_searching").foregroundColor(.secondary)
+                        Text(text("servers_searching")).foregroundColor(.secondary)
                     } else if state.found.isEmpty {
-                        Text("servers_found_none").foregroundColor(.secondary)
+                        Text(text("servers_found_none")).foregroundColor(.secondary)
                     }
                     ForEach(state.found, id: \.serverId) { found in
                         Button(found.name + " · " + found.endpoint) { flow.openFound(found: found) }
@@ -60,9 +60,9 @@ struct ServersView: View {
                     }
                 } header: {
                     HStack {
-                        Text("servers_found")
+                        Text(text("servers_found"))
                         Spacer()
-                        Button("servers_refresh") { flow.refreshFound() }
+                        Button(text("servers_refresh")) { flow.refreshFound() }
                             .disabled(state.searching || state.busy)
                     }
                     .textCase(nil)
@@ -73,13 +73,13 @@ struct ServersView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .disabled(state.busy)
-                    Button("servers_add") { flow.addServer(address: address) }
+                    Button(text("servers_add")) { flow.addServer(address: address) }
                         .disabled(state.busy || address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
 
                 StatusSection(busy: state.busy, problem: state.problem)
             }
-            .navigationTitle("servers_title")
+            .navigationTitle(text("servers_title"))
         }
     }
 }
