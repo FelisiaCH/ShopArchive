@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kmp.library)
@@ -15,11 +17,14 @@ kotlin {
         minSdk = libs.versions.android.minSdk.get().toInt()
     }
     // The static framework iosApp/ links; SKIE turns Flow, suspend and sealed types into Swift's AsyncSequence, async and enum.
+    // Xcode builds it through embedAndSignAppleFrameworkForXcode; the XCFramework (device + simulator) is what CI hands to xtool on Linux.
+    val xcf = XCFramework("ClientCore")
     listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
         target.binaries.framework {
             baseName = "ClientCore"
             isStatic = true
             export(project(":shared"))
+            xcf.add(this)
         }
     }
 

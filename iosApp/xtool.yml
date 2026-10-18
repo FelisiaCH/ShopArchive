@@ -1,0 +1,10 @@
+# Builds and installs the app on an iPhone from Linux: ./fetch-clientcore.sh once per client core change, then `xtool dev`.
+version: 1
+bundleID: xyz.felismp.shoparchive
+product: ShopArchive
+infoPath: AppInfo.plist
+resources:
+  - ShopArchive/en.lproj
+  - ShopArchive/lo.lproj
+  - ShopArchive/th.lproj
+skipLSP: true

@@ -62,6 +62,13 @@ jobs:
       # Unsigned simulator build; its script phase builds the ClientCore framework through Gradle.
       - run: xcodebuild -project ShopArchive.xcodeproj -scheme ShopArchive -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -configuration Debug CODE_SIGNING_ALLOWED=NO build
         working-directory: iosApp
+      # Kotlin/Native links Apple binaries only on macOS: on Linux, iosApp/fetch-clientcore.sh downloads this and xtool builds the app with it.
+      - run: ./gradlew :clientCore:assembleClientCoreReleaseXCFramework
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ClientCore-xcframework
+          path: clientCore/build/XCFrameworks/release/
+          if-no-files-found: error
 
   # Manual only: GitHub-hosted arm64 runners may be unavailable to private repos.
   linux-arm64:
