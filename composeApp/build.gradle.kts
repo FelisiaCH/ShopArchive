@@ -213,8 +213,8 @@ abstract class IosStringsTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val resources: DirectoryProperty
 
-    @get:InputDirectory
-    @get:PathSensitive(PathSensitivity.RELATIVE)
+    // Not an input: generation writes here (and may create it), and the check reads it whole on every run.
+    @get:Internal
     abstract val target: DirectoryProperty
 
     /** Every file the iOS app's text consists of: its path under [target], and what it contains. */
