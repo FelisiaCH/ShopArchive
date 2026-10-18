@@ -1,7 +1,7 @@
 import SwiftUI
 import ClientCore
 
-/// The day's status, the money and the latest lines of the chosen branch. The slips card opens History and the Close day button Reports; the notes card only shows its count: Notes is not built yet.
+/// The day's status, the money and the latest lines of the chosen branch. The slips card opens History, the notes card Notes and the Close day button Reports.
 struct TodayView: View {
     let ws: Workspace
     let can: Capabilities
@@ -21,7 +21,7 @@ struct TodayView: View {
                 if let failure = ui.failure {
                     Banner(text: text("today_failed") + " " + failureText(failure), tone: .error)
                 }
-                TodayContent(data: data, can: can, canWrite: canWrite, openDay: { ws.go(to: .openDay) }, closeDay: { ws.openReports(tab: .closeDay) }, openHistory: { ws.go(to: .history) })
+                TodayContent(data: data, can: can, canWrite: canWrite, openDay: { ws.go(to: .openDay) }, closeDay: { ws.openReports(tab: .closeDay) }, openHistory: { ws.go(to: .history) }, openNotes: { ws.openNotes(day: data.oldestUnreadNote ?? data.date) })
             } else if let failure = ui.failure {
                 Banner(text: text("today_failed") + " " + failureText(failure), tone: .error)
                 Button(text("retry")) { ws.today.reload() }
@@ -44,6 +44,7 @@ private struct TodayContent: View {
     let openDay: () -> Void
     let closeDay: () -> Void
     let openHistory: () -> Void
+    let openNotes: () -> Void
 
     var body: some View {
         switch onEnum(of: data.status) {
@@ -110,7 +111,7 @@ private struct TodayContent: View {
         }
     }
 
-    /// The slips attached today (with the dashboard; opens History) and the notes for the owner that are unread (with the read node).
+    /// The slips attached today (with the dashboard; opens History) and the notes for the owner that are unread (with the read node; opens Notes).
     @ViewBuilder
     private var counts: some View {
         let unread = data.unreadNotes
@@ -129,11 +130,14 @@ private struct TodayContent: View {
                     }
                 }
                 if let unread {
-                    Card {
-                        Text(text("today_notes")).font(.caption).foregroundColor(.secondary)
-                        Text(String(unread.intValue)).font(.headline)
-                        Text(text("today_notes_unread")).font(.caption).foregroundColor(.secondary)
+                    Button(action: openNotes) {
+                        Card {
+                            Text(text("today_notes")).font(.caption).foregroundColor(.secondary)
+                            Text(String(unread.intValue)).font(.headline)
+                            Text(text("today_notes_unread")).font(.caption).foregroundColor(.secondary)
+                        }
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }

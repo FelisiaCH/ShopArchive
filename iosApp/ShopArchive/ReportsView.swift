@@ -1,11 +1,6 @@
 import SwiftUI
 import ClientCore
 
-extension Capabilities {
-    /// The Reports tabs this app has: Compose's `reportsTabs` without Notifications, which is not built yet.
-    var reportsTabsBuilt: [ReportsTab] { reportsTabs.filter { $0 != .notifications } }
-}
-
 /// Reports: the tabs the person may use, then the chosen one. The Close day tab is CloseDayView.
 struct ReportsView: View {
     let ws: Workspace
@@ -29,7 +24,7 @@ struct ReportsView: View {
 
     var body: some View {
         // Only the tabs the person may use; if the chosen one is not among them (rights changed), the first is shown.
-        let tabs = can.reportsTabsBuilt
+        let tabs = can.reportsTabs
         Group {
             if let tab = tabs.contains(chosen) ? chosen : tabs.first {
                 Page {
@@ -41,7 +36,7 @@ struct ReportsView: View {
                     case .overview: OverviewSection(ws: ws)
                     case .closeDay: CloseDayView(ws: ws)
                     case .export: ExportSection(ws: ws)
-                    case .notifications: EmptyView()
+                    case .notifications: NotificationsSection(ws: ws)
                     }
                 }
             }
@@ -274,6 +269,114 @@ private struct CurrencyReport: View {
         TableLine(cells: [text("item_label"), text("reports_sum"), text("reports_entries")], header: true)
         ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
             TableLine(cells: [isBlank(row.item) ? "—" : row.item, groupThousands(row.sum), String(row.count)])
+        }
+    }
+}
+
+// ---- notifications ----
+
+private struct NotificationsSection: View {
+    let ws: Workspace
+    @State private var ui: NotificationsUi
+
+    init(ws: Workspace) {
+        self.ws = ws
+        _ui = State(initialValue: ws.notifications.ui.value)
+    }
+
+    var body: some View {
+        let n = ws.notifications
+        VStack(alignment: .leading, spacing: 12) {
+            Text(text("notif_hint")).foregroundColor(.secondary)
+            if let failure = ui.failure {
+                Banner(text: text("notif_load_failed") + " " + failureText(failure), tone: .error)
+            }
+            if let failure = ui.actionFailure {
+                Banner(text: text("notif_resend_failed") + " " + failureText(failure), tone: .error)
+            }
+            if ui.canSend && !ui.closedDays.isEmpty {
+                Text(text("notif_closed_days")).font(.headline)
+                ForEach(ui.closedDays, id: \.id) { day in
+                    let enabled = !ui.blocked && !ui.working.contains(day.id) && !ui.dayWaiting(session: day)
+                    Button(text("notif_send_day", day.businessDate)) { n.sendDay(session: day) }
+                        .buttonStyle(.bordered)
+                        .disabled(!enabled)
+                }
+            }
+            if let items = ui.items {
+                if items.isEmpty {
+                    Text(text("notif_empty")).foregroundColor(.secondary)
+                } else {
+                    ForEach(items, id: \.id) { item in
+                        Message(ws: ws, n: item, canSend: ui.canSend && ui.canResend(n: item), enabled: !ui.blocked && !ui.working.contains(item.id))
+                    }
+                }
+            } else if ui.failure == nil {
+                Text(text("working")).foregroundColor(.secondary)
+            }
+            if ui.blocked {
+                Text(text("needs_connection")).font(.caption).foregroundColor(.secondary)
+            }
+            Button(text("notif_refresh")) { n.reload() }
+                .buttonStyle(.bordered)
+                .disabled(ui.loading)
+        }
+        .collect(n.ui, into: $ui)
+        // Opening the tab asks again: the outbox changes on the server without telling the app.
+        .task { n.reload() }
+    }
+}
+
+private struct Message: View {
+    let ws: Workspace
+    let n: NotificationDto
+    let canSend: Bool
+    let enabled: Bool
+
+    private var event: String {
+        switch n.event {
+        case "day.closed": return text("notif_event_day")
+        case "entry.created": return text("notif_event_entry")
+        case "device.new": return text("notif_event_device")
+        case "note.created": return text("notif_event_note")
+        default: return n.event
+        }
+    }
+
+    private var stateWords: String {
+        switch n.state {
+        case .queued: return text("notif_state_queued")
+        case .sent: return text("notif_state_sent")
+        case .unknown: return text("notif_state_unknown")
+        case .failed: return text("notif_state_failed")
+        }
+    }
+
+    private var stateTone: Tone {
+        switch n.state {
+        case .sent: return .success
+        case .failed: return .error
+        default: return .info
+        }
+    }
+
+    var body: some View {
+        let branch = ws.branches.first { $0.key == n.branch }?.displayName ?? n.branch
+        // device.new of a user with no branch has none.
+        let title = branch.isEmpty ? event : "\(event) · \(branch)"
+        let when = String(n.createdAt.prefix(16)).replacingOccurrences(of: "T", with: " ")
+        Card {
+            Text(title).font(.headline)
+            Text(verbatim: "\(n.code) · \(n.user) · \(when)").font(.caption).foregroundColor(.secondary)
+            Chip(text: stateWords, tone: stateTone)
+            if n.attempts > 1 {
+                Text(text("notif_attempts", n.attempts)).font(.caption).foregroundColor(.secondary)
+            }
+            if canSend {
+                Button(text("notif_resend")) { ws.notifications.resend(id: n.id) }
+                    .buttonStyle(.bordered)
+                    .disabled(!enabled)
+            }
         }
     }
 }
