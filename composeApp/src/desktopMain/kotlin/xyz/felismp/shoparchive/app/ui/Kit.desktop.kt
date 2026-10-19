@@ -131,7 +131,7 @@ actual fun ShopBanner(text: String, tone: Tone, modifier: Modifier) {
 actual fun ShopChip(text: String, tone: Tone, modifier: Modifier) {
     val (fill, accent) = toneColors(tone)
     // A neutral chip is a quiet label; only success and error take a color.
-    FluentChip(text, if (tone == Tone.Info) FluentTheme.colors.shop.textSecondary else accent, if (tone == Tone.Info) FluentTheme.colors.shop.surfaceSelected else fill, modifier)
+    FluentChip(text, if (tone == Tone.Info) FluentTheme.colors.shop.textSecondary else accent, if (tone == Tone.Info) FluentTheme.colors.shop.border else fill, modifier)
 }
 
 @Composable

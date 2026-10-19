@@ -77,7 +77,8 @@ internal fun TableLine(cells: List<String>, header: Boolean = false) {
             cells.forEachIndexed { i, cell ->
                 val mod = androidx.compose.ui.Modifier.weight(if (i == 0) 1.3f else 1f)
                 when {
-                    header -> ShopText(cell, TextRole.Caption, muted = true, modifier = mod)
+                    header && i == 0 -> ShopText(cell, TextRole.Caption, muted = true, modifier = mod)
+                    header -> androidx.compose.foundation.layout.Box(mod, contentAlignment = androidx.compose.ui.Alignment.CenterEnd) { ShopText(cell, TextRole.Caption, muted = true) }
                     i == 0 -> ShopText(cell, modifier = mod)
                     else -> ShopText(cell, TextRole.Amount, modifier = mod)
                 }

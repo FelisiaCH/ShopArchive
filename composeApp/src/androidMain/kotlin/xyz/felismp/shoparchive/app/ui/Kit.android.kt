@@ -253,7 +253,7 @@ actual fun ShopBanner(text: String, tone: Tone, modifier: Modifier) {
 @Composable
 actual fun ShopChip(text: String, tone: Tone, modifier: Modifier) {
     val (fill, accent) = toneColors(tone)
-    Surface(modifier, color = fill, shape = CircleShape) {
+    Surface(modifier, color = if (tone == Tone.Info) ShopTheme.colors.border else fill, shape = CircleShape) {
         Text(
             text, Modifier.padding(horizontal = ShopTheme.spacing.x12, vertical = ShopTheme.spacing.x4),
             style = MaterialTheme.typography.labelLarge.copy(lineHeight = 22.sp), color = if (tone == Tone.Info) ShopTheme.colors.textSecondary else accent,
