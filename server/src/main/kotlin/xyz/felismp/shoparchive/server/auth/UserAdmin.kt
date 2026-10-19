@@ -53,6 +53,7 @@ internal class DefaultUserAdminService(
     }
 
     override fun setRole(principal: Principal, name: String, role: String, ip: String): AdminUserDto = change(principal, "admin.user.role", name, ip) {
+        guardAccount(principal, name)
         users.setRole(name, role)
         name
     }
@@ -72,7 +73,12 @@ internal class DefaultUserAdminService(
 
     override fun setEnabled(principal: Principal, name: String, enabled: Boolean, ip: String): AdminUserDto =
         change(principal, if (enabled) "admin.user.enable" else "admin.user.disable", name, ip) {
-            if (enabled) users.setEnabled(name, true) else accounts.disableAccount(name)
+            if (enabled) {
+                users.setEnabled(name, true)
+            } else {
+                guardAccount(principal, name)
+                accounts.disableAccount(name)
+            }
             name
         }
 
@@ -112,6 +118,17 @@ internal class DefaultUserAdminService(
                 else -> ErrorCode.INVALID_REQUEST
             }
             throw ApiError(e.status, code, e.message ?: "Failed", reason = e.reason)
+        }
+    }
+
+    /** From the app (the console is not held to this): an op cannot lock themselves out, and the last enabled op cannot be taken away. */
+    private fun guardAccount(principal: Principal, name: String) {
+        val target = users.user(name)
+        if (target.id == principal.userId) {
+            throw ApiError(409, ErrorCode.CONFLICT, "You cannot disable your own account or change your own role here.", reason = ErrorReasons.USER_SELF_CHANGE)
+        }
+        if (target.op && target.enabled && users.userNames().count { users.user(it).let { u -> u.op && u.enabled } } == 1) {
+            throw ApiError(409, ErrorCode.CONFLICT, "'$name' is the last enabled op.", reason = ErrorReasons.USER_LAST_OP)
         }
     }
 

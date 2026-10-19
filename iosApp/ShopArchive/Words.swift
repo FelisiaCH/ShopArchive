@@ -123,6 +123,8 @@ private let reasonKeys: [String: String] = {
         r.USER_EXISTS: "reason_user_exists",
         r.USER_NAME_INVALID: "reason_user_name_invalid",
         r.USER_SELF_RESET: "reason_user_self_reset",
+        r.USER_SELF_CHANGE: "reason_user_self_change",
+        r.USER_LAST_OP: "reason_user_last_op",
         r.ROLE_NOT_FOUND: "reason_role_not_found",
         r.KEY_INVALID: "reason_key_invalid",
         r.KEY_EXISTS: "reason_key_exists",

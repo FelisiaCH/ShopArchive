@@ -114,6 +114,10 @@ object ErrorReasons {
     const val USER_NAME_INVALID = "user.name-invalid"
     /** An op cannot reset its own account from the app: that would end the session it asks from. */
     const val USER_SELF_RESET = "user.self-reset"
+    /** An op cannot disable their own account or change their own role from the app. */
+    const val USER_SELF_CHANGE = "user.self-change"
+    /** The last enabled op cannot be disabled or given another role: nobody would be left to run the shop. */
+    const val USER_LAST_OP = "user.last-op"
     const val ROLE_NOT_FOUND = "role.not-found"
     /** A branch or category key is not 1 to 32 characters from a-z, 0-9 and -. */
     const val KEY_INVALID = "key.invalid"
@@ -136,7 +140,7 @@ object ErrorReasons {
         ENTRY_CATEGORY_ARCHIVED, ENTRY_CATEGORY_TYPE, ENTRY_CHANGED_ELSEWHERE, ENTRY_DELETED, ENTRY_PAST_WINDOW, ENTRY_MOVE_FUTURE, ENTRY_MOVE_OCCUPIED,
         CLOSE_COUNT_MISSING, CLOSE_NOTE_NEEDED, CLOSE_CURRENCY_UNKNOWN, CLOSE_AMOUNT_INVALID,
         NOTIFICATION_PENDING,
-        USER_NOT_FOUND, USER_EXISTS, USER_NAME_INVALID, USER_SELF_RESET, ROLE_NOT_FOUND, KEY_INVALID, KEY_EXISTS, NAME_REQUIRED,
+        USER_NOT_FOUND, USER_EXISTS, USER_NAME_INVALID, USER_SELF_RESET, USER_SELF_CHANGE, USER_LAST_OP, ROLE_NOT_FOUND, KEY_INVALID, KEY_EXISTS, NAME_REQUIRED,
         DATE_INVALID, RANGE_ORDER, RANGE_TOO_LONG,
     )
 }

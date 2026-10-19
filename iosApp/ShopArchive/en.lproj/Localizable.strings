@@ -306,6 +306,8 @@
 "reason_user_exists" = "A user with that name exists already. Choose another name.";
 "reason_user_name_invalid" = "A user name is 3 to 32 characters from a-z, 0-9 and _.";
 "reason_user_self_reset" = "You cannot reset your own account here. Ask for it to be done on the server.";
+"reason_user_self_change" = "You cannot disable your own account or change your own role here.";
+"reason_user_last_op" = "This is the last admin account that is switched on, so it cannot be disabled or given another role.";
 "reason_role_not_found" = "That role does not exist.";
 "reason_key_invalid" = "A key is 1 to 32 characters from a-z, 0-9 and -.";
 "reason_key_exists" = "That key is used already. Choose another one.";

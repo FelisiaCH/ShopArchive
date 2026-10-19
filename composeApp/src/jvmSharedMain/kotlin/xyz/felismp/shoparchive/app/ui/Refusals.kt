@@ -60,6 +60,8 @@ internal val REASON_WORDS: Map<String, StringResource> = mapOf(
     ErrorReasons.USER_EXISTS to Res.string.reason_user_exists,
     ErrorReasons.USER_NAME_INVALID to Res.string.reason_user_name_invalid,
     ErrorReasons.USER_SELF_RESET to Res.string.reason_user_self_reset,
+    ErrorReasons.USER_SELF_CHANGE to Res.string.reason_user_self_change,
+    ErrorReasons.USER_LAST_OP to Res.string.reason_user_last_op,
     ErrorReasons.ROLE_NOT_FOUND to Res.string.reason_role_not_found,
     ErrorReasons.KEY_INVALID to Res.string.reason_key_invalid,
     ErrorReasons.KEY_EXISTS to Res.string.reason_key_exists,
