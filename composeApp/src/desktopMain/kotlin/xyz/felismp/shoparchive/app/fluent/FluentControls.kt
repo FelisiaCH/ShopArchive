@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -46,6 +47,7 @@ import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -69,14 +71,25 @@ fun FluentText(
     BasicText(annotated, modifier, style.copy(color = color), maxLines = maxLines, overflow = overflow)
 }
 
-/** Card: card fill on the layer, 1px stroke, radius 8. */
+/** Card: card fill on the layer, 1px stroke, radius 8. Without [padded] the content runs to the edges; with [onClick] the card is one target and shows hover and press. */
 @Composable
-fun FluentCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+fun FluentCard(modifier: Modifier = Modifier, padded: Boolean = true, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     val c = FluentTheme.colors
+    val source = remember { MutableInteractionSource() }
+    val hovered by source.collectIsHoveredAsState()
+    val pressed by source.collectIsPressedAsState()
+    val focused = focusRingVisible(source)
+    val fill = when {
+        onClick != null && pressed -> c.pressedOverlay.compositeOver(c.card)
+        onClick != null && hovered -> c.hoverOverlay.compositeOver(c.card)
+        else -> c.card
+    }
     Column(
-        modifier.fillMaxWidth().clip(FluentShapes.card).background(c.card)
-            .border(1.dp, c.cardStroke, FluentShapes.card).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier.fillMaxWidth().clip(FluentShapes.card).background(fill)
+            .border(if (focused) 2.dp else 1.dp, if (focused) c.shop.text else c.cardStroke, FluentShapes.card)
+            .then(if (onClick != null) Modifier.hoverable(source).clickable(source, indication = null, role = Role.Button, onClick = onClick) else Modifier)
+            .then(if (padded) Modifier.padding(16.dp) else Modifier),
+        verticalArrangement = Arrangement.spacedBy(if (padded) 8.dp else 0.dp),
         content = content,
     )
 }
@@ -92,7 +105,7 @@ private fun focusRingVisible(source: MutableInteractionSource): Boolean {
 private fun Modifier.controlBorder(focused: Boolean, stroke: Color, textColor: Color, shape: androidx.compose.ui.graphics.Shape) =
     if (focused) border(2.dp, textColor, shape) else border(1.dp, stroke, shape)
 
-/** Standard (subtle) button, or the accent button when [accent] is set. Height 32, radius 4. [icon] is 16 and goes before the text. */
+/** Standard (subtle) button, or the accent button when [accent] is set. Height 36, radius 4. [icon] is 16 and goes before the text. */
 @Composable
 fun FluentButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, accent: Boolean = false, icon: ImageVector? = null) {
     val c = FluentTheme.colors
@@ -108,11 +121,11 @@ fun FluentButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifie
     }
     val fill = if (hovered || pressed) overlay.compositeOver(base) else base
     Box(
-        modifier.heightIn(min = 32.dp).clip(FluentShapes.control).background(fill)
+        modifier.heightIn(min = 36.dp).clip(FluentShapes.control).background(fill)
             .controlBorder(focused, if (accent) Color.Transparent else c.controlStroke, c.shop.text, FluentShapes.control)
             .hoverable(source)
             .clickable(source, indication = null, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 5.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
         val content = if (accent) c.shop.onAccent else c.shop.text
@@ -152,7 +165,7 @@ fun FluentToggleSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, mod
     }
 }
 
-/** SelectorBar: text items in a row, the selected one in the primary color with a short accent bar under it. [icon] is 16 and goes before the text. */
+/** Segmented selector: the options in a recessed track, the selected one raised on a card with its stroke and in the strong weight. [icon] is 16 and goes before the text. */
 @Composable
 fun <T> FluentSelectorBar(
     options: List<Pair<T, String>>,
@@ -162,44 +175,38 @@ fun <T> FluentSelectorBar(
     icon: (T) -> ImageVector? = { null },
 ) {
     val c = FluentTheme.colors
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(modifier.clip(FluentShapes.card).background(c.shop.surfaceSelected).border(1.dp, c.cardStroke, FluentShapes.card).padding(3.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         for ((value, label) in options) {
             val isSelected = value == selected
             val source = remember { MutableInteractionSource() }
             val hovered by source.collectIsHoveredAsState()
             val focused = focusRingVisible(source)
-            Column(
+            val content = if (isSelected) c.shop.text else c.shop.textSecondary
+            Row(
                 Modifier.clip(FluentShapes.control)
-                    .background(if (hovered) c.hoverOverlay else Color.Transparent)
-                    .then(if (focused) Modifier.border(2.dp, c.shop.text, FluentShapes.control) else Modifier)
+                    .background(if (isSelected) c.controlFill else if (hovered) c.hoverOverlay else Color.Transparent)
+                    .border(if (focused) 2.dp else 1.dp, if (focused) c.shop.text else if (isSelected) c.cardStroke else Color.Transparent, FluentShapes.control)
                     .hoverable(source)
                     .selectable(isSelected, source, indication = null, role = Role.Tab) { onSelect(value) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                    .padding(horizontal = 16.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                val content = if (isSelected) c.shop.text else c.shop.textSecondary
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    icon(value)?.let { Image(rememberVectorPainter(it), contentDescription = null, Modifier.size(16.dp), colorFilter = ColorFilter.tint(content)) }
-                    FluentText(label, style = FluentTheme.typography.body, color = content)
-                }
-                Box(
-                    Modifier.size(width = 16.dp, height = 3.dp).clip(RoundedCornerShape(1.5.dp))
-                        .background(if (isSelected) c.shop.accent else Color.Transparent),
-                )
+                icon(value)?.let { Image(rememberVectorPainter(it), contentDescription = null, Modifier.size(16.dp), colorFilter = ColorFilter.tint(content)) }
+                FluentText(label, style = if (isSelected) FluentTheme.typography.bodyStrong else FluentTheme.typography.body, color = content)
             }
         }
     }
 }
 
 /**
- * Left navigation pane item: 36 high, radius 4, a 3x16 accent bar at the left edge when selected. [compact] shows the icon alone, centered
- * (the 48 wide strip), with [tooltip] shown when the pointer rests on it.
+ * Left navigation pane item: 40 high, radius 4, a 3x16 accent bar at the left edge and a stronger fill when selected. [compact] shows the icon alone,
+ * centered (the 48 wide strip), with [tooltip] shown when the pointer rests on it. [badge] is a count in a pill at the right (a dot in the strip).
  */
 @Composable
-fun FluentNavigationItem(label: String, icon: ImageVector?, selected: Boolean, compact: Boolean = false, tooltip: String = label, onClick: () -> Unit) {
-    if (compact) FluentTooltip(tooltip) { NavigationItemBox(label, icon, selected, true, onClick) }
-    else NavigationItemBox(label, icon, selected, false, onClick)
+fun FluentNavigationItem(label: String, icon: ImageVector?, selected: Boolean, compact: Boolean = false, tooltip: String = label, badge: Int? = null, onClick: () -> Unit) {
+    if (compact) FluentTooltip(tooltip) { NavigationItemBox(label, icon, selected, true, badge, onClick) }
+    else NavigationItemBox(label, icon, selected, false, badge, onClick)
 }
 
 /** A small label that shows to the right of [content] when the pointer rests on it. */
@@ -221,7 +228,7 @@ private fun FluentTooltip(text: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun NavigationItemBox(label: String, icon: ImageVector?, selected: Boolean, compact: Boolean, onClick: () -> Unit) {
+private fun NavigationItemBox(label: String, icon: ImageVector?, selected: Boolean, compact: Boolean, badge: Int?, onClick: () -> Unit) {
     val c = FluentTheme.colors
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
@@ -229,11 +236,13 @@ private fun NavigationItemBox(label: String, icon: ImageVector?, selected: Boole
     val focused = focusRingVisible(source)
     val fill = when {
         pressed -> c.pressedOverlay
-        selected || hovered -> c.hoverOverlay
+        selected -> c.shop.text.copy(alpha = 0.08f)
+        hovered -> c.hoverOverlay
         else -> Color.Transparent
     }
+    val ink = if (selected) c.shop.text else c.shop.textSecondary
     Box(
-        Modifier.padding(horizontal = 4.dp).fillMaxWidth().height(36.dp).clip(FluentShapes.control).background(fill)
+        Modifier.padding(horizontal = 4.dp).fillMaxWidth().heightIn(min = 40.dp).clip(FluentShapes.control).background(fill)
             .then(if (focused) Modifier.border(2.dp, c.shop.text, FluentShapes.control) else Modifier)
             .hoverable(source)
             .selectable(selected, source, indication = null, role = Role.Tab, onClick = onClick),
@@ -246,11 +255,17 @@ private fun NavigationItemBox(label: String, icon: ImageVector?, selected: Boole
             )
         }
         if (compact) {
-            if (icon != null) Image(rememberVectorPainter(icon), contentDescription = label, Modifier.size(16.dp), colorFilter = ColorFilter.tint(c.shop.text))
+            if (icon != null) Image(rememberVectorPainter(icon), contentDescription = label, Modifier.size(18.dp), colorFilter = ColorFilter.tint(ink))
+            if (badge != null && badge > 0) Box(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 8.dp).size(8.dp).clip(CircleShape).background(c.shop.accent))
         } else {
-            Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (icon != null) Image(rememberVectorPainter(icon), contentDescription = null, Modifier.size(16.dp), colorFilter = ColorFilter.tint(c.shop.text))
-                FluentText(label, style = FluentTheme.typography.body)
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (icon != null) Image(rememberVectorPainter(icon), contentDescription = null, Modifier.size(18.dp), colorFilter = ColorFilter.tint(ink))
+                FluentText(label, Modifier.weight(1f), style = if (selected) FluentTheme.typography.bodyStrong else FluentTheme.typography.body, color = ink)
+                if (badge != null && badge > 0) {
+                    Box(Modifier.defaultMinSize(minWidth = 22.dp).clip(CircleShape).background(c.shop.accent).padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
+                        FluentText(badge.toString(), style = FluentTheme.typography.caption.copy(fontWeight = FontWeight.SemiBold), color = c.shop.onAccent)
+                    }
+                }
             }
         }
     }

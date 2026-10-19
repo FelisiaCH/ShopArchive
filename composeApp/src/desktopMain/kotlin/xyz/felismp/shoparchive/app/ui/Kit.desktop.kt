@@ -29,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -45,6 +47,9 @@ import xyz.felismp.shoparchive.app.flow.ThisDevice
 import xyz.felismp.shoparchive.app.theme.FluentTheme
 import xyz.felismp.shoparchive.app.theme.ThemeMode
 import java.util.Locale
+import org.jetbrains.compose.resources.stringResource
+import xyz.felismp.shoparchive.app.resources.Res
+import xyz.felismp.shoparchive.app.resources.app_name
 
 private val PAGE_MARGIN = 36.dp
 private val PAGE_MAX_WIDTH = 1000.dp
@@ -58,7 +63,7 @@ actual fun ScreenFrame(title: String, content: @Composable ColumnScope.() -> Uni
     Box(Modifier.fillMaxSize().background(FluentTheme.colors.layer), contentAlignment = Alignment.TopCenter) {
         Column(
             Modifier.widthIn(max = 520.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             FluentText(title, style = FluentTheme.typography.subtitle)
             content()
@@ -67,18 +72,20 @@ actual fun ScreenFrame(title: String, content: @Composable ColumnScope.() -> Uni
 }
 
 @Composable
-actual fun ShopText(text: String, role: TextRole, muted: Boolean, modifier: Modifier) {
+actual fun ShopText(text: String, role: TextRole, muted: Boolean, modifier: Modifier, color: Color) {
     val t = FluentTheme.typography
     val style = when (role) {
-        TextRole.Title -> t.bodyStrong
+        TextRole.Title -> t.section
         TextRole.Body -> t.body
         TextRole.Caption -> t.caption
         TextRole.Mono -> t.body.copy(fontFamily = FontFamily.Monospace)
         // Prompt has no tabular figures, so money is set in the system's monospace (Consolas on Windows) where every digit is as wide as the next.
-        TextRole.Amount -> t.body.copy(fontFamily = FontFamily.Monospace, textAlign = TextAlign.End)
+        TextRole.Amount -> t.bodyStrong.copy(fontFamily = FontFamily.Monospace, textAlign = TextAlign.End)
+        TextRole.Display -> t.display.copy(fontFamily = FontFamily.Monospace)
     }
     val c = FluentTheme.colors.shop
-    FluentText(text, modifier, style, color = if (muted) c.textSecondary else c.text)
+    val default = if (!muted) c.text else if (role == TextRole.Caption) c.textMuted else c.textSecondary
+    FluentText(text, modifier, style, color = color.takeOrElse { default })
 }
 
 @Composable
@@ -94,6 +101,7 @@ actual fun ShopTextField(value: String, onValueChange: (String) -> Unit, label: 
         singleLine = kind != FieldKind.Multiline,
         password = kind == FieldKind.Password || kind == FieldKind.Pin,
         enabled = enabled,
+        amount = kind == FieldKind.Amount,
     )
 }
 
@@ -108,7 +116,7 @@ private fun toneColors(tone: Tone): Pair<Color, Color> {
     val c = FluentTheme.colors
     return when (tone) {
         Tone.Info -> c.card to c.shop.accent
-        Tone.Success -> c.card to c.shop.moneyIn
+        Tone.Success -> c.shop.moneyIn.copy(alpha = 0.12f).compositeOver(c.card) to c.shop.moneyIn
         Tone.Error -> c.shop.warnBg to c.shop.moneyOut
     }
 }
@@ -122,7 +130,8 @@ actual fun ShopBanner(text: String, tone: Tone, modifier: Modifier) {
 @Composable
 actual fun ShopChip(text: String, tone: Tone, modifier: Modifier) {
     val (fill, accent) = toneColors(tone)
-    FluentChip(text, accent, fill, modifier)
+    // A neutral chip is a quiet label; only success and error take a color.
+    FluentChip(text, if (tone == Tone.Info) FluentTheme.colors.shop.textSecondary else accent, if (tone == Tone.Info) FluentTheme.colors.shop.surfaceSelected else fill, modifier)
 }
 
 @Composable
@@ -135,7 +144,7 @@ actual fun ShopPage(title: String, content: @Composable ColumnScope.() -> Unit) 
     Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Column(
             Modifier.widthIn(max = PAGE_MAX_WIDTH + PAGE_MARGIN * 2).fillMaxWidth().padding(horizontal = PAGE_MARGIN, vertical = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (title.isNotEmpty()) FluentText(title, style = FluentTheme.typography.title)
             content()
@@ -144,7 +153,7 @@ actual fun ShopPage(title: String, content: @Composable ColumnScope.() -> Unit) 
 }
 
 @Composable
-actual fun ShopCard(modifier: Modifier, content: @Composable ColumnScope.() -> Unit) = FluentCard(modifier, content)
+actual fun ShopCard(modifier: Modifier, padded: Boolean, onClick: (() -> Unit)?, content: @Composable ColumnScope.() -> Unit) = FluentCard(modifier, padded, onClick, content)
 
 @Composable
 actual fun ShopChoice(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier) =
@@ -160,7 +169,7 @@ actual fun Modifier.fillWidthOnPhone(): Modifier = this
 
 @Composable
 actual fun ShopFixedPage(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxSize().padding(horizontal = PAGE_MARGIN, vertical = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = PAGE_MARGIN, vertical = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         FluentText(title, style = FluentTheme.typography.title)
         content()
     }
@@ -169,14 +178,15 @@ actual fun ShopFixedPage(title: String, content: @Composable ColumnScope.() -> U
 @Composable
 actual fun <T> ShopNavigation(
     items: List<Pair<T, String>>, icon: (T) -> ShopIcon, selected: T?, onSelect: (T) -> Unit, wide: Boolean,
-    footer: List<NavAction>, account: NavAccount?, content: @Composable () -> Unit,
+    footer: List<NavAction>, account: NavAccount?, badge: (T) -> Int?, content: @Composable () -> Unit,
 ) {
     // The pane on the left is the 280 dp one with labels when [wide], else the 48 dp strip of icons; never a bottom bar. It sits on the window
     // background, the page on a layer of its own: Fluent layer color, a 1 dp stroke along the top and left, the top left corner rounded by 8.
     val colors = FluentTheme.colors
     Row(Modifier.fillMaxSize().background(colors.backdrop)) {
         Column(Modifier.width(if (wide) 280.dp else 48.dp).fillMaxHeight().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            items.forEach { (value, label) -> FluentNavigationItem(label, icon(value).fluent(), value == selected, compact = !wide) { onSelect(value) } }
+            if (wide) FluentText(stringResource(Res.string.app_name), Modifier.padding(start = 20.dp, top = 8.dp, bottom = 16.dp), style = FluentTheme.typography.section)
+            items.forEach { (value, label) -> FluentNavigationItem(label, icon(value).fluent(), value == selected, compact = !wide, badge = badge(value)) { onSelect(value) } }
             Spacer(Modifier.weight(1f))
             footer.forEach { FluentNavigationItem(it.label, it.icon.fluent(), it.selected, compact = !wide, onClick = it.onClick) }
             if (account != null) {
