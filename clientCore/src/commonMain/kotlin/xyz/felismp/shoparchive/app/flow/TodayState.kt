@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import xyz.felismp.shoparchive.app.client.ClientError
 import xyz.felismp.shoparchive.app.client.EntryFilter
+import xyz.felismp.shoparchive.app.client.clockWarningMinutes
 import xyz.felismp.shoparchive.shared.DashboardCurrency
 import xyz.felismp.shoparchive.shared.DashboardDto
 import xyz.felismp.shoparchive.shared.EntryDto
@@ -52,6 +53,8 @@ data class TodayData(
     val unreadNotes: Int? = null,
     /** The date of the oldest of them, null when there are none (or [unreadNotes] is null). */
     val oldestUnreadNote: String? = null,
+    /** The minutes the server's clock is off the device's when that is more than five (business dates would be wrong), else null. */
+    val clockOffMinutes: Int? = null,
 )
 
 /** [loading] only before the first answer; a reload keeps showing the last [data]. [failure] is set when the day itself could not be read. */
@@ -118,6 +121,7 @@ class TodayState(private val env: Env) {
                     branch, date, status, staleFrom = open?.businessDate?.takeIf { it != today },
                     currencies = stats?.currencies, recent = stats?.recent.orEmpty(), statsFailure = statsFailure, showStats = showStats, mine = mine,
                     slips = stats?.slips ?: 0, unreadNotes = unread?.unread, oldestUnreadNote = unread?.oldest,
+                    clockOffMinutes = clockWarningMinutes(env.api.serverClockOffsetMillis),
                 ),
             )
         } catch (e: CancellationException) {

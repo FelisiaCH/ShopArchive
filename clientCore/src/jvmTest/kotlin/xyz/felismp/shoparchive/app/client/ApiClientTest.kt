@@ -1,6 +1,7 @@
 package xyz.felismp.shoparchive.app.client
 
 import kotlinx.coroutines.runBlocking
+import mockwebserver3.MockResponse
 import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.CreateNoteRequest
 import xyz.felismp.shoparchive.shared.NotesUnread
@@ -34,6 +35,18 @@ class ApiClientTest {
             assertTrue(s.requests.all { it.headers[PROTOCOL_HEADER] == "$PROTOCOL_VERSION" })
             assertEquals(null, s.requests[0].headers["Authorization"])
             assertEquals("Bearer TOKEN-1", s.requests[1].headers["Authorization"])
+            api.close()
+        }
+    }
+
+    @Test fun remembersHowFarTheServersDateHeaderIsFromTheDeviceClock() = runBlocking {
+        val hourAhead = java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME.format(java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC).plusHours(1))
+        TlsServer { MockResponse.Builder().code(200).addHeader("Content-Type", "application/json").addHeader("Date", hourAhead).body("""{"serverId":"s","name":"n","motd":"","version":"1","protocol":1}""").build() }.use { s ->
+            val api = ApiClient("sid", s.pin, listOf(s.endpoint))
+            assertEquals(null, api.serverClockOffsetMillis)
+            api.info()
+            val minutes = clockWarningMinutes(api.serverClockOffsetMillis)
+            assertTrue(minutes in 59..61, "$minutes")
             api.close()
         }
     }

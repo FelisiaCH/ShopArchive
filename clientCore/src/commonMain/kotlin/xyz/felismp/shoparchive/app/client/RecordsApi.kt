@@ -45,6 +45,9 @@ class ExportFile(val fileName: String, val bytes: ByteArray)
 
 /** The record calls the screens make; [ApiClient] is the real one, tests use a fake. */
 interface RecordsApi {
+    /** How far the server's clock was ahead of the device's at its last answer (see [clockOffsetMillis]); null before any answer or when it sent no date. */
+    val serverClockOffsetMillis: Long? get() = null
+
     /** The branch's open day. Throws [ClientError.Api] with `NO_OPEN_SESSION` when none is open. */
     suspend fun currentSession(branch: String): SessionDto
 

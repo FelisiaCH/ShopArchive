@@ -48,6 +48,10 @@ private struct TodayContent: View {
     let openNotes: () -> Void
 
     var body: some View {
+        // Business dates come from the server's clock, so a wrong one is worth saying before anything else.
+        if let minutes = data.clockOffMinutes {
+            Banner(text: text("clock_off", String(minutes.intValue)), tone: .error)
+        }
         switch onEnum(of: data.status) {
         case .notOpened:
             Card {
