@@ -39,9 +39,9 @@ fun slipAmount(text: String, exponents: Map<String, Int>): Pair<String, Long>? {
         val fraction = m.groupValues[2]
         if (fraction.drop(exponent).any { it != '0' }) return@mapNotNull null
         val kept = fraction.take(exponent)
-        parseTypedAmount(m.groupValues[1] + if (kept.isEmpty()) "" else ".$kept", exponent)
+        parseTypedAmount(m.groupValues[1] + if (kept.isEmpty()) "" else ".$kept", exponent, allowZero = false, decimal = '.')
     }
-    val watermark = Regex("""(?<!\p{L})amount (\d+)[\s-]*""" + Regex.escape(code) + """(?!\p{L})""").findAll(text).mapNotNull { parseTypedAmount(it.groupValues[1], exponent) }
+    val watermark = Regex("""(?<!\p{L})amount (\d+)[\s-]*""" + Regex.escape(code) + """(?!\p{L})""").findAll(text).mapNotNull { parseTypedAmount(it.groupValues[1], exponent, allowZero = false, decimal = '.') }
     val amount = (grouped + watermark).groupingBy { it }.eachCount().maxWithOrNull(compareBy<Map.Entry<Long, Int>> { it.value }.thenBy { it.key })?.key ?: return null
     return code to amount
 }

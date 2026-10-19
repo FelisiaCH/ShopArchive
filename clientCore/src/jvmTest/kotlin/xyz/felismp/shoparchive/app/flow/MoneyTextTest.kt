@@ -45,22 +45,72 @@ class MoneyTextTest {
 }
 
 class TypedAmountTest {
+    // en-like: "." is the decimal; comma-decimal (de, fr): "," is the decimal.
+    private fun en(text: String, exponent: Int, allowZero: Boolean = false) = parseTypedAmount(text, exponent, allowZero, '.')
+
+    private fun de(text: String, exponent: Int, allowZero: Boolean = false) = parseTypedAmount(text, exponent, allowZero, ',')
+
     @Test fun accepted() {
-        assertEquals(2500L, parseTypedAmount("2,500", 0))
-        assertEquals(123450L, parseTypedAmount("1,234.50", 2))
-        assertEquals(1234567L, parseTypedAmount("1 234 567", 0))
-        assertEquals(1500L, parseTypedAmount("1\u00A0500", 0))
-        assertEquals(1250L, parseTypedAmount(" 12.5 ", 2))
-        assertEquals(0L, parseTypedAmount("0", 0, allowZero = true))
+        assertEquals(2500L, en("2,500", 0))
+        assertEquals(123450L, en("1,234.50", 2))
+        assertEquals(1234567L, en("1 234 567", 0))
+        assertEquals(1500L, en("1\u00A0500", 0))
+        assertEquals(1250L, en(" 12.5 ", 2))
+        assertEquals(0L, en("0", 0, allowZero = true))
     }
 
     @Test fun refused() {
         for (typed in listOf("1,50", "1,5", "-700", "+5", "12.345", "1..5", "1.2.3", "1,2345", ",500", "500,", "1,,500", "12a", "", "0,500", "1.5", "1e3")) {
             val exponent = if (typed == "12.345") 2 else 0
-            assertEquals(null, parseTypedAmount(typed, exponent), typed)
+            assertEquals(null, en(typed, exponent), typed)
         }
-        assertEquals(null, parseTypedAmount("0", 0)) // zero only where allowed
-        assertEquals(null, parseTypedAmount("1.5", 0))
+        assertEquals(null, en("0", 0)) // zero only where allowed
+        assertEquals(null, en("1.5", 0))
+    }
+
+    @Test fun kipInAnEnglishLikeLocale() {
+        assertEquals(1500L, en("1,500", 0))
+        assertEquals(1500L, en("1500", 0))
+        assertEquals(null, en("1.500", 0)) // a dot is a decimal here, and kip has none
+        assertEquals(null, en("1,50", 0))
+    }
+
+    @Test fun kipInACommaDecimalLocale() {
+        assertEquals(1500L, de("1.500", 0)) // the dot groups, not 1.5
+        assertEquals(1500L, de("1500", 0))
+        assertEquals(1234500L, de("1.234.500", 0))
+        assertEquals(1500L, de("1 500", 0))
+        assertEquals(1500L, de("1,500", 0)) // kip has no decimals, so a comma can only group
+        assertEquals(null, de("1,50", 0))
+        assertEquals(null, de("15,5", 0))
+        assertEquals(null, de("1.500,000", 0))
+        assertEquals(null, de("1.50", 0))
+        assertEquals(0L, de("0", 0, allowZero = true))
+    }
+
+    @Test fun twoDecimalCurrenciesInAnEnglishLikeLocale() {
+        assertEquals(123450L, en("1,234.50", 2))
+        assertEquals(150L, en("1.5", 2))
+        assertEquals(150000L, en("1,500", 2))
+        assertEquals(null, en("1,50", 2))
+        assertEquals(null, en("1.234", 2))
+    }
+
+    @Test fun twoDecimalCurrenciesInACommaDecimalLocale() {
+        assertEquals(150L, de("1,5", 2))
+        assertEquals(150L, de("1,50", 2))
+        assertEquals(5L, de("0,05", 2))
+        assertEquals(123450L, de("1.234,50", 2))
+        assertEquals(123450L, de("1 234,50", 2))
+        assertEquals(120000L, de("1200", 2))
+        assertEquals(1250L, de("12.5", 2)) // a dot that cannot group is still a decimal
+        assertEquals(150000L, de("1.500", 2)) // like kip: the dot groups, never 1.5
+        assertEquals(null, de("1,234", 2))
+        assertEquals(null, de("1,5,0", 2))
+        assertEquals(null, de("1,5.0", 2))
+        assertEquals(null, de("1.234,5,0", 2))
+        assertEquals(null, de(",50", 2))
+        assertEquals(null, de("1,", 2))
     }
 }
 
