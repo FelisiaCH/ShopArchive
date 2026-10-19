@@ -331,6 +331,7 @@
     <string name="notif_event_entry">ລາຍການໃໝ່</string>
     <string name="notif_event_device">ອຸປະກອນໃໝ່</string>
     <string name="notif_attempts">ລອງແລ້ວ %1$d ເທື່ອ</string>
+    <string name="notif_retry_at">ລອງໃໝ່ເວລາ %1$s</string>
     <string name="notif_resend">ສົ່ງອີກຄັ້ງ</string>
     <string name="notif_resend_failed">ສົ່ງອີກຄັ້ງບໍ່ໄດ້.</string>
     <string name="notif_closed_days">ວັນທີ່ປິດຍອດແລ້ວ</string>
