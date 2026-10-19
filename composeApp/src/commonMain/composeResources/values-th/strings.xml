@@ -416,4 +416,36 @@
     <plurals name="notes_count">
         <item quantity="other">%1$d โน้ต</item>
     </plurals>
+    <string name="nav_manage">จัดการร้าน</string>
+    <string name="manage_staff">พนักงาน</string>
+    <string name="manage_branches">สาขา</string>
+    <string name="manage_categories">หมวดหมู่</string>
+    <string name="manage_add">เพิ่ม</string>
+    <string name="manage_rename">เปลี่ยนชื่อ</string>
+    <string name="manage_staff_add">เพิ่มพนักงาน</string>
+    <string name="manage_staff_hint">คนใหม่ตั้ง PIN ของตัวเองเมื่อเข้าสู่ระบบครั้งแรก</string>
+    <string name="manage_role">บทบาท</string>
+    <string name="manage_role_none">ไม่มีบทบาท</string>
+    <string name="manage_admin">ผู้ดูแล</string>
+    <string name="manage_off">ปิดอยู่</string>
+    <string name="manage_no_pin">ยังไม่มี PIN</string>
+    <string name="manage_disable">ปิดบัญชี</string>
+    <string name="manage_enable">เปิดบัญชี</string>
+    <string name="manage_unlock">ปลดล็อก</string>
+    <string name="manage_reset">รีเซ็ต PIN</string>
+    <string name="manage_reset_ask">รีเซ็ต PIN ของ %1$s ไหม</string>
+    <string name="manage_reset_body">%1$s จะถูกออกจากระบบทุกอุปกรณ์ และตั้ง PIN ใหม่เมื่อเข้าสู่ระบบครั้งต่อไป</string>
+    <string name="manage_reset_yes">ใช่ รีเซ็ตเลย</string>
+    <string name="manage_branch_add">เพิ่มสาขา</string>
+    <string name="manage_branch_name">ชื่อสาขา</string>
+    <string name="manage_category_add">เพิ่มหมวดหมู่</string>
+    <string name="manage_name_lo">ชื่อภาษาลาว</string>
+    <string name="manage_name_th">ชื่อภาษาไทย</string>
+    <string name="manage_name_en">ชื่อภาษาอังกฤษ</string>
+    <string name="manage_names_hint">เขียนอย่างน้อยหนึ่งชื่อ ภาษาที่เว้นว่างจะใช้ชื่อที่เขียนไว้</string>
+    <string name="manage_applies_to">ใช้กับ</string>
+    <string name="manage_both">ทั้งสอง</string>
+    <string name="manage_archive">เก็บถาวร</string>
+    <string name="manage_archived">เก็บถาวรแล้ว</string>
+    <string name="manage_unarchive">นำกลับมาใช้</string>
 </resources>

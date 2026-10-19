@@ -416,4 +416,36 @@
     <plurals name="notes_count">
         <item quantity="other">%1$d ບັນທຶກ</item>
     </plurals>
+    <string name="nav_manage">ຈັດການຮ້ານ</string>
+    <string name="manage_staff">ພະນັກງານ</string>
+    <string name="manage_branches">ສາຂາ</string>
+    <string name="manage_categories">ໝວດໝູ່</string>
+    <string name="manage_add">ເພີ່ມ</string>
+    <string name="manage_rename">ປ່ຽນຊື່</string>
+    <string name="manage_staff_add">ເພີ່ມພະນັກງານ</string>
+    <string name="manage_staff_hint">ຄົນໃໝ່ຕັ້ງ PIN ຂອງຕົນເອງເມື່ອເຂົ້າສູ່ລະບົບເທື່ອທຳອິດ</string>
+    <string name="manage_role">ບົດບາດ</string>
+    <string name="manage_role_none">ບໍ່ມີບົດບາດ</string>
+    <string name="manage_admin">ຜູ້ດູແລ</string>
+    <string name="manage_off">ປິດຢູ່</string>
+    <string name="manage_no_pin">ຍັງບໍ່ມີ PIN</string>
+    <string name="manage_disable">ປິດບັນຊີ</string>
+    <string name="manage_enable">ເປີດບັນຊີ</string>
+    <string name="manage_unlock">ປົດລັອກ</string>
+    <string name="manage_reset">ຣີເຊັດ PIN</string>
+    <string name="manage_reset_ask">ຣີເຊັດ PIN ຂອງ %1$s ບໍ</string>
+    <string name="manage_reset_body">%1$s ຈະຖືກອອກຈາກລະບົບທຸກອຸປະກອນ ແລະ ຕັ້ງ PIN ໃໝ່ເມື່ອເຂົ້າສູ່ລະບົບຄັ້ງຕໍ່ໄປ</string>
+    <string name="manage_reset_yes">ແມ່ນ, ຣີເຊັດເລີຍ</string>
+    <string name="manage_branch_add">ເພີ່ມສາຂາ</string>
+    <string name="manage_branch_name">ຊື່ສາຂາ</string>
+    <string name="manage_category_add">ເພີ່ມໝວດໝູ່</string>
+    <string name="manage_name_lo">ຊື່ເປັນພາສາລາວ</string>
+    <string name="manage_name_th">ຊື່ເປັນພາສາໄທ</string>
+    <string name="manage_name_en">ຊື່ເປັນພາສາອັງກິດ</string>
+    <string name="manage_names_hint">ຂຽນຢ່າງໜ້ອຍໜຶ່ງຊື່. ພາສາທີ່ເວັ້ນວ່າງຈະໃຊ້ຊື່ທີ່ຂຽນໄວ້</string>
+    <string name="manage_applies_to">ໃຊ້ກັບ</string>
+    <string name="manage_both">ທັງສອງ</string>
+    <string name="manage_archive">ເກັບຖາວອນ</string>
+    <string name="manage_archived">ເກັບຖາວອນແລ້ວ</string>
+    <string name="manage_unarchive">ນຳກັບມາໃຊ້</string>
 </resources>
