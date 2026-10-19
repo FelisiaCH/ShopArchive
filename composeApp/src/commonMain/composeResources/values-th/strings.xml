@@ -88,6 +88,7 @@
     <string name="day_closed">ปิดยอดแล้ว</string>
     <string name="day_stale">วันที่เปิดอยู่เริ่มเมื่อ %1$s และยังไม่ปิด</string>
     <string name="day_stale_other">วันที่เปิดอยู่เริ่มเมื่อ %1$s และยังไม่ปิด ขอให้ผู้จัดการปิดวัน</string>
+    <string name="clock_off">นาฬิกาของเซิร์ฟเวอร์คลาดเคลื่อน %1$s นาที วันที่อาจไม่ถูกต้อง ให้แก้เวลาในคอมพิวเตอร์เซิร์ฟเวอร์</string>
     <string name="today_in">เงินเข้า</string>
     <string name="today_out">เงินออก</string>
     <string name="today_net">สุทธิ</string>

@@ -96,6 +96,17 @@ class HttpServerTest {
     }
 
     @Test
+    fun everyAnswerCarriesTheServersClockInItsDateHeader() {
+        val port = start()
+
+        val response = get(pinnedClient(), port, "/api/v1/info", protocol = false)
+
+        val date = response.headers().firstValue("Date").orElse("")
+        // The clients compare this with their own clock to warn about a wrong one.
+        assertTrue(kotlin.math.abs(java.time.ZonedDateTime.parse(date, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli() - System.currentTimeMillis()) < 60_000, date)
+    }
+
+    @Test
     fun aClientThatDoesNotTrustTheCertificateCannotConnect() {
         val port = start()
 

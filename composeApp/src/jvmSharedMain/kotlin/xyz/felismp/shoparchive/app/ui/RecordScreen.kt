@@ -20,6 +20,7 @@ import xyz.felismp.shoparchive.app.flow.SavePhase
 import xyz.felismp.shoparchive.app.flow.SlipNotice
 import xyz.felismp.shoparchive.app.flow.TenderRow
 import xyz.felismp.shoparchive.app.flow.Workspace
+import xyz.felismp.shoparchive.app.flow.bankTimeText
 import xyz.felismp.shoparchive.app.flow.displayAmount
 import xyz.felismp.shoparchive.app.flow.groupThousands
 import xyz.felismp.shoparchive.app.resources.*
@@ -128,7 +129,7 @@ private fun SlipCheckBanner(check: SlipCheckDto) {
         else -> {
             val details = listOfNotNull(
                 check.amount?.let { groupThousands(it) + (check.currency?.let { c -> " $c" } ?: "") },
-                check.time,
+                check.time?.let(::bankTimeText),
                 check.to?.let { stringResource(Res.string.slip_check_to, it) },
             )
             ShopBanner(stringResource(Res.string.slip_check_known, check.source, details.joinToString(" · ")), Tone.Success)

@@ -88,6 +88,7 @@
     <string name="day_closed">ປິດຍອດແລ້ວ</string>
     <string name="day_stale">ວັນທີ່ເປີດຢູ່ເລີ່ມເມື່ອ %1$s ແລະ ຍັງບໍ່ປິດ.</string>
     <string name="day_stale_other">ວັນທີ່ເປີດຢູ່ເລີ່ມເມື່ອ %1$s ແລະ ຍັງບໍ່ປິດ. ຂໍໃຫ້ຜູ້ຈັດການປິດວັນ.</string>
+    <string name="clock_off">ໂມງຂອງເຊີບເວີຄາດເຄື່ອນ %1$s ນາທີ ວັນທີອາດບໍ່ຖືກຕ້ອງ. ໃຫ້ແກ້ເວລາຢູ່ຄອມພິວເຕີເຊີບເວີ.</string>
     <string name="today_in">ເງິນເຂົ້າ</string>
     <string name="today_out">ເງິນອອກ</string>
     <string name="today_net">ສຸດທິ</string>

@@ -385,7 +385,7 @@ private struct TransferLine: View {
         let payer = t.from.map { name in name + (t.fromAccount.map { " (\($0))" } ?? "") }
         let line = [
             "\(t.source) ✓ \(groupThousands(t.amount)) \(t.currency)",
-            t.time,
+            HistoryTextKt.bankTimeText(time: t.time),
             [payer, "\(t.to) (\(t.toAccount))"].compactMap { $0 }.joined(separator: " → "),
         ].joined(separator: " · ")
         if t.toShop?.boolValue == false {
@@ -636,6 +636,15 @@ private struct EditFormView: View {
         }
     }
 
+    /// "slip-1.jpg" as "Slip 1", like the history; a name that is not that stays as it is.
+    private func storedSlipLabel(_ file: String) -> String {
+        guard let numbers = HistoryTextKt.historySlipNumbers(text: file) else { return file }
+        // Kotlin's Ints in a list come over as plain NSNumber (see ints() in Kit.swift).
+        let ints = (numbers as NSArray).compactMap { ($0 as? NSNumber)?.intValue }
+        guard let n = ints.first else { return file }
+        return text("detail_slip", String(n))
+    }
+
     @ViewBuilder
     private var slips: some View {
         Text(text("slips_title")).font(.headline)
@@ -668,9 +677,10 @@ private struct EditFormView: View {
             Text(text("slip_preparing")).foregroundColor(.secondary)
         }
         ForEach(f.keep, id: \.file) { slip in
+            let label = storedSlipLabel(slip.file)
             HStack {
-                Text(slip.file).frame(maxWidth: .infinity, alignment: .leading)
-                Button(text("slip_remove", slip.file)) { state.removeStoredSlip(file: slip.file) }
+                Text(verbatim: label).frame(maxWidth: .infinity, alignment: .leading)
+                Button(text("slip_remove", label)) { state.removeStoredSlip(file: slip.file) }
                     .buttonStyle(.bordered)
                     .disabled(busy)
             }
