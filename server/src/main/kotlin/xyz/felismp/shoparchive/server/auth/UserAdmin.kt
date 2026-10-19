@@ -24,6 +24,8 @@ internal class DefaultUserAdminService(
     private val audit: AuditLog,
     /** The keys of the branches not archived (see [xyz.felismp.shoparchive.server.users.registerUserCommands]). */
     private val activeBranches: () -> List<String>,
+    /** Whether the caller's session is still there: disabling an account or taking it off the device ends its sessions, so a request already in flight changes nothing. */
+    private val live: (Principal) -> Boolean,
 ) : UserAdminService {
     private val lock = Any()
 
@@ -96,10 +98,11 @@ internal class DefaultUserAdminService(
 
     /**
      * An op by the account's own flag in the user store (not by the permission word `op`, which a permission block can hold without making an op); the PIN or password was asked for by the route; a rule the admin broke ([UserException]) becomes the refusal the app words. The whole change runs under [lock]:
-     * the op is checked, the last-op and self guards read the accounts and the write is made with no other admin change in between, so two ops
+     * the session and the op are checked, the last-op and self guards read the accounts and the write is made with no other admin change in between, so two ops
      * disabling each other at the same moment cannot both pass the guard.
      */
     private fun <T> admin(principal: Principal, block: () -> T): T = synchronized(lock) {
+        if (!live(principal)) throw ApiError(401, ErrorCode.UNAUTHORIZED, "The session has ended. Unlock again.")
         if (!users.isOpById(principal.userId)) {
             throw ApiError(403, ErrorCode.FORBIDDEN, "This needs an admin (op).", reason = ErrorReasons.PERMISSION_MISSING)
         }

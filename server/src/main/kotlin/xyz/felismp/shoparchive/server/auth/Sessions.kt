@@ -1,6 +1,7 @@
 package xyz.felismp.shoparchive.server.auth
 
 import xyz.felismp.shoparchive.api.ApiError
+import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.shared.ErrorCode
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -61,6 +62,9 @@ internal class Sessions(private val clock: Clock = Clock.systemUTC()) {
         }
         return found
     }
+
+    /** Whether [principal]'s session has not ended (expired, or revoked by a disable or a device removal) and is still the same account's. */
+    fun isLive(principal: Principal): Boolean = accessBySession(principal.session)?.userId == principal.userId
 
     /** Whether the PIN or password was entered for [session] less than [window] ago. */
     fun verifiedWithin(session: String, window: Duration): Boolean {

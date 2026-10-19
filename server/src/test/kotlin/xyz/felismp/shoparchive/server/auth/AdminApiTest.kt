@@ -333,8 +333,8 @@ class AdminApiTest {
     fun theLastEnabledOpCannotBeDisabledOrGivenAnotherRole() = env().run {
         console("role create clerk")
         addUser("boss", op = true)
-        val service = DefaultUserAdminService(users, auth.accounts, auth.audit) { emptyList() }
-        // An op whose own request was already in flight when its account was disabled: only the guard on the target is left to hold.
+        val service = DefaultUserAdminService(users, auth.accounts, auth.audit, { emptyList() }) { true }
+        // The guard on the target alone: the session is taken as live here (a real disable ends it, see the next test).
         addUser("ghost", op = true)
         users.setEnabled("ghost", false)
         val caller = Principal(users.user("ghost").id, "ghost", "device", "session")
@@ -356,10 +356,27 @@ class AdminApiTest {
     }
 
     @Test
+    fun aRequestWhoseSessionEndedOnTheWayChangesNothing() = env().run {
+        addUser("boss", op = true)
+        addUser("boss2", op = true)
+        val service = DefaultUserAdminService(users, auth.accounts, auth.audit, { emptyList() }, auth.sessions::isLive)
+        // An op disabled while their request was still on its way: the disable ended the session the request was let in with.
+        val gone = Principal(users.user("boss").id, "boss", "device", "ended-session")
+
+        for (call in listOf({ service.setEnabled(gone, "boss2", false, "ip") }, { service.add(gone, CreateUserRequest("zed", NO_ROLE, emptyList()), "ip") })) {
+            val refused = assertFailsWith<ApiError> { call() }
+            assertEquals(401, refused.status)
+            assertEquals(ErrorCode.UNAUTHORIZED, refused.code)
+        }
+        assertTrue(users.user("boss2").enabled)
+        assertEquals(listOf("boss", "boss2"), users.userNames())
+    }
+
+    @Test
     fun twoOpsDisablingEachOtherAtTheSameMomentNeverLeaveNoEnabledOp() = env().run {
         addUser("opa", op = true)
         addUser("opb", op = true)
-        val service = DefaultUserAdminService(users, auth.accounts, auth.audit) { emptyList() }
+        val service = DefaultUserAdminService(users, auth.accounts, auth.audit, { emptyList() }) { true }
         fun caller(name: String) = Principal(users.user(name).id, name, "device", "session")
         val callers = mapOf("opa" to caller("opa"), "opb" to caller("opb"))
 
