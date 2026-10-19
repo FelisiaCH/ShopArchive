@@ -28,7 +28,9 @@ struct ConsoleView: View {
                         ForEach(Array(ui.lines.enumerated()), id: \.offset) { _, line in ConsoleRow(line: line) }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
                 }
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .onAppear { scrollToEnd(proxy) }
                 // The last line, not the count: at the most lines kept, the oldest go as new ones come and the count stays.
                 .onChange(of: ui.lines.last.map { ObjectIdentifier($0 as AnyObject) }) { _ in scrollToEnd(proxy) }
@@ -38,13 +40,13 @@ struct ConsoleView: View {
             }
             HStack(spacing: 8) {
                 TextField(text("console_field"), text: Binding(get: { input }, set: { input = $0; c.setInput(text: $0) }))
-                    .textFieldStyle(.roundedBorder)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.send)
                     .onSubmit { c.send() }
+                    .field()
                 Button(text("console_run")) { c.send() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.filled)
                     .disabled(!ui.canSend)
             }
         }
