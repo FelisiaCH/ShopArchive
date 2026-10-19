@@ -55,6 +55,8 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
         // is offered, so no entry is there that the workspace would ignore; the screen itself says it is loading, or offers a retry. Windows has no More: Today stays,
         // so there is always a way out of Settings back to that screen.
         val folded = navigationBottomBar && !wide
+        // Back steps out of what is open toward Today; on Today it is not taken, so Android leaves the app.
+        OnBackPress(destination != Destination.TODAY) { ws.back(folded) }
         val items = listOf(Destination.TODAY to today, Destination.RECORD to record, Destination.HISTORY to history, Destination.REPORTS to reports, Destination.NOTES to notes)
             .filter { (d, _) -> (config is ConfigState.Ready || (d == Destination.TODAY && !navigationBottomBar)) && can.allows(d) && ((d != Destination.REPORTS && d != Destination.NOTES) || !folded) }
             .let { if (navigationBottomBar) it + (Destination.MORE to more) else it }

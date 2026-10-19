@@ -78,8 +78,8 @@ private fun Overview(ws: Workspace) {
         ui.range, r::selectRange,
     )
     if (ui.range == ReportRange.CUSTOM) {
-        ShopTextField(ui.from, r::setFrom, stringResource(Res.string.filter_from))
-        ShopTextField(ui.to, r::setTo, stringResource(Res.string.filter_to))
+        ShopDateField(ui.from, r::setFrom, stringResource(Res.string.filter_from))
+        ShopDateField(ui.to, r::setTo, stringResource(Res.string.filter_to))
     } else {
         ShopText(ui.from + " – " + ui.to, TextRole.Caption, muted = true)
     }
@@ -184,8 +184,8 @@ private fun ExportSection(ws: Workspace) {
         if (phase is ExportPhase.Ready) saver.save(phase.file.fileName, if (phase.file.fileName.endsWith(".xlsx")) XLSX_MIME else CSV_MIME, phase.file.bytes)
     }
     ShopText(stringResource(Res.string.export_hint), muted = true)
-    ShopTextField(ui.from, x::setFrom, stringResource(Res.string.filter_from))
-    ShopTextField(ui.to, x::setTo, stringResource(Res.string.filter_to))
+    ShopDateField(ui.from, x::setFrom, stringResource(Res.string.filter_from))
+    ShopDateField(ui.to, x::setTo, stringResource(Res.string.filter_to))
     ui.rangeProblem?.let { ShopText(it.text(), TextRole.Caption) }
     if (ws.branches.size > 1) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         ws.branches.forEach { b -> ShopChoice(b.displayName, ui.branch == b.key, { x.setBranch(b.key) }) }

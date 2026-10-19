@@ -118,6 +118,37 @@ struct Choice: View {
     }
 }
 
+/// A day picked from a calendar. The flow keeps it as `yyyy-MM-dd`; the picker takes a Date, so the two are converted in the device's time zone and the Gregorian calendar,
+/// and the picker is told the same calendar so a Thai or Lao device does not show another era. It always holds a date: none of the places that use it takes an empty one.
+struct DateField: View {
+    let label: String
+    let value: String
+    let onPick: (String) -> Void
+
+    private static func format() -> DateFormatter {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = .current
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }
+
+    private var day: Binding<Date> {
+        Binding(
+            get: { Self.format().date(from: value) ?? Date() },
+            set: { onPick(Self.format().string(from: $0)) }
+        )
+    }
+
+    var body: some View {
+        DatePicker(label, selection: day, displayedComponents: .date)
+            .datePickerStyle(.compact)
+            .environment(\.locale, Language.locale)
+            .environment(\.calendar, Calendar(identifier: .gregorian))
+    }
+}
+
 /// Children side by side that wrap onto the next line when one is full, as Compose's FlowRow.
 struct FlowLayout: Layout {
     private let spacing: CGFloat = 8

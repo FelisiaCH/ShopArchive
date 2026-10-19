@@ -76,6 +76,19 @@ class FakeRecordsApi : RecordsApi {
 
     override suspend fun sessionsOn(branch: String, date: String) = todaysSessions
 
+    /** Every session the fake server holds, oldest first; [sessionsBetween] answers the ones of the branch inside the range. */
+    var pastSessions: List<SessionDto> = emptyList()
+    var pastSessionsError: Exception? = null
+    val rangeCalls = mutableListOf<Triple<String, String, String>>()
+    var pastSessionsGate: CompletableDeferred<Unit>? = null
+
+    override suspend fun sessionsBetween(branch: String, from: String, to: String): List<SessionDto> {
+        rangeCalls += Triple(branch, from, to)
+        pastSessionsGate?.await()
+        pastSessionsError?.let { throw it }
+        return pastSessions.filter { it.branch == branch && it.businessDate in from..to }
+    }
+
     override suspend fun openSession(branch: String, request: OpenSessionRequest): OpenSessionResponse {
         opened += branch to request
         openError?.let { throw it }

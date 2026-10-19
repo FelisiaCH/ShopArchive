@@ -19,11 +19,7 @@
 "pin_field" = "PIN";
 "unlock_pin" = "ปลดล็อกด้วย PIN";
 "unlock_password" = "ปลดล็อกด้วยรหัสผ่าน";
-"unlocked_title" = "เชื่อมต่อแล้ว";
-"unlocked_body" = "เข้าสู่ระบบเป็น %1$@ บน %2$@";
-"status_connected" = "เชื่อมต่อแล้ว";
 "status_connecting" = "กำลังเชื่อมต่อ…";
-"status_offline" = "ออฟไลน์";
 "pinmm_title" = "กุญแจของเซิร์ฟเวอร์เปลี่ยนไป";
 "pinmm_body" = "อุปกรณ์นี้เชื่อถือกุญแจเซิร์ฟเวอร์อื่น จึงไม่ได้ส่งข้อมูลใดๆ อย่าไปต่อ ติดต่อผู้ดูแลเซิร์ฟเวอร์";
 "proto_title" = "แอปหรือเซิร์ฟเวอร์เก่าเกินไป";
@@ -86,7 +82,6 @@
 "no_branch" = "คุณไม่มีสาขาให้ทำงาน ขอให้เจ้าของเพิ่มคุณเข้าสาขา";
 "more_signed_in" = "เข้าสู่ระบบเป็น %1$@";
 "today_title" = "วันนี้";
-"day_not_opened" = "ยังไม่เปิดวัน";
 "day_open_by" = "เปิดตั้งแต่ %1$@ โดย %2$@";
 "day_closed" = "ปิดยอดแล้ว";
 "day_stale" = "วันที่เปิดอยู่เริ่มเมื่อ %1$@ และยังไม่ปิด";
@@ -196,7 +191,7 @@
 "detail_delete_body" = "ยังอยู่ในประวัติโดยทำเครื่องหมายว่าลบแล้ว และไม่นับในยอดรวม";
 "detail_delete_yes" = "ใช่ ลบเลย";
 "detail_move_to" = "ย้ายไปวันไหน";
-"detail_move_date" = "วันที่ (yyyy-MM-dd)";
+"detail_move_date" = "วันที่";
 "detail_move_yes" = "ย้าย";
 "detail_failed" = "ยังไม่ได้ทำ";
 "detail_history" = "การเปลี่ยนแปลง";
@@ -204,6 +199,7 @@
 "history_action_edit" = "แก้ไข";
 "history_action_delete" = "ลบ";
 "history_action_move" = "ย้าย";
+"history_action_manual_edit" = "แก้ไขด้วยมือ";
 "history_field_category" = "หมวดหมู่";
 "history_field_date" = "วันที่";
 "history_field_item" = "รายการ";
@@ -224,8 +220,8 @@
 "export_write_failed" = "เขียนไฟล์ที่นั่นไม่ได้ ลองที่อื่น";
 "filter_all" = "ทั้งหมด";
 "filter_deleted" = "แสดงที่ลบแล้ว";
-"filter_from" = "ตั้งแต่วันที่ (yyyy-MM-dd)";
-"filter_to" = "ถึงวันที่ (yyyy-MM-dd)";
+"filter_from" = "ตั้งแต่วันที่";
+"filter_to" = "ถึงวันที่";
 "filter_range" = "วันที่";
 "history_deleted" = "ลบแล้ว";
 "history_empty" = "ไม่มีรายการที่ตรงกับตัวกรอง";

@@ -2,7 +2,9 @@ package xyz.felismp.shoparchive.app.ui
 
 import android.content.res.Configuration
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
@@ -30,6 +32,8 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +46,8 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -54,6 +60,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
@@ -72,9 +79,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import org.jetbrains.compose.resources.stringResource
 import java.util.Locale
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 import xyz.felismp.shoparchive.app.client.PlatformContext
 import xyz.felismp.shoparchive.app.flow.ThisDevice
 import xyz.felismp.shoparchive.app.resources.Res
+import xyz.felismp.shoparchive.app.resources.cancel
+import xyz.felismp.shoparchive.app.resources.reauth_confirm
 import xyz.felismp.shoparchive.app.resources.perm_allow
 import xyz.felismp.shoparchive.app.resources.perm_body
 import xyz.felismp.shoparchive.app.resources.perm_denied_body
@@ -150,6 +162,30 @@ actual fun ShopTextField(value: String, onValueChange: (String) -> Unit, label: 
             },
         ),
     )
+}
+
+/** A read-only field that opens Material's calendar on a tap. The calendar speaks UTC midnights, so the day is converted in UTC both ways and no time zone moves it. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+actual fun ShopDateField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier.fillMaxWidth()) {
+        OutlinedTextField(value, {}, Modifier.fillMaxWidth().heightIn(min = MinTarget), readOnly = true, singleLine = true, label = { Text(label) })
+        Box(Modifier.matchParentSize().clickable(role = Role.Button) { open = true })
+    }
+    if (open) {
+        val state = rememberDatePickerState(initialSelectedDateMillis = runCatching { LocalDate.parse(value.trim()).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }.getOrNull())
+        DatePickerDialog(
+            onDismissRequest = { open = false },
+            confirmButton = {
+                TextButton({
+                    state.selectedDateMillis?.let { onValueChange(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toString()) }
+                    open = false
+                }) { Text(stringResource(Res.string.reauth_confirm)) }
+            },
+            dismissButton = { TextButton({ open = false }) { Text(stringResource(Res.string.cancel)) } },
+        ) { DatePicker(state) }
+    }
 }
 
 @Composable
@@ -311,6 +347,9 @@ actual fun OnAppResume(action: () -> Unit) {
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
 }
+
+@Composable
+actual fun OnBackPress(enabled: Boolean, action: () -> Unit) = BackHandler(enabled, action)
 
 private var systemLocale: Locale? = null
 

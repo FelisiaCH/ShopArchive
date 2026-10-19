@@ -98,8 +98,8 @@ private fun Filters(ws: Workspace, ui: HistoryUi, currencies: List<String>, cate
     val h = ws.history
     ShopCard {
         ShopText(stringResource(Res.string.filter_range), TextRole.Title)
-        ShopTextField(ui.from, h::setFrom, stringResource(Res.string.filter_from))
-        ShopTextField(ui.to, h::setTo, stringResource(Res.string.filter_to))
+        ShopDateField(ui.from, h::setFrom, stringResource(Res.string.filter_from))
+        ShopDateField(ui.to, h::setTo, stringResource(Res.string.filter_to))
         ui.rangeProblem?.let { ShopText(it.text(), TextRole.Caption) }
         if (ws.branches.size > 1) {
             ShopText(stringResource(Res.string.branch_label), TextRole.Caption, muted = true)
@@ -221,7 +221,7 @@ private fun Actions(state: EntryDetailState, ui: DetailUi) {
     ui.moveText?.let { text ->
         ShopCard {
             ShopText(stringResource(Res.string.detail_move_to), TextRole.Title)
-            ShopTextField(text, state::setMoveDate, stringResource(Res.string.detail_move_date))
+            ShopDateField(text, state::setMoveDate, stringResource(Res.string.detail_move_date))
             if (!ui.moveValid) ShopText(stringResource(Res.string.range_not_a_date), TextRole.Caption)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ShopButton(stringResource(Res.string.detail_move_yes), state::confirmMove, enabled = !busy && ui.moveValid && ui.canWrite)
@@ -267,6 +267,7 @@ private fun SlipImage(n: Int, load: Load<ByteArray>) {
 private val ACTION_WORDS = mapOf(
     "create" to Res.string.history_action_create, "edit" to Res.string.history_action_edit,
     "delete" to Res.string.history_action_delete, "move" to Res.string.history_action_move,
+    "manual-edit" to Res.string.history_action_manual_edit,
 )
 private val FIELD_WORDS = mapOf(
     "category" to Res.string.history_field_category, "date" to Res.string.history_field_date, "item" to Res.string.history_field_item,

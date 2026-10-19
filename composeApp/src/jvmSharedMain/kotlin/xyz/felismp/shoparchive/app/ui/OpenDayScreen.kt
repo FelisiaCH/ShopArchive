@@ -33,7 +33,7 @@ fun OpenDayScreen(ws: Workspace) {
     ShopPage(stringResource(Res.string.openday_btn)) {
         ShopText(stringResource(Res.string.openday_hint), muted = true)
         ui.currencies.forEach { currency ->
-            val text = ui.amounts[currency.code].orEmpty()
+            val text = ui.amounts[currency.code] ?: ui.prefill[currency.code].orEmpty()
             ShopTextField(
                 text, { ws.openDay.setAmount(currency.code, it) },
                 stringResource(Res.string.openday_amount, currency.code), kind = FieldKind.Amount, enabled = !saving,

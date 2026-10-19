@@ -44,6 +44,10 @@ expect fun ShopTextField(
     enabled: Boolean = true,
 )
 
+/** A day as `yyyy-MM-dd`: picked in a calendar on Android, typed on Windows. The field never holds "no date": nothing that uses it takes an empty one. */
+@Composable
+expect fun ShopDateField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier = Modifier)
+
 /** Inline message: the InfoBar on Windows, a tinted banner on Android. */
 @Composable
 expect fun ShopBanner(text: String, tone: Tone, modifier: Modifier = Modifier)
@@ -117,6 +121,10 @@ expect fun LocalNetworkGate(content: @Composable () -> Unit)
 /** Runs [action] each time the app comes back to the front (Android); never on desktop. */
 @Composable
 expect fun OnAppResume(action: () -> Unit)
+
+/** While [enabled], the system Back gesture / button runs [action] instead of leaving the app (Android); never on desktop. */
+@Composable
+expect fun OnBackPress(enabled: Boolean, action: () -> Unit)
 
 /** Shows [content] in the language [tag] (`en`, `lo`, `th`), or the system's when null; a change rebuilds [content]. */
 @Composable

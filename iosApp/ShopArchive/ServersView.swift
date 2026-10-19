@@ -40,7 +40,7 @@ struct ServersView: View {
                         Button { flow.openServer(serverId: row.serverId) } label: {
                             VStack(alignment: .leading) {
                                 Text(row.name)
-                                Text(row.endpoint + " · " + String.localizedStringWithFormat(text("server_users"), row.userCount))
+                                Text(row.endpoint + " · " + text("server_users", row.userCount))
                                     .font(.caption).foregroundColor(.secondary)
                             }
                         }

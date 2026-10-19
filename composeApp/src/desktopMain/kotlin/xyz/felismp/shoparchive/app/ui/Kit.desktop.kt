@@ -97,6 +97,12 @@ actual fun ShopTextField(value: String, onValueChange: (String) -> Unit, label: 
     )
 }
 
+// Windows keeps the typed date; the hint the labels no longer carry is added here.
+@Composable
+actual fun ShopDateField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier) {
+    FluentTextBox(value, onValueChange, "$label (yyyy-MM-dd)", modifier.widthIn(max = FIELD_MAX_WIDTH), singleLine = true)
+}
+
 @Composable
 private fun toneColors(tone: Tone): Pair<Color, Color> {
     val c = FluentTheme.colors
@@ -208,6 +214,9 @@ actual fun LocalNetworkGate(content: @Composable () -> Unit) = content()
 
 @Composable
 actual fun OnAppResume(action: () -> Unit) = Unit // idle time alone locks the desktop app
+
+@Composable
+actual fun OnBackPress(enabled: Boolean, action: () -> Unit) = Unit // a window has no system Back
 
 private val systemLocale: Locale = Locale.getDefault()
 

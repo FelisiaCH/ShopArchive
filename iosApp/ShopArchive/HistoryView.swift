@@ -72,7 +72,7 @@ private struct HistoryList: View {
     let ws: Workspace
     @State private var ui: HistoryUi
     @State private var config: any ConfigState
-    // What is typed is kept here as well: a field bound to the flow alone loses characters while the flow's answer is on its way back.
+    // The picked dates are kept here as well: a picker bound to the flow alone shows the old date until the flow's answer is back.
     @State private var from: String
     @State private var to: String
 
@@ -125,14 +125,8 @@ private struct HistoryList: View {
         let categories = (ready?.categories ?? []).filter { !$0.archived }
         Card {
             Text(text("filter_range")).font(.headline)
-            TextField(text("filter_from"), text: Binding(get: { from }, set: { from = $0; history.setFrom(text: $0) }))
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            TextField(text("filter_to"), text: Binding(get: { to }, set: { to = $0; history.setTo(text: $0) }))
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+            DateField(label: text("filter_from"), value: from) { from = $0; history.setFrom(text: $0) }
+            DateField(label: text("filter_to"), value: to) { to = $0; history.setTo(text: $0) }
             if let problem = ui.rangeProblem {
                 Text(rangeText(problem)).font(.caption)
             }
@@ -303,7 +297,7 @@ private func isWorking(_ action: any ActionPhase) -> Bool {
 private struct Actions: View {
     let state: EntryDetailState
     let ui: DetailUi
-    // Each tap on Move starts the card again: the flow puts the entry's own date back, and the card's typed text must show that one.
+    // Each tap on Move starts the card again: the flow puts the entry's own date back, and the card's date must show that one.
     @State private var moveOpened = 0
 
     var body: some View {
@@ -354,23 +348,20 @@ private struct Actions: View {
 private struct MoveCard: View {
     let state: EntryDetailState
     let ui: DetailUi
-    // What is typed is kept here as well (see HistoryList); this card is there only while a move is being asked for.
-    @State private var typed: String
+    // The picked date is kept here as well (see HistoryList); this card is there only while a move is being asked for.
+    @State private var date: String
 
     init(state: EntryDetailState, ui: DetailUi, first: String) {
         self.state = state
         self.ui = ui
-        _typed = State(initialValue: first)
+        _date = State(initialValue: first)
     }
 
     var body: some View {
         let busy = isWorking(ui.action)
         Card {
             Text(text("detail_move_to")).font(.headline)
-            TextField(text("detail_move_date"), text: Binding(get: { typed }, set: { typed = $0; state.setMoveDate(text: $0) }))
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+            DateField(label: text("detail_move_date"), value: date) { date = $0; state.setMoveDate(text: $0) }
             if !ui.moveValid {
                 Text(text("range_not_a_date")).font(.caption)
             }
@@ -471,9 +462,15 @@ private struct HistoryLine: View {
     }
 
     private var headline: String {
-        let action = known(["create", "edit", "delete", "move"], item.action, prefix: "history_action_")
+        let action = actionWord()
         let at = item.at.replacingOccurrences(of: "T", with: " ").prefix(16)
         return "\(action) · \(at) · \(item.by.name)"
+    }
+
+    /// The key of "manual-edit" has an underscore where the server's word has a hyphen, so it is not found by prefix.
+    private func actionWord() -> String {
+        if item.action == "manual-edit" { return text("history_action_manual_edit") }
+        return known(["create", "edit", "delete", "move"], item.action, prefix: "history_action_")
     }
 
     private func change(_ c: HistoryChange) -> String {
