@@ -2,6 +2,7 @@ package xyz.felismp.shoparchive.app.ui
 
 import android.content.res.Configuration
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -311,6 +312,9 @@ actual fun OnAppResume(action: () -> Unit) {
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
 }
+
+@Composable
+actual fun OnBackPress(enabled: Boolean, action: () -> Unit) = BackHandler(enabled, action)
 
 private var systemLocale: Locale? = null
 

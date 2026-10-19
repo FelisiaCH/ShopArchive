@@ -126,6 +126,24 @@ class Workspace(
         _destination.value = Destination.NOTES
     }
 
+    /**
+     * The system Back: what the screen's own Back or Cancel does, one step toward Today (an edit, then the entry, then History; Open day; a page
+     * under More). [folded]: Reports and Notes sit under More. False on Today, where nothing is open and Back leaves the app.
+     */
+    fun back(folded: Boolean): Boolean {
+        when (_destination.value) {
+            Destination.TODAY -> return false
+            Destination.HISTORY -> history.detail.value?.let { open ->
+                if (open.ui.value.edit != null) open.cancelEdit() else history.closeDetail()
+            } ?: run { _destination.value = Destination.TODAY }
+            Destination.OPEN_DAY -> { openDay.reset(); _destination.value = Destination.TODAY }
+            Destination.REPORTS, Destination.NOTES -> _destination.value = if (folded) Destination.MORE else Destination.TODAY
+            Destination.CONSOLE -> _destination.value = Destination.MORE
+            Destination.RECORD, Destination.MORE -> _destination.value = Destination.TODAY
+        }
+        return true
+    }
+
     fun selectBranch(key: String) {
         if (key !in branches.map { it.key }) return
         chosen.value = key

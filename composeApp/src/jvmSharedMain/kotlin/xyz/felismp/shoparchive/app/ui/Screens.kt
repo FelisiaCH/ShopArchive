@@ -168,6 +168,7 @@ private fun LockedScreen(s: AppState.Locked, flow: AppFlow) {
 @Composable
 private fun ReauthScreen(p: ReauthPrompt, flow: AppFlow) {
     var secret by remember(p.needsPassword) { mutableStateOf("") }
+    OnBackPress(!p.busy, flow::cancelReauth)
     ScreenFrame(stringResource(Res.string.reauth_title)) {
         ShopText(stringResource(if (p.needsPassword) Res.string.reauth_body_password else Res.string.reauth_body_pin))
         ShopTextField(
@@ -189,6 +190,7 @@ private val LANGUAGES = listOf<Pair<String?, StringResource>>(
 
 @Composable
 private fun SettingsScreen(s: AppState.Settings, flow: AppFlow) {
+    OnBackPress(true, flow::closeSettings)
     ScreenFrame(stringResource(Res.string.nav_settings)) {
         SettingsBody(s, flow)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
