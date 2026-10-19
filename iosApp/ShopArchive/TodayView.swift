@@ -25,6 +25,7 @@ struct TodayView: View {
             } else if let failure = ui.failure {
                 Banner(text: text("today_failed") + " " + failureText(failure), tone: .error)
                 Button(text("retry")) { ws.today.reload() }
+                    .buttonStyle(.tonal)
             } else {
                 Text(text("working")).foregroundColor(.secondary)
             }
@@ -62,7 +63,7 @@ private struct TodayContent: View {
                         Text(text("needs_connection")).font(.caption).foregroundColor(.secondary)
                     }
                     Button(text("openday_btn"), action: openDay)
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.filledFull)
                         .disabled(!canWrite)
                         .padding(.top, 4)
                 } else {
@@ -70,20 +71,22 @@ private struct TodayContent: View {
                 }
             }
         case .open(let open):
-            Chip(text: text("day_open_by", clockTime(open.session.openedAt), open.session.openedBy.name), tone: .success)
+            Chip(text: text("day_open_by", clockTime(open.session.openedAt), open.session.openedBy.name), tone: .success, systemImage: "checkmark.circle.fill")
             if let staleFrom = data.staleFrom {
                 Banner(text: text(can.closeDay ? "day_stale" : "day_stale_other", staleFrom), tone: .error)
             }
             if can.closeDay {
                 // Primary when the day is stale.
                 if data.staleFrom != nil {
-                    Button(text("closeday_btn"), action: closeDay).buttonStyle(.borderedProminent)
+                    Button(action: closeDay) { Label(text("closeday_btn"), systemImage: "lock") }
+                        .buttonStyle(.filledFull)
                 } else {
-                    Button(text("closeday_btn"), action: closeDay).buttonStyle(.bordered)
+                    Button(action: closeDay) { Label(text("closeday_btn"), systemImage: "lock") }
+                        .buttonStyle(.tonalFull)
                 }
             }
         case .closed:
-            Chip(text: text("day_closed"), tone: .info)
+            Chip(text: text("day_closed"), tone: .info, systemImage: "lock.fill")
         }
 
         counts
@@ -93,11 +96,10 @@ private struct TodayContent: View {
                 Banner(text: text("today_mine_failed") + " " + failureText(failure), tone: .error)
             }
             if let mine = data.mine {
-                Text(text("today_mine")).font(.headline)
                 if mine.isEmpty {
-                    Text(text("today_empty")).foregroundColor(.secondary)
+                    Card(title: text("today_mine")) { Text(text("today_empty")).foregroundColor(.secondary) }
                 } else {
-                    Card { ForEach(mine, id: \.id) { RecentLine(ws: ws, entry: $0) } }
+                    RowsCard(title: text("today_mine"), mine, id: \.id) { RecentLine(ws: ws, entry: $0) }
                 }
             }
         } else {
@@ -110,8 +112,7 @@ private struct TodayContent: View {
                     Text(text("today_empty")).foregroundColor(.secondary)
                 }
             } else {
-                Text(text("today_latest")).font(.headline)
-                Card { ForEach(Array(data.recent.prefix(10)), id: \.id) { RecentLine(ws: ws, entry: $0) } }
+                RowsCard(title: text("today_latest"), Array(data.recent.prefix(10)), id: \.id) { RecentLine(ws: ws, entry: $0) }
             }
         }
     }
@@ -124,8 +125,8 @@ private struct TodayContent: View {
             HStack(alignment: .top, spacing: 12) {
                 if data.showStats {
                     let slips = Card {
-                        Text(text("today_slips")).font(.caption).foregroundColor(.secondary)
-                        Text(String(data.slips)).font(.headline)
+                        Label(text("today_slips"), systemImage: "paperclip").font(.footnote).foregroundColor(.secondary)
+                        Text(String(data.slips)).font(.title.weight(.semibold))
                     }
                     if can.viewEntries {
                         Button(action: openHistory) { slips }
@@ -137,26 +138,14 @@ private struct TodayContent: View {
                 if let unread {
                     Button(action: openNotes) {
                         Card {
-                            Text(text("today_notes")).font(.caption).foregroundColor(.secondary)
-                            Text(String(unread.intValue)).font(.headline)
+                            Label(text("today_notes"), systemImage: "envelope").font(.footnote).foregroundColor(.secondary)
+                            Text(String(unread.intValue)).font(.title.weight(.semibold))
                             Text(text("today_notes_unread")).font(.caption).foregroundColor(.secondary)
                         }
                     }
                     .buttonStyle(.plain)
                 }
             }
-        }
-    }
-}
-
-struct AmountLine: View {
-    let label: String
-    let shown: String
-
-    var body: some View {
-        HStack {
-            Text(label).frame(maxWidth: .infinity, alignment: .leading)
-            Text(shown).font(.body.monospacedDigit()).frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -169,15 +158,23 @@ private struct CurrencyCard: View {
         let totals = currency.totals
         let online = { (type: EntryType) in currency.byMethod.first { $0.key == "online" && $0.type == type }?.sum }
         Card {
-            Text(code).font(.headline)
-            AmountLine(label: text("today_in"), shown: money(totals.income))
-            AmountLine(label: text("today_out"), shown: money(totals.expense))
-            AmountLine(label: text("today_net"), shown: money(totals.net))
-            AmountLine(label: text("today_cash"), shown: money(totals.cashNet))
+            HStack {
+                Text(code).font(.headline)
+                Spacer()
+                Text(text("today_net")).font(.footnote).foregroundColor(.secondary)
+            }
+            Amount(shown: "\(signedText(totals.net)) \(code)", color: Theme.color(sign: amountSign(totals.net)), font: .title.weight(.bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Divider()
+            AmountLine(label: text("today_in"), shown: money(totals.income), color: Theme.moneyIn)
+            AmountLine(label: text("today_out"), shown: money(totals.expense), color: Theme.moneyOut)
+            AmountLine(label: text("today_cash"), shown: money(totals.cashNet), color: .secondary)
             if online(.income) != nil || online(.expense) != nil {
                 AmountLine(
                     label: text("today_online"),
-                    shown: groupThousands(online(.income) ?? "0") + " / " + groupThousands(online(.expense) ?? "0") + " " + code
+                    shown: groupThousands(online(.income) ?? "0") + " / " + groupThousands(online(.expense) ?? "0") + " " + code,
+                    color: .secondary
                 )
             }
         }
@@ -198,19 +195,18 @@ private struct RecentLine: View {
 
     var body: some View {
         let sign = entry.type == .income ? "+" : "-"
-        HStack {
-            VStack(alignment: .leading) {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: title)
                 Text(clockTime(entry.createdAt) + " · " + entry.createdBy.name).font(.caption).foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            VStack(alignment: .leading) {
+            VStack(alignment: .trailing, spacing: 2) {
                 ForEach(Array(entry.tenders.enumerated()), id: \.offset) { _, tender in
-                    Text(sign + groupThousands(tender.amount) + " " + tender.currency)
-                        .font(.body.monospacedDigit())
+                    Amount(shown: "\(sign)\(groupThousands(tender.amount)) \(tender.currency)", color: Theme.color(of: entry.type), font: .body.weight(.semibold))
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .rowInset()
     }
 }

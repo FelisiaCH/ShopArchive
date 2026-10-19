@@ -21,6 +21,7 @@ struct RootView: View {
     var body: some View {
         content
             .id(language)
+            .tint(Theme.accent)
             .background(ActivityReporter(flow: flow))
             .task {
                 for await next in flow.state {
