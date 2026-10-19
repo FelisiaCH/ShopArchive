@@ -17,8 +17,8 @@ import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.WsMessage
 import kotlinx.datetime.LocalDate
 
-/** Where the shell is. Open day is under Today in the navigation, the console under More. */
-enum class Destination { TODAY, OPEN_DAY, RECORD, HISTORY, REPORTS, NOTES, CONSOLE, MORE }
+/** Where the shell is. Open day is under Today in the navigation, the console and Manage shop under More. */
+enum class Destination { TODAY, OPEN_DAY, RECORD, HISTORY, REPORTS, NOTES, CONSOLE, ADMIN, MORE }
 
 /**
  * Everything the signed-in person's screens keep: the shop's lists, the chosen branch, where they are in the app and the Record draft.
@@ -150,7 +150,7 @@ class Workspace(
             } ?: run { _destination.value = Destination.TODAY }
             Destination.OPEN_DAY -> { openDay.reset(); _destination.value = Destination.TODAY }
             Destination.REPORTS, Destination.NOTES -> _destination.value = if (folded) Destination.MORE else Destination.TODAY
-            Destination.CONSOLE -> _destination.value = Destination.MORE
+            Destination.CONSOLE, Destination.ADMIN -> _destination.value = Destination.MORE
             Destination.RECORD, Destination.MORE -> _destination.value = Destination.TODAY
         }
         return true

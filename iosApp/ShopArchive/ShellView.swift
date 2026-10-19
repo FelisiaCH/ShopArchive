@@ -107,7 +107,8 @@ struct ShellView: View {
     private var selected: Destination {
         switch destination {
         case .more, .record, .history: return destination
-        case .reports, .notes, .console: return .more
+        // Manage shop (.admin) has no iOS screen yet: it stays on More, which the default page shows.
+        case .reports, .notes, .console, .admin: return .more
         default: return .today
         }
     }

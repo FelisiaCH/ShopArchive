@@ -1191,6 +1191,11 @@ class AppFlowTest {
         ws.openReports(ReportsTab.EXPORT)
         assertTrue(ws.back(folded = false))
         assertEquals(Destination.TODAY, ws.destination.value, "Reports in the pane goes to Today")
+
+        ws.go(Destination.ADMIN)
+        assertEquals(Destination.ADMIN, ws.destination.value)
+        assertTrue(ws.back(folded = true))
+        assertEquals(Destination.MORE, ws.destination.value, "Manage shop goes back to More")
     }
 
     // ---- auto-lock ----

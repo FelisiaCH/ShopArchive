@@ -70,6 +70,7 @@ class Capabilities(private val held: Set<String>, private val editWindowDays: In
         Destination.HISTORY -> viewEntries
         Destination.REPORTS -> reports
         Destination.CONSOLE -> console
+        Destination.ADMIN -> admin
         Destination.NOTES -> noteCreate || noteRead
     }
 

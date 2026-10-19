@@ -135,6 +135,9 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
         reloadConfig()
     }
 
+    /** A new branch under the next free key `branch-N`, so nobody types a slug. */
+    fun addBranch(displayName: String) = addBranch(nextKey("branch", ui.value.branches.map { it.key }), displayName)
+
     /** Renames the branch ([displayName] not null) and/or archives or restores it ([archived] not null). The key never changes. */
     fun updateBranch(key: String, displayName: String?, archived: Boolean?) = act(env.can.manageBranches) {
         env.calls.run { env.api.updateBranch(key, UpdateBranchRequest(displayName, archived)) }
@@ -146,9 +149,15 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
         reloadConfig()
     }
 
+    /** A new category under the next free key `category-N`. */
+    fun addCategory(name: LocalizedName, appliesTo: AppliesTo) = addCategory(nextKey("category", ui.value.categories.map { it.key }), name, appliesTo)
+
     /** Changes only what is not null: the names, what the category is for, archived or restored. The key never changes. */
     fun updateCategory(key: String, name: LocalizedName?, appliesTo: AppliesTo?, archived: Boolean?) = act(env.can.manageCategories) {
         env.calls.run { env.api.updateCategory(key, UpdateCategoryRequest(name, appliesTo, archived)) }
         reloadConfig()
     }
 }
+
+/** The lowest `prefix-N` (N from 1) that is not in [taken]: a slug of a-z, 0-9 and `-`, as the server wants a key. */
+internal fun nextKey(prefix: String, taken: List<String>): String = generateSequence(1) { it + 1 }.map { "$prefix-$it" }.first { it !in taken }

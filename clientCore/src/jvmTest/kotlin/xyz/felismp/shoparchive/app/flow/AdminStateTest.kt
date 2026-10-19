@@ -193,4 +193,17 @@ class AdminStateTest {
 
         assertEquals(listOf("main", "old"), s.admin.ui.value.branches.map { it.key }, "archived ones too: they can be brought back")
     }
+
+    @Test fun aNewBranchOrCategoryTakesTheNextFreeKey() = runTest(UnconfinedTestDispatcher()) {
+        assertEquals("branch-1", nextKey("branch", listOf("main")))
+        assertEquals("branch-3", nextKey("branch", listOf("branch-1", "main", "branch-2")))
+        assertEquals("branch-2", nextKey("branch", listOf("branch-3", "branch-1")), "the lowest free one")
+
+        val s = setup()
+        s.admin.addBranch("Kiosk")
+        s.admin.addCategory(LocalizedName("ທິບ", "ทิป", "Tips"), AppliesTo.INCOME)
+        s.h.config.value = ConfigState.Ready(testConfig(branches = listOf(xyz.felismp.shoparchive.shared.BranchDto("branch-1", "A", true))))
+        s.admin.addBranch("Market")
+        assertEquals(listOf("addBranch branch-1 Kiosk", "addCategory category-1 Tips INCOME", "addBranch branch-2 Market"), s.h.api.adminCalls)
+    }
 }
