@@ -304,6 +304,14 @@
     <string name="reason_close_currency_unknown">This shop does not use that currency.</string>
     <string name="reason_close_amount_invalid">A counted amount is not valid: write 0 or more, with the decimals the currency allows.</string>
     <string name="reason_notification_pending">This message is still waiting to be sent. Send it again only after it has failed.</string>
+    <string name="reason_user_not_found">That user does not exist.</string>
+    <string name="reason_user_exists">A user with that name exists already. Choose another name.</string>
+    <string name="reason_user_name_invalid">A user name is 3 to 32 characters from a-z, 0-9 and _.</string>
+    <string name="reason_user_self_reset">You cannot reset your own account here. Ask for it to be done on the server.</string>
+    <string name="reason_role_not_found">That role does not exist.</string>
+    <string name="reason_key_invalid">A key is 1 to 32 characters from a-z, 0-9 and -.</string>
+    <string name="reason_key_exists">That key is used already. Choose another one.</string>
+    <string name="reason_name_required">Write a name in every language that is asked for.</string>
     <string name="reason_date_invalid">That is not a valid date.</string>
     <string name="reason_range_order">The start date is after the end date.</string>
     <string name="reason_range_too_long">That range is too long. Choose fewer days.</string>
