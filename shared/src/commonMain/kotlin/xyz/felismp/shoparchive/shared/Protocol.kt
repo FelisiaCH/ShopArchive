@@ -109,6 +109,18 @@ object ErrorReasons {
 
     const val NOTIFICATION_PENDING = "notification.pending"
 
+    const val USER_NOT_FOUND = "user.not-found"
+    const val USER_EXISTS = "user.exists"
+    const val USER_NAME_INVALID = "user.name-invalid"
+    /** An op cannot reset its own account from the app: that would end the session it asks from. */
+    const val USER_SELF_RESET = "user.self-reset"
+    const val ROLE_NOT_FOUND = "role.not-found"
+    /** A branch or category key is not 1 to 32 characters from a-z, 0-9 and -. */
+    const val KEY_INVALID = "key.invalid"
+    const val KEY_EXISTS = "key.exists"
+    /** A branch needs a display name, a category a name in Lao, Thai and English. */
+    const val NAME_REQUIRED = "name.required"
+
     const val DATE_INVALID = "date.invalid"
     const val RANGE_ORDER = "range.order"
     const val RANGE_TOO_LONG = "range.too-long"
@@ -124,6 +136,7 @@ object ErrorReasons {
         ENTRY_CATEGORY_ARCHIVED, ENTRY_CATEGORY_TYPE, ENTRY_CHANGED_ELSEWHERE, ENTRY_DELETED, ENTRY_PAST_WINDOW, ENTRY_MOVE_FUTURE, ENTRY_MOVE_OCCUPIED,
         CLOSE_COUNT_MISSING, CLOSE_NOTE_NEEDED, CLOSE_CURRENCY_UNKNOWN, CLOSE_AMOUNT_INVALID,
         NOTIFICATION_PENDING,
+        USER_NOT_FOUND, USER_EXISTS, USER_NAME_INVALID, USER_SELF_RESET, ROLE_NOT_FOUND, KEY_INVALID, KEY_EXISTS, NAME_REQUIRED,
         DATE_INVALID, RANGE_ORDER, RANGE_TOO_LONG,
     )
 }
@@ -240,6 +253,7 @@ data class CurrencyInfo(val code: String, val exponent: Int)
  * [branches] are the ones the caller works in (all of them with `shoparchive.branch.all`); [categories] are all of them, archived ones marked.
  * [permissions] are the permission nodes the caller holds now (an op holds every registered one), so the app can leave out what the server would refuse.
  * [userId] is the caller's user id, which is what an entry's `createdBy.id` is compared with to tell the caller's own entries (a name can be renamed or reused).
+ * [admin] is true for an op, the only one who may use `/api/v1/admin/...` (a permission node cannot say it: any user can be given a node).
  */
 @Serializable
 data class ConfigResponse(
@@ -251,6 +265,7 @@ data class ConfigResponse(
     val records: RecordsPolicy = RecordsPolicy(),
     val permissions: List<String> = emptyList(),
     val userId: String = "",
+    val admin: Boolean = false,
 )
 
 /** A message the server pushes on `/api/v1/ws`: JSON with a `type` field. */
@@ -296,6 +311,11 @@ data class SessionClosedMessage(val id: String, val branch: String, val business
 @Serializable
 @SerialName("note.changed")
 data class NoteChangedMessage(val branch: String, val date: String) : WsMessage
+
+/** The branches, categories or an account's rights changed: an app that shows them asks `GET /api/v1/config` again. */
+@Serializable
+@SerialName("config.changed")
+data object ConfigChangedMessage : WsMessage
 
 /** Body of `POST /api/v1/command`: one line as typed in the app's console. */
 @Serializable

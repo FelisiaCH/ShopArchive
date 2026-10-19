@@ -20,6 +20,8 @@ object PermissionNodes {
     const val NOTE_READ = "shoparchive.note.read"
     const val NOTIFICATIONS_VIEW = "shoparchive.notifications.view"
     const val NOTIFICATIONS_SEND = "shoparchive.notifications.send"
+    const val BRANCHES_MANAGE = "shoparchive.branches.manage"
+    const val CATEGORIES_MANAGE = "shoparchive.categories.manage"
 
     /** A node that starts like this lets its holder run that command in the app's console; the app shows the console to anyone who holds one. */
     const val COMMAND_PREFIX = "shoparchive.command."
