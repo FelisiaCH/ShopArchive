@@ -282,9 +282,17 @@ private struct EntryFacts: View {
 private func actionBanner(_ action: any ActionPhase) -> some View {
     switch onEnum(of: action) {
     case .working: Banner(text: text("working"), tone: .info)
-    case .failed(let a): Banner(text: text("detail_failed") + " " + failureText(a.failure), tone: .error)
+    case .failed(let a): Banner(text: notDoneText(a.failure), tone: .error)
     case .idle: EmptyView()
     }
+}
+
+/// A cancelled PIN prompt already says "Not done", so the prefix is left off then.
+private func notDoneText(_ failure: any Failure) -> String {
+    if case .client(let f) = onEnum(of: failure), case .reauthCancelled = onEnum(of: f.problem) {
+        return failureText(failure)
+    }
+    return text("detail_failed") + " " + failureText(failure)
 }
 
 private func isWorking(_ action: any ActionPhase) -> Bool {
