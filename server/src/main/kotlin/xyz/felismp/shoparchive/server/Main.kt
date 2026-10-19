@@ -133,7 +133,7 @@ fun main(args: Array<String>) {
 
     val network = Network(root, config, serverId, services, barrier = barrier)
     val auth = Auth(root, config, users, services, network::deviceEndpoints, records = records, barrier = barrier, activeBranches = records.branches::activeKeys)
-    services.register(CommandService::class.java, DefaultCommandService(commands, auth.audit, services), CORE_SERVICE_PRIORITY, "core")
+    services.register(CommandService::class.java, DefaultCommandService(commands, auth.audit, services, users), CORE_SERVICE_PRIORITY, "core")
 
     try {
         registerCoreCommands(
