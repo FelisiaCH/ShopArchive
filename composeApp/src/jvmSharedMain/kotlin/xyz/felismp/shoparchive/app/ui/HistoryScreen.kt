@@ -35,6 +35,9 @@ import xyz.felismp.shoparchive.app.flow.TenderRow
 import xyz.felismp.shoparchive.app.flow.Workspace
 import xyz.felismp.shoparchive.app.flow.displayAmount
 import xyz.felismp.shoparchive.app.flow.groupThousands
+import xyz.felismp.shoparchive.app.flow.historySlipNumbers
+import xyz.felismp.shoparchive.app.flow.historyTenders
+import xyz.felismp.shoparchive.app.flow.historyTransfers
 import xyz.felismp.shoparchive.app.flow.parseTypedAmount
 import xyz.felismp.shoparchive.app.resources.*
 import xyz.felismp.shoparchive.shared.EntryDto
@@ -175,7 +178,7 @@ private fun EntryDetailScreen(ws: Workspace, state: EntryDetailState) {
         when (val h = ui.history) {
             Load.Loading -> ShopText(stringResource(Res.string.working), muted = true)
             is Load.Failed -> ShopBanner(h.failure.text(), Tone.Error)
-            is Load.Ready -> h.value.forEach { HistoryLine(it) }
+            is Load.Ready -> h.value.forEach { HistoryLine(ws, it) }
         }
     }
 }
@@ -280,15 +283,28 @@ private val TYPE_WORDS = mapOf("income" to Res.string.type_income, "expense" to 
 private fun wordFor(words: Map<String, StringResource>, raw: String): String = words[raw]?.let { stringResource(it) } ?: raw
 
 @Composable
-private fun HistoryLine(item: HistoryItem) {
+private fun HistoryLine(ws: Workspace, item: HistoryItem) {
     ShopCard {
         ShopText(wordFor(ACTION_WORDS, item.action) + " · " + item.at.replace('T', ' ').take(16) + " · " + item.by.name, TextRole.Caption, muted = true)
         item.changes.forEach { c ->
-            // Only a change of type has words as values; the others (an item, a note, payments) are the text itself.
-            val from = if (c.field == "type") wordFor(TYPE_WORDS, c.from) else c.from
-            val to = if (c.field == "type") wordFor(TYPE_WORDS, c.to) else c.to
+            val from = historyValue(ws, c.field, c.from)
+            val to = historyValue(ws, c.field, c.to)
             ShopText(wordFor(FIELD_WORDS, c.field) + ": " + from.ifEmpty { "—" } + " → " + to.ifEmpty { "—" }, TextRole.Caption)
         }
+    }
+}
+
+/** A change's value in the user's language. An item and a note are the text itself, and text not in the form the server writes is shown as it came. */
+@Composable
+private fun historyValue(ws: Workspace, field: String, raw: String): String {
+    if (raw.isEmpty()) return raw
+    return when (field) {
+        "type" -> wordFor(TYPE_WORDS, raw)
+        "category" -> ws.categoryName(raw) ?: raw
+        "tenders" -> historyTenders(raw, stringResource(Res.string.method_cash), stringResource(Res.string.method_online))
+        "transfers" -> historyTransfers(raw)
+        "slips" -> historySlipNumbers(raw)?.map { stringResource(Res.string.detail_slip, it.toString()) }?.joinToString("; ") ?: raw
+        else -> raw
     }
 }
 

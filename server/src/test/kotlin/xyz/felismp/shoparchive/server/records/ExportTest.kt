@@ -97,6 +97,39 @@ d",LAK""" in text, text)
         assertTrue(with[2].endsWith(",0,true"))
     }
 
+    // --- the words ---
+
+    private val names = mapOf("misc" to LocalizedName("ອື່ນໆ", "อื่นๆ", "Misc"))
+    private fun words(language: String) = ExportWords(language, { names[it]?.let { n -> if (language == "lo") n.lo else if (language == "th") n.th else n.en } ?: it }, { if (it == "main") "Main" else it })
+
+    @Test
+    fun thaiWordsHeadAndFillTheCsvWithDisplayNamesAndKeepAmountsAndIdsAsTheyAre() {
+        val rows = listOf(dto(slips = 1, category = "misc", tenders = listOf(online("THB", "12.50"))), dto(id = "id2", type = EntryType.EXPENSE, deleted = true))
+        val lines = csvText(csvBytes(rows, deleted = true, words = words("th"))).split("\r\n").dropLast(1)
+        assertEquals("วันที่,เวลา,รหัสรายการ,ประเภท,สาขา,หมวดหมู่,รายการ,หมายเหตุ,สกุลเงิน,วิธีชำระเงิน,จำนวนเงิน,ผู้บันทึก,จำนวนสลิป,ลบแล้ว", lines[0])
+        assertEquals("2026-09-27,09:05:07,id1,รายรับ,Main,อื่นๆ,coffee,,THB,ออนไลน์,12.50,noy,1,ไม่", lines[1])
+        assertEquals("2026-09-27,09:05:07,id2,รายจ่าย,Main,,coffee,,LAK,เงินสด,150000,noy,0,ใช่", lines[2])
+    }
+
+    @Test
+    fun laoWordsHeadTheCsvAndTheWorkbookNamesItsSheetsAndColumns() {
+        val rows = listOf(dto(category = "misc"))
+        assertEquals(
+            "ວັນທີ,ເວລາ,ລະຫັດລາຍການ,ປະເພດ,ສາຂາ,ໝວດໝູ່,ລາຍການ,ໝາຍເຫດ,ສະກຸນເງິນ,ວິທີຈ່າຍ,ຈຳນວນເງິນ,ຜູ້ບັນທຶກ,ຈຳນວນສະລິບ",
+            csvText(csvBytes(rows, deleted = false, words = words("lo"))).split("\r\n")[0],
+        )
+        assertEquals("2026-09-27,09:05:07,id1,ລາຍຮັບ,Main,ອື່ນໆ,coffee,,LAK,ເງິນສົດ,150000,noy,0", csvText(csvBytes(rows, deleted = false, words = words("lo"))).split("\r\n")[1])
+        ReadableWorkbook(ByteArrayInputStream(xlsxBytes(rows, deleted = false, exponents = mapOf("LAK" to 0), words = words("lo")))).use { book ->
+            assertEquals(listOf("ລາຍການ", "ແຕ່ລະວັນ"), book.sheets.map { it.name }.toList())
+            val entries = book.getSheet(0).get().read()
+            assertEquals("ຈຳນວນເງິນ", entries[0].getCellText(10))
+            assertEquals("150000", entries[1].getCellAsNumber(10).get().toPlainString())
+            val daily = book.getSheet(1).get().read().map { r -> (0..7).map { r.getCellText(it) } }
+            assertEquals(listOf("ວັນທີ", "ສາຂາ", "ສະກຸນເງິນ", "ເງິນສົດເຂົ້າ", "ເງິນສົດອອກ", "ອອນລາຍເຂົ້າ", "ອອນລາຍອອກ", "ສຸດທິ"), daily[0])
+            assertEquals(listOf("2026-09-27", "Main", "LAK"), daily[1].take(3))
+        }
+    }
+
     // --- the XLSX ---
 
     @Test
@@ -179,6 +212,34 @@ d",LAK""" in text, text)
             assertEquals("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", xlsx.headers[HttpHeaders.ContentType])
             assertTrue(xlsx.headers[HttpHeaders.ContentDisposition]!!.contains("shoparchive-${gone.date}_${gone.date}.xlsx"))
             ReadableWorkbook(ByteArrayInputStream(xlsx.bodyAsBytes())).use { assertEquals(listOf("Entries", "Daily"), it.sheets.map { s -> s.name }.toList()) }
+        }
+    }
+
+    @Test
+    fun theLanguageOfTheRequestWordsTheFileAndNoLanguageKeepsTheEnglishOfBefore() = env().run {
+        val noy = login("noy", grant = listOf(EXPORT_NODE))
+        api {
+            openDay(noy)
+            val e = createEntry(noy, newEntry(item = "coffee", category = "misc", tenders = listOf(cash("LAK", "1000")))).also { check(it.status.value == 201) }.parsed(EntryDto.serializer())
+            val q = "?from=${e.date}&to=${e.date}"
+            fun lines(text: ByteArray) = csvText(text).split("\r\n").dropLast(1)
+
+            val plain = lines(getPath("/api/v1/export$q", noy).bodyAsBytes())
+            assertEquals("date,time,entry id,type,branch,category,item,note,currency,method,amount,created-by,slip count", plain[0])
+            assertEquals("income,main,misc,coffee", plain[1].split(",").slice(3..6).joinToString(","))
+
+            val thai = lines(getPath("/api/v1/export$q&language=th", noy).bodyAsBytes())
+            assertEquals("วันที่", thai[0].substringBefore(","))
+            assertEquals("รายรับ,Main,อื่นๆ,coffee", thai[1].split(",").slice(3..6).joinToString(","))
+
+            val lao = lines(getPath("/api/v1/export$q&language=lo", noy).bodyAsBytes())
+            assertEquals("ລາຍຮັບ,Main,ອື່ນໆ,coffee", lao[1].split(",").slice(3..6).joinToString(","))
+
+            val english = lines(getPath("/api/v1/export$q&language=en", noy).bodyAsBytes())
+            assertEquals("income,Main,Misc,coffee", english[1].split(",").slice(3..6).joinToString(","))
+
+            val xlsx = getPath("/api/v1/export$q&format=xlsx&language=th", noy)
+            ReadableWorkbook(ByteArrayInputStream(xlsx.bodyAsBytes())).use { assertEquals(listOf("รายการ", "ทีละวัน"), it.sheets.map { s -> s.name }.toList()) }
         }
     }
 

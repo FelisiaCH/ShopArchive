@@ -238,7 +238,7 @@ private struct EntryDetailView: View {
                     Banner(text: failureText(h.failure), tone: .error)
                 case .ready(let h):
                     ForEach(Array(((h.value as? [HistoryItem]) ?? []).enumerated()), id: \.offset) { _, item in
-                        HistoryLine(item: item)
+                        HistoryLine(ws: ws, item: item)
                     }
                 }
             }
@@ -449,6 +449,7 @@ private struct SlipImage: View {
 }
 
 private struct HistoryLine: View {
+    let ws: Workspace
     let item: HistoryItem
 
     var body: some View {
@@ -483,11 +484,24 @@ private struct HistoryLine: View {
         words.contains(raw) ? text(prefix + raw) : raw
     }
 
-    /// Only a change of type has words as values; the others (an item, a note, payments) are the text itself.
+    /// A change's value in the user's language. An item and a note are the text itself, and text not in the form the server writes is shown as it came.
     private func value(_ raw: String, of field: String) -> String {
         if raw.isEmpty { return "—" }
-        if field == "type" { return known(["income", "expense"], raw, prefix: "type_") }
-        return raw
+        switch field {
+        case "type": return known(["income", "expense"], raw, prefix: "type_")
+        case "category": return categoryTitle(ws, raw) ?? raw
+        case "tenders": return HistoryTextKt.historyTenders(text: raw, cash: text("method_cash"), online: text("method_online"))
+        case "transfers": return HistoryTextKt.historyTransfers(text: raw)
+        case "slips": return slipNames(raw)
+        default: return raw
+        }
+    }
+
+    private func slipNames(_ raw: String) -> String {
+        guard let numbers = HistoryTextKt.historySlipNumbers(text: raw) else { return raw }
+        // Kotlin's Ints in a list come over as plain NSNumber, as in sets and maps (see ints() in Kit.swift).
+        let names = (numbers as NSArray).compactMap { ($0 as? NSNumber)?.intValue }.map { text("detail_slip", String($0)) }
+        return names.joined(separator: "; ")
     }
 }
 

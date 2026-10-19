@@ -329,6 +329,7 @@
 "notif_event_entry" = "รายการใหม่";
 "notif_event_device" = "อุปกรณ์ใหม่";
 "notif_attempts" = "ลองแล้ว %1$d ครั้ง";
+"notif_retry_at" = "ลองใหม่เวลา %1$@";
 "notif_resend" = "ส่งอีกครั้ง";
 "notif_resend_failed" = "ส่งอีกครั้งไม่ได้";
 "notif_closed_days" = "วันที่ปิดยอดแล้ว";

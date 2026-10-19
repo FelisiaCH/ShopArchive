@@ -366,6 +366,15 @@ private struct Message: View {
             if n.attempts > 1 {
                 Text(text("notif_attempts", n.attempts)).font(.caption).foregroundColor(.secondary)
             }
+            // Why it is not sent (the channel's own words) and when it is tried again; nothing once it is sent.
+            if n.state != .sent {
+                if let reason = n.lastError {
+                    Text(verbatim: reason).font(.caption).foregroundColor(.secondary)
+                }
+                if let next = n.nextAttemptAt {
+                    Text(verbatim: text("notif_retry_at", localTime(next))).font(.caption).foregroundColor(.secondary)
+                }
+            }
             if canSend {
                 Button(text("notif_resend")) { ws.notifications.resend(id: n.id) }
                     .buttonStyle(.bordered)

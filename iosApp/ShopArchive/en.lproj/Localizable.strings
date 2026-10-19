@@ -329,6 +329,7 @@
 "notif_event_entry" = "New entry";
 "notif_event_device" = "New device";
 "notif_attempts" = "Tries: %1$d";
+"notif_retry_at" = "Next try: %1$@";
 "notif_resend" = "Send again";
 "notif_resend_failed" = "Could not send it again.";
 "notif_closed_days" = "Closed days";

@@ -207,7 +207,7 @@ class ExportState(private val env: Env) {
         change { Form(f.from, f.to, f.branch, f.format, ExportPhase.Working) }
         env.scope.launch {
             val phase = try {
-                ExportPhase.Ready(env.calls.run { env.api.export(f.from.trim(), f.to.trim(), branch, f.format) })
+                ExportPhase.Ready(env.calls.run { env.api.export(f.from.trim(), f.to.trim(), branch, f.format, env.language()) })
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

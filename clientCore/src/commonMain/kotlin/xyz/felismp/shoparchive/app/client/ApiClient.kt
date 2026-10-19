@@ -237,8 +237,8 @@ class ApiClient(
     override suspend fun notifyDay(branch: String, sessionId: String): NotificationDto =
         decode(send(HttpMethod.Post, "/api/v1/sessions/${branch.encodeURLPath()}/${sessionId.encodeURLPath()}/notify", null, Auth.Token))
 
-    override suspend fun export(from: String, to: String, branch: String, format: String): ExportFile {
-        val query = EntryFilter(from, to, branch).query() + "&format=" + format
+    override suspend fun export(from: String, to: String, branch: String, format: String, language: String): ExportFile {
+        val query = EntryFilter(from, to, branch).query() + "&format=" + format + "&language=" + language
         val reply = exchange(HttpMethod.Get, "/api/v1/export?$query", Auth.Token) { null }
         val name = reply.disposition?.let { ContentDisposition.parse(it).parameter(ContentDisposition.Parameters.FileName) }
         return ExportFile(name ?: "shoparchive-$from-$to.$format", reply.bytes)

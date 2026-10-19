@@ -244,7 +244,7 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 2, listOf(
 
     val setupFirstBranch = StringKey(
         "setup.first-branch", "main",
-        "The branch (its key; the display name is the key with a capital) made the first time the server starts with no users, if there is no branch yet. Empty: none is made.",
+        "The branch (its key; the display name is the key with a capital, and for main it is \"Main branch\" in the language set by locale) made the first time the server starts with no users, if there is no branch yet. Empty: none is made.",
         allowBlank = true,
     )
     val setupFirstUser = StringKey(

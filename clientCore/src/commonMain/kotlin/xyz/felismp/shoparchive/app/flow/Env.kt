@@ -38,6 +38,8 @@ class Env(
     /** The calendar date where the shop is. */
     val today: () -> LocalDate,
     val now: () -> Long,
+    /** The language the app shows now (`en`, `lo` or `th`; the system's when none is chosen): what a file the server writes for the person is written in. */
+    val language: () -> String = { "en" },
 ) {
     /** What the person may do, from the config as it stands now. */
     val can: Capabilities get() = config.value.capabilities()
