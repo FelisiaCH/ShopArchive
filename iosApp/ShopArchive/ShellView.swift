@@ -2,7 +2,7 @@ import SwiftUI
 import ClientCore
 
 /// The app after unlock, as the phone layout of Compose's Shell: a tab bar, and over the current screen the connection banner and the branch choice.
-/// The tabs: Today (Open day shows under it), Record, History and More (Reports, Notes and the console show under it, folded away as on a phone in Compose).
+/// The tabs: Today (Open day shows under it), Record, History and More (Reports, Notes, Manage shop and the console show under it, folded away as on a phone in Compose).
 /// Today's tab is there before the config has loaded too (Compose offers only More then), since a tab bar cannot select a tab it does not have: its screen says it is loading, or offers a retry.
 struct ShellView: View {
     let state: AppStateUnlocked
@@ -52,6 +52,8 @@ struct ShellView: View {
                 switch destination {
                 case .reports: screen { ReportsView(ws: ws, can: capabilities) }
                 case .notes: screen { NotesView(ws: ws) }
+                // As in Compose, Manage shop is there without a branch: it is where the first one is added.
+                case .admin: AdminView(ws: ws)
                 // As in Compose, the console is there without the config or a branch.
                 case .console: ConsoleView(ws: ws)
                 default: MoreView(state: state, flow: flow, ws: ws, can: capabilities)
@@ -107,7 +109,6 @@ struct ShellView: View {
     private var selected: Destination {
         switch destination {
         case .more, .record, .history: return destination
-        // Manage shop (.admin) has no iOS screen yet: it stays on More, which the default page shows.
         case .reports, .notes, .console, .admin: return .more
         default: return .today
         }
@@ -147,7 +148,7 @@ struct ShellView: View {
     }
 }
 
-/// Who is signed in, and the way to Reports, Notes, the console, Settings and to Lock now.
+/// Who is signed in, and the way to Reports, Notes, Manage shop, the console, Settings and to Lock now.
 private struct MoreView: View {
     let state: AppStateUnlocked
     let flow: AppFlow
@@ -162,6 +163,9 @@ private struct MoreView: View {
         }
         if can.allows(destination: .notes) {
             rows.append(MoreRow(id: "notes", title: text("nav_notes"), icon: "bubble.left") { ws.go(to: .notes) })
+        }
+        if can.admin {
+            rows.append(MoreRow(id: "admin", title: text("nav_manage"), icon: "building.2") { ws.go(to: .admin) })
         }
         if can.console {
             rows.append(MoreRow(id: "console", title: text("nav_console"), icon: "terminal") { ws.go(to: .console) })
