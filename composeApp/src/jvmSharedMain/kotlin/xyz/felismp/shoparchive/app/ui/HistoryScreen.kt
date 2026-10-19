@@ -23,8 +23,10 @@ import xyz.felismp.shoparchive.app.flow.ConfigState
 import xyz.felismp.shoparchive.app.flow.DetailUi
 import xyz.felismp.shoparchive.app.flow.EditUi
 import xyz.felismp.shoparchive.app.flow.EntryDetailState
+import xyz.felismp.shoparchive.app.flow.Failure
 import xyz.felismp.shoparchive.app.flow.HistoryUi
 import xyz.felismp.shoparchive.app.flow.Load
+import xyz.felismp.shoparchive.app.flow.Problem
 import xyz.felismp.shoparchive.app.flow.RangeProblem
 import xyz.felismp.shoparchive.app.flow.RecordIssue
 import xyz.felismp.shoparchive.app.flow.SlipNotice
@@ -55,6 +57,11 @@ private fun RangeProblem.text(): String = stringResource(
         RangeProblem.TOO_LONG -> Res.string.range_too_long
     },
 )
+
+/** The banner for a change that did not happen; a cancelled PIN prompt already says "Not done", so it is not said twice. */
+@Composable
+private fun notDone(failure: Failure): String =
+    if (failure == Failure.Client(Problem.ReauthCancelled)) failure.text() else stringResource(Res.string.detail_failed) + " " + failure.text()
 
 @Composable
 private fun methodText(method: TenderMethod) = stringResource(if (method == TenderMethod.CASH) Res.string.method_cash else Res.string.method_online)
@@ -223,7 +230,7 @@ private fun Actions(state: EntryDetailState, ui: DetailUi) {
     }
     when (val a = ui.action) {
         ActionPhase.Working -> ShopBanner(stringResource(Res.string.working), Tone.Info)
-        is ActionPhase.Failed -> ShopBanner(stringResource(Res.string.detail_failed) + " " + a.failure.text(), Tone.Error)
+        is ActionPhase.Failed -> ShopBanner(notDone(a.failure), Tone.Error)
         ActionPhase.Idle -> Unit
     }
 }
@@ -327,7 +334,7 @@ private fun EditForm(ws: Workspace, state: EntryDetailState, ui: DetailUi, edit:
     edit.issues.firstOrNull()?.let { ShopText(it.text(), TextRole.Caption, muted = true) }
     when (val a = ui.action) {
         ActionPhase.Working -> ShopBanner(stringResource(Res.string.working), Tone.Info)
-        is ActionPhase.Failed -> ShopBanner(stringResource(Res.string.detail_failed) + " " + a.failure.text(), Tone.Error)
+        is ActionPhase.Failed -> ShopBanner(notDone(a.failure), Tone.Error)
         ActionPhase.Idle -> Unit
     }
     if (!ui.canWrite) ShopText(stringResource(Res.string.needs_connection), TextRole.Caption, muted = true)
