@@ -50,6 +50,7 @@ struct ConsoleView: View {
         }
         .padding()
         .navigationTitle(text("nav_console"))
+        .navigationBarTitleDisplayMode(.inline)
         // The console sits under More (see ReportsView).
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
