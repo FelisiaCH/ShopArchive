@@ -20,7 +20,8 @@ struct SettingsView: View {
                     Picker(text("language_label"), selection: Binding(get: { language }, set: { flow.setLanguage(tag: $0) })) {
                         ForEach(Self.languages, id: \.key) { Text(text($0.key)).tag($0.tag) }
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.inline)
+                    .labelsHidden()
                 } header: {
                     Text(text("language_label")).textCase(nil)
                 }
