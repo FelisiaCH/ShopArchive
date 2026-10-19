@@ -299,7 +299,7 @@ class ApiClient(
                 content()?.let { setBody(it) }
             }
         }
-        clockOffsetMillis(response.headers[HttpHeaders.Date], Clock.System.now().toEpochMilliseconds())?.let { serverClockOffsetMillis = it }
+        serverClockOffsetMillis = clockOffsetMillis(response.headers[HttpHeaders.Date], Clock.System.now().toEpochMilliseconds())
         val bytes = response.readRawBytes()
         if (response.status.isSuccess()) return Reply(response.status.value, bytes, response.headers[HttpHeaders.ContentDisposition])
         raise(response.status.value, bytes.decodeToString(), response.headers[HttpHeaders.RetryAfter], bearer, path)
