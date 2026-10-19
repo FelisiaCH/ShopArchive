@@ -32,7 +32,7 @@ internal val CONSOLE_ONLY_COMMANDS = emptySet<String>()
 internal val OP_ONLY_COMMANDS = setOf("user", "perm", "role", "devices", "op", "deop")
 
 /** The word an op alone holds: [xyz.felismp.shoparchive.server.users.UserStore] gives an op every node, registered or not (as `auth.password.required-for` reads it). */
-private const val OP_NODE = "op"
+internal const val OP_NODE = "op"
 
 /** At most this many characters of a line go into the audit log. */
 private const val AUDITED_CHARS = 200

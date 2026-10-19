@@ -7,6 +7,7 @@ import xyz.felismp.shoparchive.server.config.YamlConfigFile
 import xyz.felismp.shoparchive.server.users.quoted
 import xyz.felismp.shoparchive.shared.AppliesTo
 import xyz.felismp.shoparchive.shared.CategoryDto
+import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.CreateCategoryRequest
 import xyz.felismp.shoparchive.shared.LocalizedName
 import xyz.felismp.shoparchive.shared.UpdateCategoryRequest
@@ -85,10 +86,10 @@ internal class CategoryStore(private val files: DataFileStore<List<Category>>) {
     fun find(key: String): Category? = all().firstOrNull { it.key == key }
 
     fun add(key: String, name: LocalizedName, appliesTo: AppliesTo): Category {
-        if (!isSlug(key)) throw badRequest("A category key is 1 to 32 characters from a-z, 0-9 and -.")
+        if (!isSlug(key)) throw badRequest("A category key is 1 to 32 characters from a-z, 0-9 and -.", ErrorReasons.KEY_INVALID)
         val category = Category(key, cleanName(name), appliesTo, archived = false)
         files.update { list ->
-            if (list.any { it.key == key }) throw conflict("A category '$key' exists already.")
+            if (list.any { it.key == key }) throw conflict("A category '$key' exists already.", ErrorReasons.KEY_EXISTS)
             list + category
         }
         return category
@@ -98,7 +99,7 @@ internal class CategoryStore(private val files: DataFileStore<List<Category>>) {
         val clean = name?.let(::cleanName)
         lateinit var changed: Category
         files.update { list ->
-            val old = list.firstOrNull { it.key == key } ?: throw notFound("No category '$key'.")
+            val old = list.firstOrNull { it.key == key } ?: throw notFound("No category '$key'.", ErrorReasons.ENTRY_CATEGORY_UNKNOWN)
             changed = old.copy(name = clean ?: old.name, appliesTo = appliesTo ?: old.appliesTo, archived = archived ?: old.archived)
             list.map { if (it.key == key) changed else it }
         }
@@ -107,7 +108,7 @@ internal class CategoryStore(private val files: DataFileStore<List<Category>>) {
 
     private fun cleanName(name: LocalizedName): LocalizedName {
         val clean = LocalizedName(name.lo.trim(), name.th.trim(), name.en.trim())
-        if (clean.lo.isEmpty() || clean.th.isEmpty() || clean.en.isEmpty()) throw badRequest("A category needs a name in Lao, Thai and English.")
+        if (clean.lo.isEmpty() || clean.th.isEmpty() || clean.en.isEmpty()) throw badRequest("A category needs a name in Lao, Thai and English.", ErrorReasons.NAME_REQUIRED)
         return clean
     }
 }
@@ -115,13 +116,26 @@ internal class CategoryStore(private val files: DataFileStore<List<Category>>) {
 internal class DefaultCategoryService(private val categories: CategoryStore, private val access: Access) : CategoryService {
     override fun list(principal: Principal): List<CategoryDto> = categories.all().map { it.toDto() }
 
-    override fun create(principal: Principal, request: CreateCategoryRequest): CategoryDto {
+    override fun create(principal: Principal, request: CreateCategoryRequest): CategoryDto = create(principal, request, "-")
+
+    override fun create(principal: Principal, request: CreateCategoryRequest, ip: String): CategoryDto {
         access.require(principal, CATEGORIES_MANAGE_NODE)
-        return categories.add(request.key, request.name, request.appliesTo).toDto()
+        // Like every command from the app, a change to the shop's setup needs the PIN or password entered recently.
+        access.requireRecentAuth(principal)
+        val category = categories.add(request.key, request.name, request.appliesTo)
+        access.audit(principal, "category.add", ip, "ok,key=${category.key}")
+        access.configChanged()
+        return category.toDto()
     }
 
-    override fun update(principal: Principal, key: String, request: UpdateCategoryRequest): CategoryDto {
+    override fun update(principal: Principal, key: String, request: UpdateCategoryRequest): CategoryDto = update(principal, key, request, "-")
+
+    override fun update(principal: Principal, key: String, request: UpdateCategoryRequest, ip: String): CategoryDto {
         access.require(principal, CATEGORIES_MANAGE_NODE)
-        return categories.update(key, request.name, request.appliesTo, request.archived).toDto()
+        access.requireRecentAuth(principal)
+        val category = categories.update(key, request.name, request.appliesTo, request.archived)
+        access.audit(principal, "category.update", ip, "ok,key=$key")
+        access.configChanged()
+        return category.toDto()
     }
 }

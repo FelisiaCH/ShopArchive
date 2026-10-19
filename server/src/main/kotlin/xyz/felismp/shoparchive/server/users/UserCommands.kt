@@ -85,6 +85,9 @@ internal fun registerUserCommands(
     }
 }
 
+/** The branches a new user gets: the ones named, else the only active branch if there is exactly one. Without a branch a new user would have nowhere to work; with one there is no choice to make. */
+internal fun joinedBranches(given: List<String>, active: List<String>): List<String> = given.ifEmpty { active.takeIf { it.size == 1 }.orEmpty() }
+
 private fun addCompletion(users: UserStore, args: List<String>): List<String> {
     if (args.size == 2) return emptyList() // the new name
     return when (args[args.size - 2]) {
@@ -99,9 +102,8 @@ private fun userCommand(users: UserStore, sender: CommandSender, args: List<Stri
         "add" -> {
             if (rest.isEmpty()) usage("user add <name> [--role <role>] [--branch <branch>...]")
             val (role, given) = parseAddFlags(rest.drop(1))
-            // Without --branch a new user would have nowhere to work; with exactly one branch there is no choice to make.
             val active = if (given.isEmpty()) activeBranches() else emptyList()
-            val branches = given.ifEmpty { active.takeIf { it.size == 1 }.orEmpty() }
+            val branches = joinedBranches(given, active)
             users.addUser(rest[0], role, branches)
             sender.sendMessage(
                 "User '${rest[0]}' created" + (if (role != NO_ROLE) ", role $role" else "") + (if (branches.isNotEmpty()) ", branches ${branches.joinToString()}" else "") +

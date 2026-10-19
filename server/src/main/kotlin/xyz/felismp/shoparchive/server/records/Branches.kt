@@ -7,6 +7,7 @@ import xyz.felismp.shoparchive.server.config.YamlConfigFile
 import xyz.felismp.shoparchive.server.users.quoted
 import xyz.felismp.shoparchive.shared.BranchDto
 import xyz.felismp.shoparchive.shared.CreateBranchRequest
+import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.UpdateBranchRequest
 import xyz.felismp.shoparchive.shared.isSlug
 
@@ -74,12 +75,12 @@ internal class BranchStore(private val files: DataFileStore<List<Branch>>) {
     fun find(key: String): Branch? = all().firstOrNull { it.key == key }
 
     fun add(key: String, displayName: String): Branch {
-        if (!isSlug(key)) throw badRequest("A branch key is 1 to 32 characters from a-z, 0-9 and -.")
+        if (!isSlug(key)) throw badRequest("A branch key is 1 to 32 characters from a-z, 0-9 and -.", ErrorReasons.KEY_INVALID)
         val name = displayName.trim()
-        if (name.isEmpty()) throw badRequest("A branch needs a display name.")
+        if (name.isEmpty()) throw badRequest("A branch needs a display name.", ErrorReasons.NAME_REQUIRED)
         val branch = Branch(key, name, archived = false)
         files.update { list ->
-            if (list.any { it.key == key }) throw conflict("A branch '$key' exists already.")
+            if (list.any { it.key == key }) throw conflict("A branch '$key' exists already.", ErrorReasons.KEY_EXISTS)
             list + branch
         }
         return branch
@@ -87,10 +88,10 @@ internal class BranchStore(private val files: DataFileStore<List<Branch>>) {
 
     fun update(key: String, displayName: String?, archived: Boolean?): Branch {
         val name = displayName?.trim()
-        if (name != null && name.isEmpty()) throw badRequest("A branch needs a display name.")
+        if (name != null && name.isEmpty()) throw badRequest("A branch needs a display name.", ErrorReasons.NAME_REQUIRED)
         lateinit var changed: Branch
         files.update { list ->
-            val old = list.firstOrNull { it.key == key } ?: throw notFound("No branch '$key'.")
+            val old = list.firstOrNull { it.key == key } ?: throw notFound("No branch '$key'.", ErrorReasons.BRANCH_UNKNOWN)
             changed = old.copy(displayName = name ?: old.displayName, archived = archived ?: old.archived)
             list.map { if (it.key == key) changed else it }
         }
@@ -102,13 +103,26 @@ internal class DefaultBranchService(private val branches: BranchStore, private v
     override fun list(principal: Principal): List<BranchDto> =
         branches.all().filter { access.canBranch(principal, it.key) }.map { it.toDto() }
 
-    override fun create(principal: Principal, request: CreateBranchRequest): BranchDto {
+    override fun create(principal: Principal, request: CreateBranchRequest): BranchDto = create(principal, request, "-")
+
+    override fun create(principal: Principal, request: CreateBranchRequest, ip: String): BranchDto {
         access.require(principal, BRANCHES_MANAGE_NODE)
-        return branches.add(request.key, request.displayName).toDto()
+        // Like every command from the app, a change to the shop's setup needs the PIN or password entered recently.
+        access.requireRecentAuth(principal)
+        val branch = branches.add(request.key, request.displayName)
+        access.audit(principal, "branch.add", ip, "ok,key=${branch.key}")
+        access.configChanged()
+        return branch.toDto()
     }
 
-    override fun update(principal: Principal, key: String, request: UpdateBranchRequest): BranchDto {
+    override fun update(principal: Principal, key: String, request: UpdateBranchRequest): BranchDto = update(principal, key, request, "-")
+
+    override fun update(principal: Principal, key: String, request: UpdateBranchRequest, ip: String): BranchDto {
         access.require(principal, BRANCHES_MANAGE_NODE)
-        return branches.update(key, request.displayName, request.archived).toDto()
+        access.requireRecentAuth(principal)
+        val branch = branches.update(key, request.displayName, request.archived)
+        access.audit(principal, "branch.update", ip, "ok,key=$key")
+        access.configChanged()
+        return branch.toDto()
     }
 }

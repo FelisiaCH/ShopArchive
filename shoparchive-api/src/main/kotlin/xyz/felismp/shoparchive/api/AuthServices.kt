@@ -1,6 +1,9 @@
 package xyz.felismp.shoparchive.api
 
+import xyz.felismp.shoparchive.shared.AdminRoleDto
+import xyz.felismp.shoparchive.shared.AdminUserDto
 import xyz.felismp.shoparchive.shared.ConfigResponse
+import xyz.felismp.shoparchive.shared.CreateUserRequest
 import xyz.felismp.shoparchive.shared.DeviceInfo
 import xyz.felismp.shoparchive.shared.DeviceMode
 import xyz.felismp.shoparchive.shared.ErrorCode
@@ -80,6 +83,39 @@ interface DeviceService {
 
     /** @throws ApiError the caller is not on the device, or it holds other users and cannot become personal */
     fun setMode(principal: Principal, deviceId: String, mode: DeviceMode, ip: String)
+}
+
+/**
+ * The accounts, for an op in the app: what the console's `user` command does. Every method needs the caller to be an op and to have entered the PIN or password
+ * recently, and answers the account as it is afterwards. [ip] goes to the audit log. A user is named as the console names it, by name.
+ * @throws ApiError 403 for a caller who is no op; 401 [xyz.felismp.shoparchive.shared.ErrorCode.REAUTH_REQUIRED]; 404 for an unknown user or role; 409 for a name taken
+ */
+interface UserAdminService {
+    fun users(principal: Principal): List<AdminUserDto>
+
+    fun roles(principal: Principal): List<AdminRoleDto>
+
+    /** Makes the account; it has no PIN yet, the user sets one at the first login. Without branches it joins the only active branch, if there is exactly one. */
+    fun add(principal: Principal, request: CreateUserRequest, ip: String): AdminUserDto
+
+    /** The account keeps its id. */
+    fun rename(principal: Principal, name: String, newName: String, ip: String): AdminUserDto
+
+    /** A role name or [xyz.felismp.shoparchive.shared.ROLE_NONE]. */
+    fun setRole(principal: Principal, name: String, role: String, ip: String): AdminUserDto
+
+    fun addBranch(principal: Principal, name: String, branch: String, ip: String): AdminUserDto
+
+    fun removeBranch(principal: Principal, name: String, branch: String, ip: String): AdminUserDto
+
+    /** Disabling ends the account's sessions. Enabling forgets the wrong tries. */
+    fun setEnabled(principal: Principal, name: String, enabled: Boolean, ip: String): AdminUserDto
+
+    /** Forgets the wrong tries and the lock; an account the server disabled for them is enabled again. */
+    fun unlock(principal: Principal, name: String, ip: String): AdminUserDto
+
+    /** Takes the account off every device and clears its PIN and password, so it sets a new PIN at its next login. Not the caller's own account (403, [xyz.felismp.shoparchive.shared.ErrorReasons.USER_SELF_RESET]). */
+    fun reset(principal: Principal, name: String, ip: String): AdminUserDto
 }
 
 /** What `GET /api/v1/config` answers for the signed-in caller. */

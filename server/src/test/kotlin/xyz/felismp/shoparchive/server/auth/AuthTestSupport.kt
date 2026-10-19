@@ -177,6 +177,7 @@ internal class AuthEnv(
         auth = Auth(
             root, settings, users, services, { listOf("shop.example.com:25655", "192.168.1.20:25655") }, clock, TEST_COST,
             hasher ?: Hasher(settings.auth.hashConcurrency, TEST_COST), records ?: NoRecords, barrier,
+            activeBranches = { records?.branches?.activeKeys().orEmpty() },
         )
         services.register(CommandService::class.java, DefaultCommandService(commands, auth.audit, services), 0, "core")
         registerCoreCommands(

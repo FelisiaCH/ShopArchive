@@ -100,24 +100,24 @@ internal fun Route.recordRoutes(services: ServiceRegistry) {
 
     post("/branches") {
         val body = call.receive<CreateBranchRequest>()
-        call.respond(HttpStatusCode.Created, blocking { services.require<BranchService>().create(call.principal, body) })
+        call.respond(HttpStatusCode.Created, blocking { services.require<BranchService>().create(call.principal, body, call.ip) })
     }
 
     put("/branches/{key}") {
         val body = call.receive<UpdateBranchRequest>()
-        call.respond(blocking { services.require<BranchService>().update(call.principal, call.param("key"), body) })
+        call.respond(blocking { services.require<BranchService>().update(call.principal, call.param("key"), body, call.ip) })
     }
 
     get("/categories") { call.respond(blocking { services.require<CategoryService>().list(call.principal) }) }
 
     post("/categories") {
         val body = call.receive<CreateCategoryRequest>()
-        call.respond(HttpStatusCode.Created, blocking { services.require<CategoryService>().create(call.principal, body) })
+        call.respond(HttpStatusCode.Created, blocking { services.require<CategoryService>().create(call.principal, body, call.ip) })
     }
 
     put("/categories/{key}") {
         val body = call.receive<UpdateCategoryRequest>()
-        call.respond(blocking { services.require<CategoryService>().update(call.principal, call.param("key"), body) })
+        call.respond(blocking { services.require<CategoryService>().update(call.principal, call.param("key"), body, call.ip) })
     }
 
     // 201 when this call opened the day; 200 with `alreadyOpenBy` when it was open already.
