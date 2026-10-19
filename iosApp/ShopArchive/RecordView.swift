@@ -40,7 +40,7 @@ struct RecordView: View {
                 Banner(text: text(can.openDay ? "block_no_day" : "block_no_day_other"), tone: .info)
                 if can.openDay {
                     Button(text("openday_btn")) { ws.go(to: .openDay) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.tonalFull)
                 }
             }
             Picker("", selection: Binding(get: { draft.type }, set: { record.setType(type: $0) })) {
@@ -51,53 +51,16 @@ struct RecordView: View {
             .disabled(!editable)
 
             if !ui.categories.isEmpty {
-                Text(text("category_label")).font(.headline)
-                FlowLayout {
-                    if !ui.policy.requireCategory {
-                        Choice(name: text("category_none"), selected: draft.category == nil) { record.setCategory(key: nil) }
-                    }
-                    ForEach(ui.categories, id: \.key) { c in
-                        Choice(name: categoryName(c.name), selected: draft.category == c.key) { record.setCategory(key: c.key) }
-                    }
-                }
-                .disabled(!editable)
+                categories
             }
-
-            TextField(text("item_label"), text: Binding(get: { item }, set: { item = $0; record.setItem(text: $0) }))
-                .textFieldStyle(.roundedBorder)
-                .disabled(!editable)
-            if !ui.suggestions.isEmpty && editable {
-                FlowLayout {
-                    ForEach(ui.suggestions, id: \.self) { s in
-                        Choice(name: s, selected: false) { item = s; record.setItem(text: s) }
-                    }
-                }
-            }
-            TextField(text("note_label"), text: Binding(get: { note }, set: { note = $0; record.setNote(text: $0) }), axis: .vertical)
-                .lineLimit(1...5)
-                .textFieldStyle(.roundedBorder)
-                .disabled(!editable)
-
-            Text(text("tenders_title")).font(.headline)
-            ForEach(draft.tenders, id: \.key) { tender($0) }
-            Button(text("tender_add")) { record.addTender() }
-                .buttonStyle(.bordered)
-                .disabled(!editable)
+            details
+            tenders
 
             if ui.online || !draft.slips.isEmpty || !draft.transfers.isEmpty {
                 slips
             }
 
-            phase
-            if let issue = ui.issues.first, !saved {
-                Text(issueText(issue)).font(.caption).foregroundColor(.secondary)
-            }
-            if ui.block == .offline {
-                Text(text("needs_connection")).font(.caption).foregroundColor(.secondary)
-            }
-            Button(text("record_save")) { record.save() }
-                .buttonStyle(.borderedProminent)
-                .disabled(!ui.canSave)
+            saveArea
         }
         .navigationTitle(text("record_title"))
         .collect(ws.record.ui, into: $ui)
@@ -124,6 +87,65 @@ struct RecordView: View {
                 if let image { add(image, use) }
             }
             .ignoresSafeArea()
+        }
+    }
+
+    private var categories: some View {
+        Card(title: text("category_label")) {
+            FlowLayout {
+                if !ui.policy.requireCategory {
+                    Choice(name: text("category_none"), selected: draft.category == nil) { record.setCategory(key: nil) }
+                }
+                ForEach(ui.categories, id: \.key) { c in
+                    Choice(name: categoryName(c.name), selected: draft.category == c.key) { record.setCategory(key: c.key) }
+                }
+            }
+            .disabled(!editable)
+        }
+    }
+
+    /// The item and the note, as two rows of one block.
+    private var details: some View {
+        Card {
+            TextField(text("item_label"), text: Binding(get: { item }, set: { item = $0; record.setItem(text: $0) }))
+                .disabled(!editable)
+            if !ui.suggestions.isEmpty && editable {
+                FlowLayout {
+                    ForEach(ui.suggestions, id: \.self) { s in
+                        Choice(name: s, selected: false) { item = s; record.setItem(text: s) }
+                    }
+                }
+            }
+            Divider()
+            TextField(text("note_label"), text: Binding(get: { note }, set: { note = $0; record.setNote(text: $0) }), axis: .vertical)
+                .lineLimit(1...5)
+                .disabled(!editable)
+        }
+    }
+
+    private var tenders: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionHeader(text("tenders_title"))
+            ForEach(draft.tenders, id: \.key) { tender($0) }
+            Button { record.addTender() } label: { Label(text("tender_add"), systemImage: "plus") }
+                .buttonStyle(.tonalFull)
+                .disabled(!editable)
+        }
+    }
+
+    /// What the last try said, what is missing and Save, close together at the end of the page.
+    private var saveArea: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            phase
+            if let issue = ui.issues.first, !saved {
+                Text(issueText(issue)).font(.footnote).foregroundColor(.secondary)
+            }
+            if ui.block == .offline {
+                Text(text("needs_connection")).font(.footnote).foregroundColor(.secondary)
+            }
+            Button(text("record_save")) { record.save() }
+                .buttonStyle(.filledFull)
+                .disabled(!ui.canSave)
         }
     }
 
@@ -154,77 +176,90 @@ struct RecordView: View {
                 }
             ))
             .keyboardType(.decimalPad)
-            .textFieldStyle(.roundedBorder)
+            .font(.title3.monospacedDigit())
+            .field()
             .disabled(!editable)
             if let currency, let minor = MoneyTextKt.parseTypedAmount(text: value, exponent: currency.exponent, allowZero: false) {
                 Text(text("record_amount_shown", displayAmount(minor: minor.int64Value, exponent: currency.exponent) + " " + currency.code))
-                    .font(.body.monospacedDigit())
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             } else if ints(ui.badRows).contains(Int(row.key)) {
-                Text(text("issue_amount_invalid")).font(.caption).foregroundColor(.red)
+                Text(text("issue_amount_invalid")).font(.caption).foregroundColor(Theme.moneyOut)
             }
             if ints(ui.amountFromSlip).contains(Int(row.key)) {
                 Text(text("amount_from_slip")).font(.caption).foregroundColor(.secondary)
             }
             if draft.tenders.count > 1 {
                 Button(text("tender_remove")) { record.removeTender(row: row.key) }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.tonal)
                     .disabled(!editable)
             }
         }
     }
 
-    @ViewBuilder
     private var slips: some View {
-        Text(text("slips_title")).font(.headline)
-        Text(text("slips_count", String(draft.slips.count), String(ui.policy.slipMaxCount))).font(.caption).foregroundColor(.secondary)
+        Card(title: text("slips_title")) {
+            Text(text("slips_count", String(draft.slips.count), String(ui.policy.slipMaxCount))).font(.footnote).foregroundColor(.secondary)
+            slipButtons
+            if ui.compressing {
+                Text(text("slip_preparing")).foregroundColor(.secondary)
+            }
+            if ui.scanning {
+                Text(text("slip_scanning")).foregroundColor(.secondary)
+            }
+            ForEach(draft.transfers, id: \.key) { t in
+                HStack {
+                    Label("QR · " + t.check.source, systemImage: "qrcode").frame(maxWidth: .infinity, alignment: .leading)
+                    Button(text("slip_remove", "QR")) { record.removeTransfer(key: t.key) }
+                        .buttonStyle(.tonal)
+                        .disabled(!editable)
+                }
+                if let use = t.uses.first { usedBefore(use) }
+                checkBanner(t.check)
+            }
+            // Numbered like the files the server keeps (slip-1.jpg ...): a photo picker only gives a name of its own.
+            ForEach(Array(draft.slips.enumerated()), id: \.element.key) { i, slip in
+                let label = text("detail_slip", String(i + 1))
+                HStack(spacing: 12) {
+                    SlipThumbnail(bytes: slip.bytes)
+                    Text(label + " · \(Int(slip.bytes.size) / 1024 + 1) KB").frame(maxWidth: .infinity, alignment: .leading)
+                    Button(text("slip_remove", label)) { record.removeSlip(key: slip.key) }
+                        .buttonStyle(.tonal)
+                        .disabled(!editable)
+                }
+                if let use = slip.uses.first { usedBefore(use) }
+                if slip.twiceHere { Banner(text: text("slip_attached_twice"), tone: .error) }
+                if let check = slip.check { checkBanner(check) }
+            }
+            slipNoticeBanner
+        }
+    }
+
+    /// Where a slip comes from: the photo library, the camera, a QR code.
+    private var slipButtons: some View {
         FlowLayout {
             PhotosPicker(selection: $picked, matching: .images) {
-                Text(text(cameraAvailable ? "slip_gallery" : "slip_file"))
+                Label(text(cameraAvailable ? "slip_gallery" : "slip_file"), systemImage: "photo")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.tonal)
             .disabled(!editable)
             if cameraAvailable {
-                Button(text("slip_camera")) { camera = .photo }
-                    .buttonStyle(.bordered)
+                Button { camera = .photo } label: { Label(text("slip_camera"), systemImage: "camera") }
+                    .buttonStyle(.tonal)
                     .disabled(!editable)
                 // Only a server with a bank plugin confirms a QR code.
                 if ui.policy.slipCheck {
-                    Button(text("slip_scan")) { camera = .scan }
-                        .buttonStyle(.bordered)
+                    Button { camera = .scan } label: { Label(text("slip_scan"), systemImage: "qrcode.viewfinder") }
+                        .buttonStyle(.tonal)
                         .disabled(!editable)
                 }
             }
         }
-        if ui.compressing {
-            Text(text("slip_preparing")).foregroundColor(.secondary)
-        }
-        if ui.scanning {
-            Text(text("slip_scanning")).foregroundColor(.secondary)
-        }
-        ForEach(draft.transfers, id: \.key) { t in
-            HStack {
-                Text("QR · " + t.check.source).frame(maxWidth: .infinity, alignment: .leading)
-                Button(text("slip_remove", "QR")) { record.removeTransfer(key: t.key) }
-                    .buttonStyle(.bordered)
-                    .disabled(!editable)
-            }
-            if let use = t.uses.first { usedBefore(use) }
-            checkBanner(t.check)
-        }
-        // Numbered like the files the server keeps (slip-1.jpg ...): a photo picker only gives a name of its own.
-        ForEach(Array(draft.slips.enumerated()), id: \.element.key) { i, slip in
-            let label = text("detail_slip", String(i + 1))
-            HStack {
-                Text(label + " · \(Int(slip.bytes.size) / 1024 + 1) KB").frame(maxWidth: .infinity, alignment: .leading)
-                Button(text("slip_remove", label)) { record.removeSlip(key: slip.key) }
-                    .buttonStyle(.bordered)
-                    .disabled(!editable)
-            }
-            if let use = slip.uses.first { usedBefore(use) }
-            if slip.twiceHere { Banner(text: text("slip_attached_twice"), tone: .error) }
-            if let check = slip.check { checkBanner(check) }
-        }
+    }
+
+    @ViewBuilder
+    private var slipNoticeBanner: some View {
         if let notice = ui.slipNotice {
             switch notice {
             case .tooMany: Banner(text: text("notice_too_many", String(ui.policy.slipMaxCount)), tone: .error)
@@ -274,10 +309,10 @@ struct RecordView: View {
             }
             HStack(spacing: 8) {
                 Button(text("record_check_again")) { record.checkAgain() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.filledFull)
                     .disabled(!ui.connected)
                 Button(text("record_discard")) { record.discardDraft() }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.tonalFull)
             }
         case .failed(let p):
             Banner(text: text("record_failed", failureText(p.failure)), tone: .error)

@@ -255,7 +255,7 @@ struct ActionButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         let destructive = configuration.role == .destructive
         configuration.label
-            .font(.body.weight(.medium))
+            .fontWeight(.medium)
             .multilineTextAlignment(.center)
             .foregroundColor(foreground(destructive: destructive))
             .padding(.horizontal, 16)
