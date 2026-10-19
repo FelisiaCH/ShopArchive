@@ -2,11 +2,8 @@ package xyz.felismp.shoparchive.server.records
 
 import xyz.felismp.shoparchive.api.ApiError
 import xyz.felismp.shoparchive.api.AuthService
-import xyz.felismp.shoparchive.api.EventService
 import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.api.ServiceRegistry
-import xyz.felismp.shoparchive.server.auth.AuditLog
-import xyz.felismp.shoparchive.shared.ConfigChangedMessage
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.Refusal
@@ -29,16 +26,6 @@ internal class Access(private val services: ServiceRegistry) {
     }
 
     fun requireRecentAuth(principal: Principal) = auth.requireRecentAuth(principal)
-
-    /** One line in the audit log: what [principal] changed, from [ip]. */
-    fun audit(principal: Principal, event: String, ip: String, result: String) {
-        services.get(AuditLog::class.java)?.record(event, principal.username, principal.deviceId, ip, result)
-    }
-
-    /** Tells every open app that the branches or categories changed, so it asks for the config again. */
-    fun configChanged() {
-        services.get(EventService::class.java)?.broadcast(ConfigChangedMessage)
-    }
 
     fun forbidden(message: String, reason: String? = null) = ApiError(403, ErrorCode.FORBIDDEN, message, reason = reason)
 }

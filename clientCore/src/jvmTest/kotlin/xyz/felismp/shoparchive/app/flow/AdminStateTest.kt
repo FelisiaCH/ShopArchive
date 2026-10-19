@@ -206,4 +206,14 @@ class AdminStateTest {
         s.admin.addBranch("Market")
         assertEquals(listOf("addBranch branch-1 Kiosk", "addCategory category-1 Tips INCOME", "addBranch branch-2 Market"), s.h.api.adminCalls)
     }
+
+    @Test fun aKeyTheServerHasButThePersonDoesNotSeeIsSkipped() = runTest(UnconfinedTestDispatcher()) {
+        val s = setup()
+        s.h.api.hiddenBranchKeys = setOf("branch-1", "branch-2")
+        s.admin.addBranch("Kiosk")
+
+        assertEquals(listOf("addBranch branch-1 Kiosk", "addBranch branch-2 Kiosk", "addBranch branch-3 Kiosk"), s.h.api.adminCalls)
+        assertNull(s.admin.ui.value.failure)
+        assertEquals(1, s.admin.ui.value.done)
+    }
 }

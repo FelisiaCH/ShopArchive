@@ -116,26 +116,13 @@ internal class CategoryStore(private val files: DataFileStore<List<Category>>) {
 internal class DefaultCategoryService(private val categories: CategoryStore, private val access: Access) : CategoryService {
     override fun list(principal: Principal): List<CategoryDto> = categories.all().map { it.toDto() }
 
-    override fun create(principal: Principal, request: CreateCategoryRequest): CategoryDto = create(principal, request, "-")
-
-    override fun create(principal: Principal, request: CreateCategoryRequest, ip: String): CategoryDto {
+    override fun create(principal: Principal, request: CreateCategoryRequest): CategoryDto {
         access.require(principal, CATEGORIES_MANAGE_NODE)
-        // Like every command from the app, a change to the shop's setup needs the PIN or password entered recently.
-        access.requireRecentAuth(principal)
-        val category = categories.add(request.key, request.name, request.appliesTo)
-        access.audit(principal, "category.add", ip, "ok,key=${category.key}")
-        access.configChanged()
-        return category.toDto()
+        return categories.add(request.key, request.name, request.appliesTo).toDto()
     }
 
-    override fun update(principal: Principal, key: String, request: UpdateCategoryRequest): CategoryDto = update(principal, key, request, "-")
-
-    override fun update(principal: Principal, key: String, request: UpdateCategoryRequest, ip: String): CategoryDto {
+    override fun update(principal: Principal, key: String, request: UpdateCategoryRequest): CategoryDto {
         access.require(principal, CATEGORIES_MANAGE_NODE)
-        access.requireRecentAuth(principal)
-        val category = categories.update(key, request.name, request.appliesTo, request.archived)
-        access.audit(principal, "category.update", ip, "ok,key=$key")
-        access.configChanged()
-        return category.toDto()
+        return categories.update(key, request.name, request.appliesTo, request.archived).toDto()
     }
 }

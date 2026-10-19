@@ -33,34 +33,22 @@ interface BranchService {
     /** The branches the caller works in: all of them with `shoparchive.branch.all`. Archived ones are marked. */
     fun list(principal: Principal): List<BranchDto>
 
-    /** @throws ApiError 403 without `shoparchive.branches.manage`; 400 for a key that is not a slug; 409 if the key is taken; 401 [xyz.felismp.shoparchive.shared.ErrorCode.REAUTH_REQUIRED] unless the PIN or password was entered recently */
+    /** @throws ApiError 403 without `shoparchive.branches.manage`; 400 for a key that is not a slug; 409 if the key is taken */
     fun create(principal: Principal, request: CreateBranchRequest): BranchDto
 
-    /** Like [create], told the caller's address for the audit log; a service that keeps no log may leave this out. */
-    fun create(principal: Principal, request: CreateBranchRequest, ip: String): BranchDto = create(principal, request)
-
-    /** The key never changes. @throws ApiError 403 without `shoparchive.branches.manage`; 404 for an unknown key; 401 [xyz.felismp.shoparchive.shared.ErrorCode.REAUTH_REQUIRED] unless the PIN or password was entered recently */
+    /** The key never changes. @throws ApiError 403 without `shoparchive.branches.manage`; 404 for an unknown key */
     fun update(principal: Principal, key: String, request: UpdateBranchRequest): BranchDto
-
-    /** Like [update], told the caller's address for the audit log. */
-    fun update(principal: Principal, key: String, request: UpdateBranchRequest, ip: String): BranchDto = update(principal, key, request)
 }
 
 interface CategoryService {
     /** Every category, archived ones marked; any signed-in user may read them. */
     fun list(principal: Principal): List<CategoryDto>
 
-    /** @throws ApiError 403 without `shoparchive.categories.manage`; 400 for a key that is not a slug; 409 if the key is taken; 401 [xyz.felismp.shoparchive.shared.ErrorCode.REAUTH_REQUIRED] unless the PIN or password was entered recently */
+    /** @throws ApiError 403 without `shoparchive.categories.manage`; 400 for a key that is not a slug; 409 if the key is taken */
     fun create(principal: Principal, request: CreateCategoryRequest): CategoryDto
 
-    /** Like [create], told the caller's address for the audit log; a service that keeps no log may leave this out. */
-    fun create(principal: Principal, request: CreateCategoryRequest, ip: String): CategoryDto = create(principal, request)
-
-    /** The key never changes. @throws ApiError 403 without `shoparchive.categories.manage`; 404 for an unknown key; 401 [xyz.felismp.shoparchive.shared.ErrorCode.REAUTH_REQUIRED] unless the PIN or password was entered recently */
+    /** The key never changes. @throws ApiError 403 without `shoparchive.categories.manage`; 404 for an unknown key */
     fun update(principal: Principal, key: String, request: UpdateCategoryRequest): CategoryDto
-
-    /** Like [update], told the caller's address for the audit log. */
-    fun update(principal: Principal, key: String, request: UpdateCategoryRequest, ip: String): CategoryDto = update(principal, key, request)
 }
 
 /** What `GET /api/v1/entries` filters by; [from] and [to] are `yyyy-MM-dd` and default to the current month. */

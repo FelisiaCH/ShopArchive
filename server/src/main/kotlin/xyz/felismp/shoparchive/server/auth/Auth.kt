@@ -82,7 +82,7 @@ internal class Auth(
         services.register(EventService::class.java, events, CORE_SERVICE_PRIORITY, "core")
         // The record services write their own lines (a branch added) through the registry, as they reach the login services.
         services.register(AuditLog::class.java, audit, CORE_SERVICE_PRIORITY, "core")
-        services.register(UserAdminService::class.java, DefaultUserAdminService(users, accounts, audit, services, activeBranches), CORE_SERVICE_PRIORITY, "core")
+        services.register(UserAdminService::class.java, DefaultUserAdminService(users, accounts, audit, activeBranches), CORE_SERVICE_PRIORITY, "core")
         services.register(DeviceService::class.java, DefaultDeviceService(config, users, devices, sessions, audit), CORE_SERVICE_PRIORITY, "core")
         services.register(ClientConfigService::class.java, DefaultClientConfigService(config, users, policy, endpoints, records), CORE_SERVICE_PRIORITY, "core")
         services.register(AuthService::class.java, DefaultAuthService(config, users, policy, hasher, sessions, devices, audit, services, backoff, clock, barrier), CORE_SERVICE_PRIORITY, "core")
