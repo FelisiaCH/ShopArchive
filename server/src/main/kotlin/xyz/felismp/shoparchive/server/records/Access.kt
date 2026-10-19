@@ -35,6 +35,6 @@ internal fun badRequest(message: String, reason: String? = null) = ApiError(400,
 /** The refusal of a shared rule, e.g. [xyz.felismp.shoparchive.shared.checkEntry]. */
 internal fun badRequest(refusal: Refusal) = badRequest(refusal.message, refusal.reason)
 
-internal fun notFound(message: String) = ApiError(404, ErrorCode.NOT_FOUND, message)
+internal fun notFound(message: String, reason: String? = null) = ApiError(404, ErrorCode.NOT_FOUND, message, reason = reason)
 
 internal fun conflict(message: String, reason: String? = null) = ApiError(409, ErrorCode.CONFLICT, message, reason = reason)

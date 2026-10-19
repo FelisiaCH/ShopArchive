@@ -1,8 +1,15 @@
 package xyz.felismp.shoparchive.app.client
 
 import kotlinx.coroutines.runBlocking
+import xyz.felismp.shoparchive.shared.AppliesTo
 import mockwebserver3.MockResponse
 import xyz.felismp.shoparchive.shared.ConfigResponse
+import xyz.felismp.shoparchive.shared.CreateBranchRequest
+import xyz.felismp.shoparchive.shared.CreateCategoryRequest
+import xyz.felismp.shoparchive.shared.CreateUserRequest
+import xyz.felismp.shoparchive.shared.LocalizedName
+import xyz.felismp.shoparchive.shared.UpdateBranchRequest
+import xyz.felismp.shoparchive.shared.UpdateCategoryRequest
 import xyz.felismp.shoparchive.shared.CreateNoteRequest
 import xyz.felismp.shoparchive.shared.NotesUnread
 import xyz.felismp.shoparchive.shared.DeviceMode
@@ -305,6 +312,55 @@ class ApiClientTest {
             assertEquals("POST", s.requests[1].method)
             assertEquals("/api/v1/command/complete", s.requests[2].target)
             assertEquals("Bearer TOKEN-1", s.requests[2].headers["Authorization"])
+            api.close()
+        }
+    }
+
+    @Test fun adminCallsAskTheAdminRoutesWithTheRightMethodAndBody() = runBlocking {
+        val user = """{"id":"u1","name":"noy","enabled":true}"""
+        TlsServer { r ->
+            when {
+                r.target == "/api/v1/unlock" -> json(unlockOk)
+                r.target == "/api/v1/admin/users" && r.method == "GET" -> json("[$user]")
+                r.target == "/api/v1/admin/roles" -> json("""[{"name":"clerk","users":2}]""")
+                r.target.startsWith("/api/v1/branches") -> json("""{"key":"main","displayName":"Main","archived":false}""")
+                r.target.startsWith("/api/v1/categories") -> json("""{"key":"tips","name":{"lo":"a","th":"b","en":"c"},"appliesTo":"both","archived":false}""")
+                else -> json(user)
+            }
+        }.use { s ->
+            val api = ApiClient("sid", s.pin, listOf(s.endpoint))
+            api.unlock(unlockReq)
+            assertEquals("noy", api.adminUsers().single().name)
+            assertEquals(2, api.adminRoles().single().users)
+            api.addUser(CreateUserRequest("noy", "clerk", listOf("main")))
+            api.renameUser("noy", "noi")
+            api.setUserRole("noy", "none")
+            api.addUserBranch("noy", "market")
+            api.removeUserBranch("noy", "market")
+            api.setUserEnabled("noy", false)
+            api.setUserEnabled("noy", true)
+            api.unlockUser("noy")
+            api.resetUser("noy")
+            api.addBranch(CreateBranchRequest("main", "Main"))
+            api.updateBranch("main", UpdateBranchRequest(archived = true))
+            api.addCategory(CreateCategoryRequest("tips", LocalizedName("a", "b", "c"), AppliesTo.BOTH))
+            api.updateCategory("tips", UpdateCategoryRequest(archived = true))
+
+            assertEquals(
+                listOf(
+                    "GET /api/v1/admin/users", "GET /api/v1/admin/roles", "POST /api/v1/admin/users", "POST /api/v1/admin/users/noy/rename", "PUT /api/v1/admin/users/noy/role",
+                    "POST /api/v1/admin/users/noy/branches", "DELETE /api/v1/admin/users/noy/branches/market", "POST /api/v1/admin/users/noy/disable",
+                    "POST /api/v1/admin/users/noy/enable", "POST /api/v1/admin/users/noy/unlock", "POST /api/v1/admin/users/noy/reset",
+                    "POST /api/v1/branches", "PUT /api/v1/branches/main", "POST /api/v1/categories", "PUT /api/v1/categories/tips",
+                ),
+                s.requests.drop(1).map { it.method + " " + it.target },
+            )
+            assertEquals("""{"name":"noy","role":"clerk","branches":["main"]}""", s.requests[3].body?.utf8())
+            assertEquals("""{"name":"noi"}""", s.requests[4].body?.utf8())
+            assertEquals("""{"role":"none"}""", s.requests[5].body?.utf8())
+            assertEquals("""{"branch":"market"}""", s.requests[6].body?.utf8())
+            assertEquals("""{"displayName":null,"archived":true}""", s.requests[13].body?.utf8())
+            assertTrue(s.requests.drop(1).all { it.headers["Authorization"] == "Bearer TOKEN-1" })
             api.close()
         }
     }

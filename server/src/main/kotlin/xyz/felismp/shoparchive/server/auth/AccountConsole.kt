@@ -26,6 +26,13 @@ internal class AccountConsole(
             sender.sendMessage("Your own account can only be reset on the server console.")
             return
         }
+        val removed = resetAccount(name, "console")
+        sender.sendMessage("User '$name' reset: off $removed ${if (removed == 1) "device" else "devices"}, password and PIN cleared. They set a new PIN at their next login.")
+    }
+
+    /** What `user reset` does, for the console and the app: the number of devices the account is off now. [ip] goes to the audit log. */
+    fun resetAccount(name: String, ip: String): Int {
+        val user = users.user(name)
         // The device files and the user file are one change for a backup: it must not hold the devices off and the user still with a PIN.
         val removed = barrier.mutate {
             sessions.withAccount(user.id) {
@@ -35,17 +42,21 @@ internal class AccountConsole(
                 removed
             }
         }
-        audit.record("account.reset", name, null, "console", "ok,devices=$removed")
-        sender.sendMessage("User '$name' reset: off $removed ${if (removed == 1) "device" else "devices"}, password and PIN cleared. They set a new PIN at their next login.")
+        audit.record("account.reset", name, null, ip, "ok,devices=$removed")
+        return removed
     }
 
     /** `user disable`, under the account lock: a login in flight finishes first, and none starts until the account is disabled. */
     fun disable(sender: CommandSender, name: String) {
+        disableAccount(name)
+        sender.sendMessage("User '$name' disabled")
+    }
+
+    fun disableAccount(name: String) {
         val user = users.user(name)
         sessions.withAccount(user.id) {
             users.setEnabled(name, false)
         }
-        sender.sendMessage("User '$name' disabled")
     }
 
     private fun list(sender: CommandSender, name: String) {

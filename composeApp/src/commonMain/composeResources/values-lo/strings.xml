@@ -305,6 +305,16 @@
     <string name="reason_close_currency_unknown">ຮ້ານນີ້ບໍ່ໃຊ້ສະກຸນເງິນນັ້ນ</string>
     <string name="reason_close_amount_invalid">ຈຳນວນທີ່ນັບບໍ່ຖືກຕ້ອງ ໃສ່ 0 ຫຼືຫຼາຍກວ່າ ແລະ ທົດສະນິຍົມຕາມທີ່ສະກຸນເງິນກຳນົດ</string>
     <string name="reason_notification_pending">ຂໍ້ຄວາມນີ້ຍັງລໍຖ້າສົ່ງຢູ່ ສົ່ງຊ້ຳໄດ້ເມື່ອສົ່ງບໍ່ສຳເລັດແລ້ວເທົ່ານັ້ນ</string>
+    <string name="reason_user_not_found">ບໍ່ພົບຜູ້ໃຊ້ນີ້</string>
+    <string name="reason_user_exists">ມີຜູ້ໃຊ້ຊື່ນີ້ຢູ່ແລ້ວ ກະລຸນາເລືອກຊື່ອື່ນ</string>
+    <string name="reason_user_name_invalid">ຊື່ຜູ້ໃຊ້ຕ້ອງມີ 3 ເຖິງ 32 ຕົວອັກສອນ ໃຊ້ໄດ້ສະເພາະ a-z, 0-9 ແລະ _</string>
+    <string name="reason_user_self_reset">ບໍ່ສາມາດຣີເຊັດບັນຊີຂອງຕົນເອງຢູ່ບ່ອນນີ້ໄດ້ ໃຫ້ເຮັດຢູ່ເຊີບເວີ</string>
+    <string name="reason_user_self_change">ບໍ່ສາມາດປິດບັນຊີຂອງຕົນເອງ ຫຼື ປ່ຽນບົດບາດຂອງຕົນເອງຢູ່ບ່ອນນີ້ໄດ້</string>
+    <string name="reason_user_last_op">ນີ້ແມ່ນບັນຊີຜູ້ດູແລທີ່ເປີດໃຊ້ງານຢູ່ພຽງບັນຊີດຽວ ຈຶ່ງປິດ ຫຼື ປ່ຽນບົດບາດບໍ່ໄດ້</string>
+    <string name="reason_role_not_found">ບໍ່ພົບບົດບາດນີ້</string>
+    <string name="reason_key_invalid">ລະຫັດຕ້ອງມີ 1 ເຖິງ 32 ຕົວອັກສອນ ໃຊ້ໄດ້ສະເພາະ a-z, 0-9 ແລະ -</string>
+    <string name="reason_key_exists">ລະຫັດນີ້ຖືກໃຊ້ແລ້ວ ກະລຸນາເລືອກລະຫັດອື່ນ</string>
+    <string name="reason_name_required">ກະລຸນາຂຽນຊື່ໃນທຸກພາສາທີ່ຂໍ</string>
     <string name="reason_date_invalid">ວັນທີບໍ່ຖືກຕ້ອງ</string>
     <string name="reason_range_order">ວັນເລີ່ມຢູ່ຫຼັງວັນສິ້ນສຸດ</string>
     <string name="reason_range_too_long">ໄລຍະເວລານີ້ຍາວເກີນໄປ ເລືອກໃຫ້ນ້ອຍມື້ລົງ</string>

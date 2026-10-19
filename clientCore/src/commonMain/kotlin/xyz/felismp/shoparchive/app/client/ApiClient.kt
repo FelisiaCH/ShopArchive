@@ -28,7 +28,19 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import xyz.felismp.shoparchive.shared.AddUserBranchRequest
+import xyz.felismp.shoparchive.shared.AdminRoleDto
+import xyz.felismp.shoparchive.shared.AdminUserDto
+import xyz.felismp.shoparchive.shared.BranchDto
+import xyz.felismp.shoparchive.shared.CategoryDto
 import xyz.felismp.shoparchive.shared.CloseSessionRequest
+import xyz.felismp.shoparchive.shared.CreateBranchRequest
+import xyz.felismp.shoparchive.shared.CreateCategoryRequest
+import xyz.felismp.shoparchive.shared.CreateUserRequest
+import xyz.felismp.shoparchive.shared.RenameUserRequest
+import xyz.felismp.shoparchive.shared.SetUserRoleRequest
+import xyz.felismp.shoparchive.shared.UpdateBranchRequest
+import xyz.felismp.shoparchive.shared.UpdateCategoryRequest
 import xyz.felismp.shoparchive.shared.CommandRequest
 import xyz.felismp.shoparchive.shared.CommandResponse
 import xyz.felismp.shoparchive.shared.CompleteRequest
@@ -264,6 +276,43 @@ class ApiClient(
 
     override suspend fun completeCommand(line: String): List<String> =
         post<CompleteRequest, CompleteResponse>("/api/v1/command/complete", CompleteRequest(line)).candidates
+
+    // ---- admin ----
+
+    private fun userPath(name: String) = "/api/v1/admin/users/${name.encodeURLPath()}"
+
+    override suspend fun adminUsers(): List<AdminUserDto> = get("/api/v1/admin/users")
+
+    override suspend fun adminRoles(): List<AdminRoleDto> = get("/api/v1/admin/roles")
+
+    override suspend fun addUser(request: CreateUserRequest): AdminUserDto = post("/api/v1/admin/users", request)
+
+    override suspend fun renameUser(name: String, to: String): AdminUserDto = post(userPath(name) + "/rename", RenameUserRequest(to))
+
+    override suspend fun setUserRole(name: String, role: String): AdminUserDto =
+        decode(send(HttpMethod.Put, userPath(name) + "/role", clientJson.encodeToString(SetUserRoleRequest(role)), Auth.Token))
+
+    override suspend fun addUserBranch(name: String, branch: String): AdminUserDto = post(userPath(name) + "/branches", AddUserBranchRequest(branch))
+
+    override suspend fun removeUserBranch(name: String, branch: String): AdminUserDto =
+        decode(send(HttpMethod.Delete, userPath(name) + "/branches/${branch.encodeURLPath()}", null, Auth.Token))
+
+    override suspend fun setUserEnabled(name: String, enabled: Boolean): AdminUserDto =
+        decode(send(HttpMethod.Post, userPath(name) + if (enabled) "/enable" else "/disable", null, Auth.Token))
+
+    override suspend fun unlockUser(name: String): AdminUserDto = decode(send(HttpMethod.Post, userPath(name) + "/unlock", null, Auth.Token))
+
+    override suspend fun resetUser(name: String): AdminUserDto = decode(send(HttpMethod.Post, userPath(name) + "/reset", null, Auth.Token))
+
+    override suspend fun addBranch(request: CreateBranchRequest): BranchDto = post("/api/v1/branches", request)
+
+    override suspend fun updateBranch(key: String, request: UpdateBranchRequest): BranchDto =
+        decode(send(HttpMethod.Put, "/api/v1/branches/${key.encodeURLPath()}", clientJson.encodeToString(request), Auth.Token))
+
+    override suspend fun addCategory(request: CreateCategoryRequest): CategoryDto = post("/api/v1/categories", request)
+
+    override suspend fun updateCategory(key: String, request: UpdateCategoryRequest): CategoryDto =
+        decode(send(HttpMethod.Put, "/api/v1/categories/${key.encodeURLPath()}", clientJson.encodeToString(request), Auth.Token))
 
     /** Authorized GET, decoded as [R]. */
     suspend inline fun <reified R> get(path: String): R = decode(send(HttpMethod.Get, path, null, Auth.Token))

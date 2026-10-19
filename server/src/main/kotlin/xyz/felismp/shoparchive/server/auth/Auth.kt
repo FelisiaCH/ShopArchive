@@ -7,6 +7,7 @@ import xyz.felismp.shoparchive.api.EventService
 import xyz.felismp.shoparchive.api.PermissionNode
 import xyz.felismp.shoparchive.api.PermissionNodeRegistry
 import xyz.felismp.shoparchive.api.ServiceRegistry
+import xyz.felismp.shoparchive.api.UserAdminService
 import xyz.felismp.shoparchive.server.config.ConfigService
 import xyz.felismp.shoparchive.server.net.CORE_SERVICE_PRIORITY
 import xyz.felismp.shoparchive.server.net.DefaultEventService
@@ -59,6 +60,8 @@ internal class Auth(
     val hasher: Hasher = Hasher(config.auth.hashConcurrency, cost),
     records: ClientRecordsConfig = NoRecords,
     barrier: DataBarrier = DataBarrier(),
+    /** The keys of the branches not archived: the branch a new user gets from the app when it names none. */
+    activeBranches: () -> List<String> = { emptyList() },
 ) {
     val sessions = Sessions(clock)
 
@@ -77,6 +80,9 @@ internal class Auth(
         // Disabled, role changed, credentials cleared: the tokens end now, and the open sockets follow within a second.
         users.onAccessChanged { id -> sessions.revokeAccess(id, null) }
         services.register(EventService::class.java, events, CORE_SERVICE_PRIORITY, "core")
+        // The record services write their own lines (a branch added) through the registry, as they reach the login services.
+        services.register(AuditLog::class.java, audit, CORE_SERVICE_PRIORITY, "core")
+        services.register(UserAdminService::class.java, DefaultUserAdminService(users, accounts, audit, activeBranches, sessions::isLive), CORE_SERVICE_PRIORITY, "core")
         services.register(DeviceService::class.java, DefaultDeviceService(config, users, devices, sessions, audit), CORE_SERVICE_PRIORITY, "core")
         services.register(ClientConfigService::class.java, DefaultClientConfigService(config, users, policy, endpoints, records), CORE_SERVICE_PRIORITY, "core")
         services.register(AuthService::class.java, DefaultAuthService(config, users, policy, hasher, sessions, devices, audit, services, backoff, clock, barrier), CORE_SERVICE_PRIORITY, "core")

@@ -12,6 +12,7 @@ import xyz.felismp.shoparchive.server.config.peekConfigFile
 import xyz.felismp.shoparchive.server.fsyncDirectory
 import xyz.felismp.shoparchive.server.DataBarrier
 import xyz.felismp.shoparchive.server.writeAtomically
+import xyz.felismp.shoparchive.shared.ErrorReasons
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -82,7 +83,7 @@ internal class UserStore(
 
     @Synchronized fun userNames(): List<String> = users.keys.toList()
     @Synchronized fun roleNames(): List<String> = roles.keys.toList()
-    @Synchronized fun user(name: String): UserData = users[name] ?: throw UserException("No user '$name'")
+    @Synchronized fun user(name: String): UserData = users[name] ?: throw UserException("No user '$name'", ErrorReasons.USER_NOT_FOUND, 404)
     @Synchronized fun find(name: String): UserData? = users[name]
 
     /** The user with this id and the name it has now. A name can pass to another account after a rename; an id never does. */
@@ -113,7 +114,7 @@ internal class UserStore(
             null
         }
     }
-    @Synchronized fun role(name: String): RoleData = roles[name] ?: throw UserException("No role '$name'")
+    @Synchronized fun role(name: String): RoleData = roles[name] ?: throw UserException("No role '$name'", ErrorReasons.ROLE_NOT_FOUND, 404)
     @Synchronized fun usersWithRole(role: String): List<String> = users.filterValues { it.role == role }.keys.toList()
 
     /** op -> every node; a role -> the role's value; `none` -> the user's own; a node without a value -> its default. A role that is gone, or an unknown user -> false. */
@@ -123,6 +124,13 @@ internal class UserStore(
     /** [hasPermission] for the account with this id, whatever it is called now; a name that changed hands is not the account. */
     @Synchronized
     fun hasPermissionById(id: String, node: String): Boolean = findById(id)?.let { permits(it.second, node) } ?: false
+
+    /**
+     * Whether the account with this id is an op: its own `op` flag, nothing else. [hasPermission] also says yes to the word `op` for an account whose permission block holds
+     * an unregistered node of that name (such a node is kept as it is), which makes no op; the admin API and `GET /config` ask this instead.
+     */
+    @Synchronized
+    fun isOpById(id: String): Boolean = findById(id)?.second?.op == true
 
     private fun permits(user: UserData, node: String): Boolean {
         if (user.op) return true
@@ -135,7 +143,7 @@ internal class UserStore(
     @Synchronized
     private fun addUserInLock(name: String, role: String, branches: List<String>) {
         checkUserName(name)
-        if (name in users || Files.exists(userPath(name))) throw UserException("User '$name' already exists")
+        if (name in users || Files.exists(userPath(name))) throw UserException("User '$name' already exists", ErrorReasons.USER_EXISTS, 409)
         val roleData = if (role == NO_ROLE) null else role(role)
         val data = UserData(
             id = UUID.randomUUID().toString(),
@@ -268,7 +276,7 @@ internal class UserStore(
 
     @Synchronized
     private fun removeBranchInLock(name: String, branch: String) {
-        if (branch !in user(name).branches) throw UserException("User '$name' has no branch '$branch'")
+        if (branch !in user(name).branches) throw UserException("User '$name' has no branch '$branch'", status = 404)
         editUser(name) { it.copy(branches = it.branches - branch) }
     }
 
@@ -310,7 +318,7 @@ internal class UserStore(
         // The user and both roles are read from disk first: a hand edit made since they were read (the user's
         // role, or the old role's values) decides what is copied and logged, not what memory still holds.
         val before = freshUser(name)
-        if (before.role == role) throw UserException("User '$name' already has role '$role'")
+        if (before.role == role) throw UserException("User '$name' already has role '$role'", status = 409)
         val kept = if (before.role in roles) freshRole(before.role) else null
         if (target != null) freshRole(role)
         // Leaving a role: the values it gave become the user's own. Entering one: the user's old values are only in the log.
@@ -340,7 +348,7 @@ internal class UserStore(
     private fun renameInLock(old: String, new: String) {
         checkUserName(new)
         val data = user(old)
-        if (new in users || Files.exists(userPath(new))) throw UserException("User '$new' already exists")
+        if (new in users || Files.exists(userPath(new))) throw UserException("User '$new' already exists", ErrorReasons.USER_EXISTS, 409)
         // The file is moved as it is: its content has no name in it, and a move cannot leave half a file behind.
         Files.move(userPath(old), userPath(new), StandardCopyOption.ATOMIC_MOVE)
         fsyncDirectory(root.resolve("user"))

@@ -295,6 +295,7 @@ private fun Route.protectedRoutes(services: ServiceRegistry) {
     }
 
     recordRoutes(services)
+    adminRoutes(services)
     commandRoutes(services)
     notifyRoutes(services)
     updateRoutes(services)

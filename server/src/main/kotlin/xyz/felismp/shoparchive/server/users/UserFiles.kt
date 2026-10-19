@@ -4,12 +4,13 @@ import xyz.felismp.shoparchive.api.PermissionNode
 import xyz.felismp.shoparchive.server.config.MigrationStep
 import xyz.felismp.shoparchive.server.config.Warn
 import xyz.felismp.shoparchive.server.config.YamlConfigFile
+import xyz.felismp.shoparchive.shared.ErrorReasons
 import java.time.Instant
 import java.time.format.DateTimeParseException
 import java.util.UUID
 
-/** A command the admin typed wrongly or that cannot be done; the message is shown on the console as it is. */
-internal class UserException(message: String) : Exception(message)
+/** A command the admin typed wrongly or that cannot be done; the message is shown on the console as it is. [reason] and [status] are what the app is told (see [xyz.felismp.shoparchive.shared.ErrorReasons]). */
+internal class UserException(message: String, val reason: String? = null, val status: Int = 400) : Exception(message)
 
 internal const val NO_ROLE = "none"
 
@@ -24,7 +25,7 @@ internal fun isValidUserName(name: String) = NAME.matches(name) && name != "role
 internal fun isValidRoleName(name: String) = NAME.matches(name) && name != NO_ROLE
 
 internal fun checkUserName(name: String) {
-    if (!isValidUserName(name)) throw UserException("Invalid user name '$name': 3 to 32 characters from a-z, 0-9 and _, and not 'role'")
+    if (!isValidUserName(name)) throw UserException("Invalid user name '$name': 3 to 32 characters from a-z, 0-9 and _, and not 'role'", ErrorReasons.USER_NAME_INVALID)
 }
 
 internal fun checkRoleName(name: String) {

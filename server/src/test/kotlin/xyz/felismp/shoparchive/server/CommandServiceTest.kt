@@ -24,6 +24,7 @@ import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.ReauthRequest
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.FileTime
 import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -93,6 +94,23 @@ class CommandServiceTest {
             assertEquals(HttpStatusCode.OK, runLine("user add zed", boss).status)
             assertNotNull(users.find("zed"))
         }
+    }
+
+    @Test
+    fun aPermissionNamedOpInAHandEditedUserFileIsNoOpForTheOpOnlyCommands() = env().run {
+        val noy = login("noy", grant = listOf("shoparchive.command.user"))
+        val file = root.resolve("user/noy.yml")
+        Files.writeString(file, Files.readString(file) + "  op: true\n")
+        Files.setLastModifiedTime(file, FileTime.fromMillis(System.currentTimeMillis() + 5_000))
+        users.load()
+        assertTrue(users.hasPermission("noy", "op") && !users.user("noy").op, "the premise: the word is there, the flag is not")
+        api {
+            val refused = runLine("user add zed", noy)
+            assertEquals(HttpStatusCode.Forbidden, refused.status)
+            assertEquals(ErrorReasons.PERMISSION_MISSING, refused.errorReason())
+            assertFalse("user" in candidates("us", noy))
+        }
+        assertNull(users.find("zed"))
     }
 
     @Test

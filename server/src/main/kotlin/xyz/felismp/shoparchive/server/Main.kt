@@ -132,8 +132,8 @@ fun main(args: Array<String>) {
     val backup = BackupService(root, { config.backup }, { config.timezone }, records::pauseWrites, ConsoleConfigLog, version = coreVersion(), serverId = serverId.toString(), barrier = barrier)
 
     val network = Network(root, config, serverId, services, barrier = barrier)
-    val auth = Auth(root, config, users, services, network::deviceEndpoints, records = records, barrier = barrier)
-    services.register(CommandService::class.java, DefaultCommandService(commands, auth.audit, services), CORE_SERVICE_PRIORITY, "core")
+    val auth = Auth(root, config, users, services, network::deviceEndpoints, records = records, barrier = barrier, activeBranches = records.branches::activeKeys)
+    services.register(CommandService::class.java, DefaultCommandService(commands, auth.audit, services, users), CORE_SERVICE_PRIORITY, "core")
 
     try {
         registerCoreCommands(
