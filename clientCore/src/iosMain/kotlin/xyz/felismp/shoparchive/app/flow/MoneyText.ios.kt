@@ -5,8 +5,15 @@ import platform.Foundation.NSNumberFormatter
 import platform.Foundation.NSNumberFormatterDecimalStyle
 import platform.Foundation.currentLocale
 
+// The language chosen in the app (`en`, `lo`, `th`) decides the separators, as Locale.setDefault does on the other platforms; the device's own when none is chosen.
+private var chosenLocale: NSLocale? = null
+
+internal fun setAmountLanguage(tag: String?) {
+    chosenLocale = tag?.let { NSLocale(localeIdentifier = it) }
+}
+
 private fun currentFormatter() = NSNumberFormatter().apply {
-    locale = NSLocale.currentLocale
+    locale = chosenLocale ?: NSLocale.currentLocale
     numberStyle = NSNumberFormatterDecimalStyle
 }
 
