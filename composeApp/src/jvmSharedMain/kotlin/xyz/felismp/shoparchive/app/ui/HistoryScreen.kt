@@ -1,7 +1,6 @@
 package xyz.felismp.shoparchive.app.ui
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -89,7 +88,7 @@ private fun HistoryList(ws: Workspace) {
             entries != null && entries.isEmpty() && ui.failure == null -> ShopText(stringResource(Res.string.history_empty), muted = true)
             entries != null -> {
                 if (ui.loading) ShopText(stringResource(Res.string.working), TextRole.Caption, muted = true)
-                entries.forEach { EntryRow(ws, it) { ws.history.open(it) } }
+                ShopList(entries, { ws.history.open(it) }) { EntryRow(ws, it) }
             }
         }
     }
@@ -132,21 +131,20 @@ private fun Filters(ws: Workspace, ui: HistoryUi, currencies: List<String>, cate
 }
 
 @Composable
-private fun EntryRow(ws: Workspace, e: EntryDto, onClick: () -> Unit) {
+private fun EntryRow(ws: Workspace, e: EntryDto) {
     val sign = if (e.type == EntryType.INCOME) "+" else "-"
-    ShopCard(Modifier.clickable(onClick = onClick)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                ShopText(e.item.ifBlank { ws.categoryName(e.category) ?: "—" })
-                ShopText(e.date + " " + clockTime(e.createdAt) + " · " + e.createdBy.name, TextRole.Caption, muted = true)
-                if (ws.branches.size > 1) ShopText(ws.branchName(e.branch), TextRole.Caption, muted = true)
-                if (e.slips.isNotEmpty()) ShopText(stringResource(Res.string.history_slips, e.slips.size.toString()), TextRole.Caption, muted = true)
-                if (e.deleted) ShopChip(stringResource(Res.string.history_deleted), Tone.Error)
-            }
-            Column(Modifier.weight(1f)) {
-                e.tenders.forEach { t ->
-                    ShopText(sign + groupThousands(t.amount) + " " + t.currency + " · " + methodText(t.method), TextRole.Amount, modifier = Modifier.fillMaxWidth())
-                }
+    val flow = if (e.type == EntryType.INCOME) MoneyFlow.In else MoneyFlow.Out
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            ShopText(e.item.ifBlank { ws.categoryName(e.category) ?: "—" })
+            ShopText(e.date + " " + clockTime(e.createdAt) + " · " + e.createdBy.name, TextRole.Caption, muted = true)
+            if (ws.branches.size > 1) ShopText(ws.branchName(e.branch), TextRole.Caption, muted = true)
+            if (e.slips.isNotEmpty()) ShopText(stringResource(Res.string.history_slips, e.slips.size.toString()), TextRole.Caption, muted = true)
+            if (e.deleted) ShopChip(stringResource(Res.string.history_deleted), Tone.Error)
+        }
+        Column(Modifier.weight(1f)) {
+            e.tenders.forEach { t ->
+                AmountText(sign + groupThousands(t.amount) + " " + t.currency + " · " + methodText(t.method), flow, Modifier.fillMaxWidth())
             }
         }
     }
@@ -178,7 +176,7 @@ private fun EntryDetailScreen(ws: Workspace, state: EntryDetailState) {
         when (val h = ui.history) {
             Load.Loading -> ShopText(stringResource(Res.string.working), muted = true)
             is Load.Failed -> ShopBanner(h.failure.text(), Tone.Error)
-            is Load.Ready -> h.value.forEach { HistoryLine(ws, it) }
+            is Load.Ready -> if (h.value.isNotEmpty()) ShopList(h.value) { HistoryLine(ws, it) }
         }
     }
 }
@@ -193,8 +191,9 @@ private fun EntryFacts(ws: Workspace, e: EntryDto) {
         ShopText(stringResource(Res.string.detail_created, clockTime(e.createdAt), e.createdBy.name), TextRole.Caption, muted = true)
         if (e.updatedAt != e.createdAt) ShopText(stringResource(Res.string.detail_updated, clockTime(e.updatedAt)), TextRole.Caption, muted = true)
         val sign = if (e.type == EntryType.INCOME) "+" else "-"
+        val flow = if (e.type == EntryType.INCOME) MoneyFlow.In else MoneyFlow.Out
         e.tenders.forEach { t ->
-            ShopText(sign + groupThousands(t.amount) + " " + t.currency + " · " + methodText(t.method), TextRole.Amount, modifier = Modifier.fillMaxWidth())
+            ShopText(sign + groupThousands(t.amount) + " " + t.currency + " · " + methodText(t.method), TextRole.Display, color = flow.color())
         }
     }
 }
@@ -284,13 +283,11 @@ private fun wordFor(words: Map<String, StringResource>, raw: String): String = w
 
 @Composable
 private fun HistoryLine(ws: Workspace, item: HistoryItem) {
-    ShopCard {
-        ShopText(wordFor(ACTION_WORDS, item.action) + " · " + item.at.replace('T', ' ').take(16) + " · " + item.by.name, TextRole.Caption, muted = true)
-        item.changes.forEach { c ->
-            val from = historyValue(ws, c.field, c.from)
-            val to = historyValue(ws, c.field, c.to)
-            ShopText(wordFor(FIELD_WORDS, c.field) + ": " + from.ifEmpty { "—" } + " → " + to.ifEmpty { "—" }, TextRole.Caption)
-        }
+    ShopText(wordFor(ACTION_WORDS, item.action) + " · " + item.at.replace('T', ' ').take(16) + " · " + item.by.name, TextRole.Caption, muted = true)
+    item.changes.forEach { c ->
+        val from = historyValue(ws, c.field, c.from)
+        val to = historyValue(ws, c.field, c.to)
+        ShopText(wordFor(FIELD_WORDS, c.field) + ": " + from.ifEmpty { "—" } + " → " + to.ifEmpty { "—" }, TextRole.Caption)
     }
 }
 
@@ -343,17 +340,21 @@ private fun EditForm(ws: Workspace, state: EntryDetailState, ui: DetailUi, edit:
         }
         if (edit.compressing) ShopText(stringResource(Res.string.slip_preparing), muted = true)
         f.keep.forEach { slip ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                ShopText(slip.file, modifier = Modifier.weight(1f))
-                ShopButton(stringResource(Res.string.slip_remove, slip.file), { state.removeStoredSlip(slip.file) }, primary = false, enabled = !busy)
+            ShopCard {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ShopText(slip.file, modifier = Modifier.weight(1f))
+                    ShopButton(stringResource(Res.string.slip_remove, slip.file), { state.removeStoredSlip(slip.file) }, primary = false, enabled = !busy)
+                }
             }
         }
         f.added.forEachIndexed { i, slip ->
             // Numbered after the slips kept, as on Record.
             val label = stringResource(Res.string.detail_slip, (f.keep.size + i + 1).toString())
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                ShopText(label + " · " + (slip.bytes.size / 1024 + 1) + " KB", modifier = Modifier.weight(1f))
-                ShopButton(stringResource(Res.string.slip_remove, label), { state.removeNewSlip(slip.key) }, primary = false, enabled = !busy)
+            ShopCard {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ShopText(label + " · " + (slip.bytes.size / 1024 + 1) + " KB", modifier = Modifier.weight(1f))
+                    ShopButton(stringResource(Res.string.slip_remove, label), { state.removeNewSlip(slip.key) }, primary = false, enabled = !busy)
+                }
             }
         }
         when (edit.notice) {
