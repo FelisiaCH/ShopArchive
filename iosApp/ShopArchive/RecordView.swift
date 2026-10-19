@@ -250,9 +250,10 @@ struct RecordView: View {
         } else if check.toShop?.boolValue == false {
             Banner(text: text("slip_check_not_shop", check.to ?? check.toAccount ?? ""), tone: .error)
         } else {
+            let time = check.time.map { HistoryTextKt.bankTimeText(time: $0) }
             let details = [
                 check.amount.map { groupThousands($0) + (check.currency.map { " " + $0 } ?? "") },
-                check.time,
+                time,
                 check.to.map { text("slip_check_to", $0) },
             ].compactMap { $0 }
             Banner(text: text("slip_check_known", check.source, details.joined(separator: " · ")), tone: .success)
