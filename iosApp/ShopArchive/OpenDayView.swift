@@ -59,9 +59,10 @@ struct OpenDayView: View {
     @ViewBuilder
     private func field(_ currency: CurrencyInfo) -> some View {
         let code = currency.code
-        let value = typed[code] ?? ""
+        // Until a field is typed in it shows what the last close left in the drawer.
+        let value = typed[code] ?? ui.prefill[code] ?? ""
         TextField(text("openday_amount", code), text: Binding(
-            get: { typed[code] ?? "" },
+            get: { typed[code] ?? ui.prefill[code] ?? "" },
             set: {
                 typed[code] = $0
                 ws.openDay.setAmount(code: code, text: $0)

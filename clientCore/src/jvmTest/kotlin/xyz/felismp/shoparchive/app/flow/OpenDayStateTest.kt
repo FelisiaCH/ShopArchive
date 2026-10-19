@@ -8,6 +8,10 @@ import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.OpenSessionRequest
 import xyz.felismp.shoparchive.shared.OpenSessionResponse
+import xyz.felismp.shoparchive.shared.SessionClose
+import xyz.felismp.shoparchive.shared.SessionClosedMessage
+import xyz.felismp.shoparchive.shared.SessionDto
+import xyz.felismp.shoparchive.shared.SessionStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -19,6 +23,12 @@ class OpenDayStateTest {
         val h = Harness(backgroundScope)
         return h to OpenDayState(h.env, TodayState(h.env))
     }
+
+    /** A day of "main" closed with [counted] in the drawer and [handover] taken out of it. */
+    private fun FakeRecordsApi.closedDay(id: String, date: String, counted: Map<String, String>, handover: Map<String, String>) =
+        session(id, date, SessionStatus.CLOSED).copy(
+            close = SessionClose(counted, counted, counted.mapValues { "0" }, handover, emptyList(), "", alice, "${date}T21:00:00+07:00"),
+        )
 
     @Test fun oneFieldPerCurrencyOfTheShop() = runTest(UnconfinedTestDispatcher()) {
         val (_, day) = setup()
@@ -112,5 +122,77 @@ class OpenDayStateTest {
         day.setAmount("LAK", "5")
         h.branch.value = "second"
         assertTrue(day.ui.value.amounts.isEmpty())
+    }
+
+    @Test fun theFieldsStartAtWhatTheLastCloseLeftInTheDrawer() = runTest(UnconfinedTestDispatcher()) {
+        val (h, day) = setup()
+        h.api.pastSessions = listOf(
+            h.api.closedDay("s1", "2026-10-01", mapOf("LAK" to "90000"), mapOf("LAK" to "0")),
+            h.api.closedDay("s2", "2026-10-03", mapOf("LAK" to "130000", "THB" to "1500.25"), mapOf("LAK" to "30000", "THB" to "1000.25")),
+            h.api.session("s3", date = "2026-10-04"), // still open: not a close
+        )
+        h.refetch.tryEmit(Unit)
+        assertEquals(mapOf("LAK" to "100000", "THB" to "500.00"), day.ui.value.prefill)
+        assertTrue(day.ui.value.amounts.isEmpty()) // nothing typed
+        day.confirm()
+        assertEquals(mapOf("LAK" to "100000", "THB" to "500.00"), h.api.opened.single().second.float)
+    }
+
+    @Test fun aCurrencyWithNothingLeftInTheDrawerStaysEmpty() = runTest(UnconfinedTestDispatcher()) {
+        val (h, day) = setup()
+        h.api.pastSessions = listOf(h.api.closedDay("s1", "2026-10-03", mapOf("LAK" to "50000", "THB" to "10.00"), mapOf("LAK" to "50000", "THB" to "10.00")))
+        h.refetch.tryEmit(Unit)
+        assertTrue(day.ui.value.prefill.isEmpty())
+    }
+
+    @Test fun withoutAPreviousCloseTheFieldsStayEmpty() = runTest(UnconfinedTestDispatcher()) {
+        val (h, day) = setup()
+        h.api.pastSessions = listOf(h.api.session("s1", date = "2026-10-03")) // opened, never closed
+        h.refetch.tryEmit(Unit)
+        assertTrue(day.ui.value.prefill.isEmpty())
+        day.confirm()
+        assertTrue(h.api.opened.single().second.float.isEmpty())
+    }
+
+    @Test fun aCloseThatCannotBeReadLeavesTheFieldsEmpty() = runTest(UnconfinedTestDispatcher()) {
+        val (h, day) = setup()
+        h.api.pastSessionsError = ClientError.Api(500, ErrorCode.INTERNAL, "Something went wrong.")
+        h.refetch.tryEmit(Unit)
+        assertTrue(day.ui.value.prefill.isEmpty())
+        assertEquals(null, day.ui.value.blocked)
+    }
+
+    @Test fun whatIsTypedIsNeverReplacedByTheLastClose() = runTest(UnconfinedTestDispatcher()) {
+        val (h, day) = setup()
+        day.setAmount("LAK", "5")     // typed before the close arrived
+        day.setAmount("THB", "")      // cleared on purpose
+        h.api.pastSessions = listOf(h.api.closedDay("s1", "2026-10-03", mapOf("LAK" to "100000", "THB" to "500.00"), mapOf("LAK" to "0", "THB" to "0.00")))
+        h.refetch.tryEmit(Unit)
+        assertEquals(mapOf("LAK" to "5", "THB" to ""), day.ui.value.amounts)
+        day.confirm()
+        assertEquals(mapOf("LAK" to "5"), h.api.opened.single().second.float)
+    }
+
+    @Test fun aDayClosedMeanwhileRefreshesTheFields() = runTest(UnconfinedTestDispatcher()) {
+        val (h, day) = setup()
+        h.api.pastSessions = listOf(h.api.closedDay("s1", "2026-10-01", mapOf("LAK" to "100000"), mapOf("LAK" to "0")))
+        h.refetch.tryEmit(Unit)
+        assertEquals(mapOf("LAK" to "100000"), day.ui.value.prefill)
+        h.api.pastSessions += h.api.closedDay("s2", "2026-10-03", mapOf("LAK" to "120000"), mapOf("LAK" to "20000"))
+        h.messages.tryEmit(SessionClosedMessage("s2", "main", "2026-10-03"))
+        assertEquals(mapOf("LAK" to "100000"), day.ui.value.prefill) // same kept amount, taken from the newer close
+        h.api.pastSessions += h.api.closedDay("s4", "2026-10-04", mapOf("LAK" to "80000"), mapOf("LAK" to "0"))
+        h.messages.tryEmit(SessionClosedMessage("s4", "main", "2026-10-04"))
+        assertEquals(mapOf("LAK" to "80000"), day.ui.value.prefill)
+    }
+
+    @Test fun anotherBranchUsesItsOwnLastClose() = runTest(UnconfinedTestDispatcher()) {
+        val (h, day) = setup()
+        h.api.pastSessions = listOf(h.api.closedDay("s1", "2026-10-03", mapOf("LAK" to "100000"), mapOf("LAK" to "0")))
+        h.refetch.tryEmit(Unit)
+        assertEquals(mapOf("LAK" to "100000"), day.ui.value.prefill)
+        h.branch.value = "second"
+        assertTrue(day.ui.value.prefill.isEmpty())
+        assertEquals(listOf("main", "second"), h.api.rangeCalls.map { it.first }.distinct())
     }
 }
