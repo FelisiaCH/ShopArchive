@@ -105,7 +105,7 @@ internal class DefaultClientConfigService(
             // Every registered node the caller holds: an op holds them all, anyone else by role or own setting.
             permissions = users.nodeNames().filter { users.hasPermissionById(principal.userId, it) },
             userId = principal.userId,
-            admin = name != null && users.find(name)?.op == true,
+            admin = users.isOpById(principal.userId),
         )
     }
 }

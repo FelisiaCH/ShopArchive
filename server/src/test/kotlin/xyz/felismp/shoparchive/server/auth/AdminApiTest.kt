@@ -7,16 +7,11 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import kotlinx.serialization.builtins.ListSerializer
 import org.junit.jupiter.api.io.TempDir
 import xyz.felismp.shoparchive.api.ApiError
-import xyz.felismp.shoparchive.api.AuthService
 import xyz.felismp.shoparchive.api.BranchService
 import xyz.felismp.shoparchive.api.CategoryService
 import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.api.UserAdminService
 import xyz.felismp.shoparchive.server.Services
-import xyz.felismp.shoparchive.shared.LoginRequest
-import xyz.felismp.shoparchive.shared.LoginResponse
-import xyz.felismp.shoparchive.shared.UnlockRequest
-import xyz.felismp.shoparchive.shared.UnlockResponse
 import xyz.felismp.shoparchive.server.records.BRANCHES_MANAGE_NODE
 import xyz.felismp.shoparchive.server.records.CATEGORIES_MANAGE_NODE
 import xyz.felismp.shoparchive.server.records.login
@@ -41,7 +36,9 @@ import xyz.felismp.shoparchive.shared.RenameUserRequest
 import xyz.felismp.shoparchive.shared.SetUserRoleRequest
 import xyz.felismp.shoparchive.shared.UpdateBranchRequest
 import xyz.felismp.shoparchive.shared.UpdateCategoryRequest
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.FileTime
 import java.time.Duration
 import kotlin.test.assertFailsWith
 import java.util.concurrent.CountDownLatch
@@ -309,25 +306,38 @@ class AdminApiTest {
         assertFalse(users.user("boss").enabled)
     }
 
-    /** Whoever calls is an op that no account stands behind, as in a race with a disable: only the guard on the target is left to test. */
-    private object AnyOp : AuthService {
-        override fun login(request: LoginRequest, ip: String): LoginResponse = error("unused")
-        override fun unlock(request: UnlockRequest, ip: String): UnlockResponse = error("unused")
-        override fun authenticate(accessToken: String): Principal? = null
-        override fun isValid(principal: Principal) = true
-        override fun hasPermission(principal: Principal, node: String) = true
-        override fun canAccessBranch(principal: Principal, branch: String) = true
-        override fun requireRecentAuth(principal: Principal) {}
-        override fun reauth(principal: Principal, request: ReauthRequest, ip: String) {}
+    @Test
+    fun aUserWhosePermissionsHoldTheWordOpIsNoOpForTheAdminApiNorInConfig() = env().run {
+        val noy = login("noy")
+        login("mallory")
+        val file = root.resolve("user/mallory.yml")
+        Files.writeString(file, Files.readString(file) + "  op: true\n")
+        Files.setLastModifiedTime(file, FileTime.fromMillis(System.currentTimeMillis() + 5_000))
+        users.load()
+        // The premise: the permission check says yes to "op", the account's own flag says no.
+        assertTrue(users.hasPermission("mallory", "op") && !users.user("mallory").op)
+        val mallory = token(loginDevices.getValue("mallory"), "mallory")
+        api {
+            for ((what, call) in calls()) {
+                val refused = call(mallory)
+                assertEquals(HttpStatusCode.Forbidden, refused.status, what)
+                assertEquals(ErrorReasons.PERMISSION_MISSING, refused.errorReason(), what)
+            }
+            assertFalse(getPath("/api/v1/config", mallory).parsed(ConfigResponse.serializer()).admin)
+        }
+        assertTrue(users.user("noy").pin != null && users.user("noy").enabled && noy.isNotEmpty())
+        assertEquals(listOf("mallory", "noy"), users.userNames())
     }
 
     @Test
     fun theLastEnabledOpCannotBeDisabledOrGivenAnotherRole() = env().run {
         console("role create clerk")
         addUser("boss", op = true)
-        val services = Services().also { it.register(AuthService::class.java, AnyOp, 0, "test") }
-        val service = DefaultUserAdminService(users, auth.accounts, auth.audit, services) { emptyList() }
-        val caller = Principal("stranger", "stranger", "device", "session")
+        val service = DefaultUserAdminService(users, auth.accounts, auth.audit) { emptyList() }
+        // An op whose own request was already in flight when its account was disabled: only the guard on the target is left to hold.
+        addUser("ghost", op = true)
+        users.setEnabled("ghost", false)
+        val caller = Principal(users.user("ghost").id, "ghost", "device", "session")
 
         for (call in listOf({ service.setEnabled(caller, "boss", false, "ip") }, { service.setRole(caller, "boss", "clerk", "ip") })) {
             val refused = assertFailsWith<ApiError> { call() }
@@ -349,8 +359,7 @@ class AdminApiTest {
     fun twoOpsDisablingEachOtherAtTheSameMomentNeverLeaveNoEnabledOp() = env().run {
         addUser("opa", op = true)
         addUser("opb", op = true)
-        val services = Services().also { it.register(AuthService::class.java, AnyOp, 0, "test") }
-        val service = DefaultUserAdminService(users, auth.accounts, auth.audit, services) { emptyList() }
+        val service = DefaultUserAdminService(users, auth.accounts, auth.audit) { emptyList() }
         fun caller(name: String) = Principal(users.user(name).id, name, "device", "session")
         val callers = mapOf("opa" to caller("opa"), "opb" to caller("opb"))
 

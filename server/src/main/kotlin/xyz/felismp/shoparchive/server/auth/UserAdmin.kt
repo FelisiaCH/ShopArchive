@@ -1,11 +1,8 @@
 package xyz.felismp.shoparchive.server.auth
 
 import xyz.felismp.shoparchive.api.ApiError
-import xyz.felismp.shoparchive.api.AuthService
 import xyz.felismp.shoparchive.api.Principal
-import xyz.felismp.shoparchive.api.ServiceRegistry
 import xyz.felismp.shoparchive.api.UserAdminService
-import xyz.felismp.shoparchive.server.OP_NODE
 import xyz.felismp.shoparchive.server.users.UserException
 import xyz.felismp.shoparchive.server.users.UserStore
 import xyz.felismp.shoparchive.server.users.isUsableCredential
@@ -25,14 +22,10 @@ internal class DefaultUserAdminService(
     private val users: UserStore,
     private val accounts: AccountConsole,
     private val audit: AuditLog,
-    private val services: ServiceRegistry,
     /** The keys of the branches not archived (see [xyz.felismp.shoparchive.server.users.registerUserCommands]). */
     private val activeBranches: () -> List<String>,
 ) : UserAdminService {
     private val lock = Any()
-
-    private val auth: AuthService
-        get() = services.get(AuthService::class.java) ?: throw ApiError(500, ErrorCode.INTERNAL, "AuthService is not registered")
 
     override fun users(principal: Principal): List<AdminUserDto> = admin(principal) { users.userNames().map(::dto) }
 
@@ -102,12 +95,12 @@ internal class DefaultUserAdminService(
     }
 
     /**
-     * An op (the PIN or password was asked for by the route); a rule the admin broke ([UserException]) becomes the refusal the app words. The whole change runs under [lock]:
+     * An op by the account's own flag in the user store (not by the permission word `op`, which a permission block can hold without making an op); the PIN or password was asked for by the route; a rule the admin broke ([UserException]) becomes the refusal the app words. The whole change runs under [lock]:
      * the op is checked, the last-op and self guards read the accounts and the write is made with no other admin change in between, so two ops
      * disabling each other at the same moment cannot both pass the guard.
      */
     private fun <T> admin(principal: Principal, block: () -> T): T = synchronized(lock) {
-        if (!auth.hasPermission(principal, OP_NODE)) {
+        if (!users.isOpById(principal.userId)) {
             throw ApiError(403, ErrorCode.FORBIDDEN, "This needs an admin (op).", reason = ErrorReasons.PERMISSION_MISSING)
         }
         try {

@@ -125,6 +125,13 @@ internal class UserStore(
     @Synchronized
     fun hasPermissionById(id: String, node: String): Boolean = findById(id)?.let { permits(it.second, node) } ?: false
 
+    /**
+     * Whether the account with this id is an op: its own `op` flag, nothing else. [hasPermission] also says yes to the word `op` for an account whose permission block holds
+     * an unregistered node of that name (such a node is kept as it is), which makes no op; the admin API and `GET /config` ask this instead.
+     */
+    @Synchronized
+    fun isOpById(id: String): Boolean = findById(id)?.second?.op == true
+
     private fun permits(user: UserData, node: String): Boolean {
         if (user.op) return true
         val values = if (user.role == NO_ROLE) user.permissions else roles[user.role]?.permissions ?: return false
