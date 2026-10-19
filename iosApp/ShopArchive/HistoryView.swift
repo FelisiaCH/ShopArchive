@@ -499,7 +499,8 @@ private struct HistoryLine: View {
 
     private func slipNames(_ raw: String) -> String {
         guard let numbers = HistoryTextKt.historySlipNumbers(text: raw) else { return raw }
-        let names = numbers.map { text("detail_slip", String($0.intValue)) }
+        // Kotlin's Ints in a list come over as plain NSNumber, as in sets and maps (see ints() in Kit.swift).
+        let names = (numbers as NSArray).compactMap { ($0 as? NSNumber)?.intValue }.map { text("detail_slip", String($0)) }
         return names.joined(separator: "; ")
     }
 }
