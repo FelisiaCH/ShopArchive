@@ -16,7 +16,7 @@ struct StatusSection: View {
                     }
                 }
                 if let problem {
-                    Text(problemText(problem)).foregroundColor(.red)
+                    Text(problemText(problem)).foregroundColor(Theme.moneyOut)
                 }
             }
         }

@@ -36,11 +36,11 @@ struct ShellView: View {
                     }
                 }
             }
-                .tabItem { Label(text("nav_today"), systemImage: "calendar") }
+                .tabItem { Label(text("nav_today"), systemImage: "house") }
                 .tag(Destination.today)
             if showsRecord {
                 page { screen { RecordView(ws: ws, can: capabilities) } }
-                    .tabItem { Label(text("nav_record"), systemImage: "square.and.pencil") }
+                    .tabItem { Label(text("nav_record"), systemImage: "plus.circle") }
                     .tag(Destination.record)
             }
             if showsHistory {
@@ -57,7 +57,7 @@ struct ShellView: View {
                 default: MoreView(state: state, flow: flow, ws: ws, can: capabilities)
                 }
             }
-                .tabItem { Label(text("nav_more"), systemImage: "ellipsis") }
+                .tabItem { Label(text("nav_more"), systemImage: "ellipsis.circle") }
                 .tag(Destination.more)
         }
         .collect(ws.destination, into: $destination)
@@ -74,7 +74,7 @@ struct ShellView: View {
                 branchChoice
                 content()
             }
-            .navigationBarTitleDisplayMode(.inline)
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
         }
     }
 
@@ -99,7 +99,7 @@ struct ShellView: View {
                 }
                 .padding(.horizontal)
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, 8)
         }
     }
 
@@ -134,6 +134,7 @@ struct ShellView: View {
             Page {
                 Banner(text: text("cfg_failed"), tone: .error)
                 Button(text("retry")) { ws.retry() }
+                    .buttonStyle(.tonal)
             }
         case .ready:
             if branch == nil {
@@ -152,27 +153,43 @@ private struct MoreView: View {
     let ws: Workspace
     let can: Capabilities
 
+    /// The places More leads to, in the order they are listed.
+    private var rows: [MoreRow] {
+        var rows: [MoreRow] = []
+        if let first = can.reportsTabs.first {
+            rows.append(MoreRow(id: "reports", title: text("nav_reports"), icon: "chart.bar") { ws.openReports(tab: first) })
+        }
+        if can.allows(destination: .notes) {
+            rows.append(MoreRow(id: "notes", title: text("nav_notes"), icon: "bubble.left") { ws.go(to: .notes) })
+        }
+        if can.console {
+            rows.append(MoreRow(id: "console", title: text("nav_console"), icon: "terminal") { ws.go(to: .console) })
+        }
+        rows.append(MoreRow(id: "settings", title: text("nav_settings"), icon: "gearshape") { flow.openSettings() })
+        return rows
+    }
+
     var body: some View {
         Page {
-            Text(text("more_signed_in", state.username)).foregroundColor(.secondary)
-            Text(state.server).font(.caption).foregroundColor(.secondary)
-            if let first = can.reportsTabs.first {
-                Button(text("nav_reports")) { ws.openReports(tab: first) }
-                    .buttonStyle(.bordered)
+            Card {
+                Label(text("more_signed_in", state.username), systemImage: "person.crop.circle")
+                    .font(.headline)
+                Text(state.server).font(.caption).foregroundColor(.secondary)
             }
-            if can.allows(destination: .notes) {
-                Button(text("nav_notes")) { ws.go(to: .notes) }
-                    .buttonStyle(.bordered)
+            RowsCard(rows, id: \.id) { row in
+                Button(action: row.action) { NavRow(title: row.title, systemImage: row.icon) }
+                    .buttonStyle(.row)
             }
-            if can.console {
-                Button(text("nav_console")) { ws.go(to: .console) }
-                    .buttonStyle(.bordered)
-            }
-            Button(text("nav_settings")) { flow.openSettings() }
-                .buttonStyle(.bordered)
-            Button(text("lock_now")) { flow.lockNow(problem: nil) }
-                .buttonStyle(.borderedProminent)
+            Button { flow.lockNow(problem: nil) } label: { Label(text("lock_now"), systemImage: "lock") }
+                .buttonStyle(.filledFull)
         }
         .navigationTitle(text("nav_more"))
     }
+}
+
+private struct MoreRow {
+    let id: String
+    let title: String
+    let icon: String
+    let action: () -> Void
 }

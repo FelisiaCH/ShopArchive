@@ -4,6 +4,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.toHttpDate
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
@@ -39,6 +40,7 @@ import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
 import io.ktor.util.AttributeKey
+import io.ktor.util.date.GMTDate
 import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
 import io.ktor.websocket.close
@@ -81,6 +83,11 @@ private const val ENTRIES_PATH = "/api/v1/entries"
 /** The service of type [T] with the highest priority, looked up per request so a plugin registered later or higher wins. */
 internal inline fun <reified T : Any> ServiceRegistry.require(): T =
     get(T::class.java) ?: throw ApiException(HttpStatusCode.InternalServerError, ErrorCode.INTERNAL, "${T::class.java.simpleName} is not registered")
+
+/** The server's own clock in every answer's `Date` header (Netty adds none), so the apps can warn when it is far from theirs. */
+private val serverClock = createApplicationPlugin("ShopArchiveClock") {
+    onCall { call -> call.response.header(HttpHeaders.Date, GMTDate().toHttpDate()) }
+}
 
 /**
  * Runs before routing on every request: a banned address is refused, and a request that does not name this
@@ -229,6 +236,7 @@ internal fun Application.apiModule(
         }
     }
     install(RequestBodyLimit) { bodyLimit { call -> if (call.request.path().startsWith(ENTRIES_PATH)) entryBodyBytes() else maxBodyBytes } }
+    install(serverClock)
     install(gate(services))
 
     routing {

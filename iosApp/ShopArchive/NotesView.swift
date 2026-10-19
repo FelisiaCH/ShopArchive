@@ -18,16 +18,16 @@ struct NotesView: View {
                 Text(ui.date).font(.headline)
                 HStack(spacing: 8) {
                     Button(text("notes_prev_day")) { ws.notes.previousDay() }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.tonalFull)
                     Button(text("notes_next_day")) { ws.notes.nextDay() }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.tonalFull)
                         .disabled(ui.isToday)
                 }
             }
             if let failure = ui.failure {
                 Banner(text: text("notes_load_failed") + " " + failureText(failure), tone: .error)
                 Button(text("retry")) { ws.notes.reload() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.filledFull)
             }
             if let failure = ui.markFailure {
                 Banner(text: text("notes_mark_failed") + " " + failureText(failure), tone: .error)
@@ -60,13 +60,12 @@ private struct NoteList: View {
     }
 
     var body: some View {
-        Card {
-            Text(text("notes_list_h")).font(.headline)
+        Card(title: text("notes_list_h")) {
             if let notes = ui.notes {
-                Text(summary(notes)).font(.caption).foregroundColor(.secondary)
+                Text(summary(notes)).font(.footnote).foregroundColor(.secondary)
                 if ui.canRead && ui.unreadCount > 0 {
                     Button(text("notes_mark_all")) { ws.notes.markAllRead() }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.tonalFull)
                         .disabled(!ui.connected || !ui.marking.isEmpty)
                 }
                 if notes.isEmpty {
@@ -90,6 +89,7 @@ private struct NoteRow: View {
     var body: some View {
         let own = note.createdBy.id == ui.userId
         VStack(alignment: .leading, spacing: 4) {
+            Divider().padding(.bottom, 4)
             Text(verbatim: "\(note.createdBy.name) · \(clockTime(note.createdAt))").font(.caption).foregroundColor(.secondary)
             if ui.unread(note: note) {
                 Chip(text: text("notes_unread"), tone: .info)
@@ -101,7 +101,7 @@ private struct NoteRow: View {
                     Text(text("notes_read_at", clockTime(at))).font(.caption).foregroundColor(.secondary)
                 } else {
                     Button(text("notes_mark_read")) { ws.notes.markRead(id: note.id) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.tonalFull)
                         .disabled(!ui.connected || ui.marking.contains(note.id))
                 }
             } else if own && !ui.canRead {
@@ -113,7 +113,6 @@ private struct NoteRow: View {
                 }
             }
         }
-        .padding(.top, 8)
     }
 }
 
@@ -138,7 +137,7 @@ private struct Composer: View {
         Card {
             TextField(text("notes_composer"), text: Binding(get: { draft }, set: { draft = $0; ws.notes.setDraft(text: $0) }), axis: .vertical)
                 .lineLimit(1...5)
-                .textFieldStyle(.roundedBorder)
+                .field()
                 .disabled(ui.posting)
             if let failure = ui.postFailure {
                 Banner(text: text("notes_post_failed_h") + " " + failureText(failure), tone: .error)
@@ -148,7 +147,7 @@ private struct Composer: View {
                 Text(text("needs_connection")).font(.caption).foregroundColor(.secondary)
             }
             Button(postLabel) { ws.notes.post() }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.filledFull)
                 .disabled(!ui.canPost)
             Text(text("notes_foot")).font(.caption).foregroundColor(.secondary)
         }
