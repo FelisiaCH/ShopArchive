@@ -331,6 +331,7 @@
     <string name="notif_event_entry">รายการใหม่</string>
     <string name="notif_event_device">อุปกรณ์ใหม่</string>
     <string name="notif_attempts">ลองแล้ว %1$d ครั้ง</string>
+    <string name="notif_retry_at">ลองใหม่เวลา %1$s</string>
     <string name="notif_resend">ส่งอีกครั้ง</string>
     <string name="notif_resend_failed">ส่งอีกครั้งไม่ได้</string>
     <string name="notif_closed_days">วันที่ปิดยอดแล้ว</string>

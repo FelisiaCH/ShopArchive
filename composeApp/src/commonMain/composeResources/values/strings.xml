@@ -331,6 +331,7 @@
     <string name="notif_event_entry">New entry</string>
     <string name="notif_event_device">New device</string>
     <string name="notif_attempts">Tries: %1$d</string>
+    <string name="notif_retry_at">Next try: %1$s</string>
     <string name="notif_resend">Send again</string>
     <string name="notif_resend_failed">Could not send it again.</string>
     <string name="notif_closed_days">Closed days</string>

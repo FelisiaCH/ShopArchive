@@ -31,7 +31,7 @@ internal fun firstRunSetup(config: ConfigService, users: UserStore, branches: Br
         if (users.userNames().isEmpty()) {
             val branch = setup.firstBranch
             if (branch.isNotEmpty() && branches.all().isEmpty()) {
-                branches.add(branch, branch.replaceFirstChar { it.titlecase(Locale.ROOT) })
+                branches.add(branch, firstBranchName(branch, config.locale))
                 Log.info("First start: branch '$branch' made")
             }
             users.addUser(owner, NO_ROLE, listOfNotNull(branch.takeIf { branches.find(it) != null }))
@@ -51,6 +51,14 @@ internal fun firstRunSetup(config: ConfigService, users: UserStore, branches: Br
         Log.warn("First start setup: ${e.message}")
     }
     return null
+}
+
+/** The display name of the first branch: the default key `main` in the server's language (English if it is none of the three), any other key with a capital. */
+internal fun firstBranchName(key: String, locale: Locale): String = when {
+    key != "main" -> key.replaceFirstChar { it.titlecase(Locale.ROOT) }
+    locale.language == "lo" -> "ສາຂາຫຼັກ"
+    locale.language == "th" -> "สาขาหลัก"
+    else -> "Main branch"
 }
 
 /** Prints what [firstRunSetup] made, if anything, to [out]: the terminal only, never a file under `logs/`. */

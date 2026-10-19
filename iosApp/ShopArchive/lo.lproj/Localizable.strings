@@ -329,6 +329,7 @@
 "notif_event_entry" = "ລາຍການໃໝ່";
 "notif_event_device" = "ອຸປະກອນໃໝ່";
 "notif_attempts" = "ລອງແລ້ວ %1$d ເທື່ອ";
+"notif_retry_at" = "ລອງໃໝ່ເວລາ %1$@";
 "notif_resend" = "ສົ່ງອີກຄັ້ງ";
 "notif_resend_failed" = "ສົ່ງອີກຄັ້ງບໍ່ໄດ້.";
 "notif_closed_days" = "ວັນທີ່ປິດຍອດແລ້ວ";

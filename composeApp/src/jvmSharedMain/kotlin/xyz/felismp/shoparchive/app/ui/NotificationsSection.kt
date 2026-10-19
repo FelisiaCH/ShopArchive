@@ -72,6 +72,11 @@ private fun Message(ws: Workspace, n: NotificationDto, canSend: Boolean, enabled
             },
         )
         if (n.attempts > 1) ShopText(stringResource(Res.string.notif_attempts, n.attempts), TextRole.Caption, muted = true)
+        // Why it is not sent (the channel's own words) and when it is tried again; nothing once it is sent.
+        if (n.state != NotificationState.SENT) {
+            n.lastError?.let { ShopText(it, TextRole.Caption, muted = true) }
+            n.nextAttemptAt?.let { ShopText(stringResource(Res.string.notif_retry_at, localTime(it)), TextRole.Caption, muted = true) }
+        }
         if (canSend) ShopButton(stringResource(Res.string.notif_resend), { ws.notifications.resend(n.id) }, primary = false, enabled = enabled)
     }
 }

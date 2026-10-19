@@ -53,7 +53,7 @@ class FirstRunTest {
     fun theFirstStartMakesTheBranchAndTheOpOwnerAndPrintsAPinThatLogsIn() = env().run {
         val printed = start()
 
-        assertEquals(listOf("main" to "Main"), records!!.branches.all().map { it.key to it.displayName })
+        assertEquals(listOf("main" to "ສາຂາຫຼັກ"), records!!.branches.all().map { it.key to it.displayName })
         assertEquals(listOf("owner"), users.userNames())
         assertTrue(users.user("owner").op)
         assertEquals(listOf("main"), users.user("owner").branches)
@@ -72,6 +72,24 @@ class FirstRunTest {
             val response = login("owner", pin = pin)
             assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
         }
+    }
+
+    @Test
+    fun theFirstBranchIsNamedInTheServersLanguageAndKeepsItsKey() {
+        for ((locale, name) in listOf("lo" to "ສາຂາຫຼັກ", "th" to "สาขาหลัก", "en" to "Main branch")) {
+            val dir = Files.createDirectory(root.resolve(locale))
+            AuthEnv(dir, "config-version: 1\nlocale: $locale\nauth:\n  password:\n    required-for: []\n", withRecords = true).run {
+                start()
+                assertEquals(listOf("main" to name), records!!.branches.all().map { it.key to it.displayName }, locale)
+            }
+        }
+    }
+
+    @Test
+    fun aFirstBranchWithAnotherKeyGetsTheKeyWithACapital() = env("setup:\n  first-branch: shop\n").run {
+        start()
+
+        assertEquals(listOf("shop" to "Shop"), records!!.branches.all().map { it.key to it.displayName })
     }
 
     @Test
