@@ -48,8 +48,11 @@ internal fun ShopDivider(modifier: Modifier = Modifier) {
 internal fun AmountRow(label: String, amount: String, flow: MoneyFlow = MoneyFlow.Neutral, strong: Boolean = false, muted: Boolean = false) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         ShopText(label, muted = muted, modifier = Modifier.weight(1f))
-        if (strong) ShopText(amount, TextRole.Display, color = flow.color())
-        else ShopText(amount, TextRole.Amount, muted = muted, color = flow.color())
+        // A share of the row, not all of it: a long figure at a large font size wraps instead of pushing the label out.
+        androidx.compose.foundation.layout.Box(Modifier.weight(1.5f), contentAlignment = Alignment.CenterEnd) {
+            if (strong) ShopText(amount, TextRole.Display, color = flow.color())
+            else ShopText(amount, TextRole.Amount, muted = muted, color = flow.color())
+        }
     }
 }
 
