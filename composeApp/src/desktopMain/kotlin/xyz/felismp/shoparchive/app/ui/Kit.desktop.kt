@@ -215,6 +215,9 @@ actual fun LocalNetworkGate(content: @Composable () -> Unit) = content()
 @Composable
 actual fun OnAppResume(action: () -> Unit) = Unit // idle time alone locks the desktop app
 
+@Composable
+actual fun OnBackPress(enabled: Boolean, action: () -> Unit) = Unit // a window has no system Back
+
 private val systemLocale: Locale = Locale.getDefault()
 
 @Composable

@@ -1148,6 +1148,47 @@ class AppFlowTest {
         assertEquals(Destination.TODAY, ws.destination.value)
     }
 
+    @Test fun systemBackStepsOutTowardTodayAndIsNotTakenOnToday() {
+        api.records.configBranches = listOf("main")
+        api.records.listed = listOf(testEntry())
+        store.stored = storedAlice()
+        val f = flow(); f.unlock("483926")
+        val ws = assertNotNull(f.workspace)
+        assertFalse(ws.back(folded = true), "Today with nothing open: Back leaves the app")
+
+        ws.go(Destination.RECORD)
+        assertTrue(ws.back(folded = true))
+        assertEquals(Destination.TODAY, ws.destination.value)
+
+        ws.go(Destination.HISTORY)
+        ws.history.open(ws.history.ui.value.entries!!.single())
+        ws.history.detail.value!!.startEdit()
+        assertTrue(ws.back(folded = true), "an edit is cancelled first")
+        assertNull(ws.history.detail.value!!.ui.value.edit)
+        assertEquals(Destination.HISTORY, ws.destination.value)
+        ws.history.detail.value!!.askDelete()
+        assertTrue(ws.back(folded = true), "a delete confirmation is dismissed alone")
+        assertFalse(ws.history.detail.value!!.ui.value.confirmDelete)
+        ws.history.detail.value!!.openMove()
+        assertTrue(ws.back(folded = true), "a move card is dismissed alone")
+        assertNull(ws.history.detail.value!!.ui.value.moveText)
+        assertNotNull(ws.history.detail.value)
+        assertTrue(ws.back(folded = true), "then the entry closes")
+        assertNull(ws.history.detail.value)
+        assertEquals(Destination.HISTORY, ws.destination.value)
+        assertTrue(ws.back(folded = true), "then History goes to Today")
+        assertEquals(Destination.TODAY, ws.destination.value)
+
+        ws.openReports(ReportsTab.EXPORT)
+        assertTrue(ws.back(folded = true))
+        assertEquals(Destination.MORE, ws.destination.value, "Reports under More goes back to More")
+        assertTrue(ws.back(folded = true))
+        assertEquals(Destination.TODAY, ws.destination.value)
+        ws.openReports(ReportsTab.EXPORT)
+        assertTrue(ws.back(folded = false))
+        assertEquals(Destination.TODAY, ws.destination.value, "Reports in the pane goes to Today")
+    }
+
     // ---- auto-lock ----
 
     private val minute = 60_000L

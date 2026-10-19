@@ -122,6 +122,10 @@ expect fun LocalNetworkGate(content: @Composable () -> Unit)
 @Composable
 expect fun OnAppResume(action: () -> Unit)
 
+/** While [enabled], the system Back gesture / button runs [action] instead of leaving the app (Android); never on desktop. */
+@Composable
+expect fun OnBackPress(enabled: Boolean, action: () -> Unit)
+
 /** Shows [content] in the language [tag] (`en`, `lo`, `th`), or the system's when null; a change rebuilds [content]. */
 @Composable
 expect fun AppLanguage(tag: String?, content: @Composable () -> Unit)
