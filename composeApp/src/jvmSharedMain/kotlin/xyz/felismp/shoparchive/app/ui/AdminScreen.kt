@@ -48,7 +48,7 @@ fun AdminScreen(ws: Workspace) {
         ui.failure?.let { ShopBanner(it.text(), Tone.Error) }
         if (ui.busy || ui.loading) ShopBanner(stringResource(Res.string.working), Tone.Info)
         if (ui.blocked) ShopText(stringResource(Res.string.needs_connection), TextRole.Caption, muted = true)
-        val off = ui.busy || ui.blocked
+        val off = ui.busy || ui.loading || ui.blocked
         when (section) {
             Section.STAFF -> StaffSection(admin, ui, off)
             Section.BRANCHES -> BranchesSection(admin, ui, off)

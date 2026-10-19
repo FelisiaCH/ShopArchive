@@ -74,9 +74,9 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
         core.value = next(core.value)
     }
 
-    /** Reads the users and the roles. Does nothing for a person who is no op. */
+    /** Reads the users and the roles. Does nothing for a person who is no op, or while an action runs (its answer would be overwritten by an older list). */
     fun load() {
-        if (!env.can.manageUsers || core.value.loading) return
+        if (!env.can.manageUsers || core.value.loading || core.value.busy) return
         change { it.copy(loading = true, failure = null) }
         env.scope.launch {
             try {
@@ -92,9 +92,9 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
 
     fun clearFailure() = change { it.copy(failure = null) }
 
-    /** Runs [work] when [allowed], the connection is up and no other action is running. */
+    /** Runs [work] when [allowed], the connection is up and no other action or read of the users is running. */
     private fun act(allowed: Boolean, work: suspend () -> Unit) {
-        if (!allowed || !env.canWrite.value || core.value.busy) return
+        if (!allowed || !env.canWrite.value || core.value.busy || core.value.loading) return
         change { it.copy(busy = true, failure = null) }
         env.scope.launch {
             try {
@@ -160,19 +160,23 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
         reloadConfig()
     }
 
+    /** Keys the server said it already has though this person's lists do not show them, so the next add starts past them. */
+    private val takenKeys = mutableSetOf<String>()
+
     /**
      * Calls [create] with the next free `prefix-N` of [known]. The lists hold only what this person may see, so a key the
-     * server already has (another branch's) is skipped and the next one tried, a few times at most.
+     * server already has (another branch's) is skipped and the next one tried, a few times per add.
      */
     private suspend fun withFreeKey(prefix: String, known: List<String>, create: suspend (String) -> Unit) {
-        val taken = known.toMutableList()
+        var tries = 0
         while (true) {
-            val key = nextKey(prefix, taken)
+            val key = nextKey(prefix, known + takenKeys)
             try {
                 return create(key)
             } catch (e: ClientError.Api) {
-                if (e.reason != ErrorReasons.KEY_EXISTS || taken.size - known.size >= KEY_TRIES) throw e
-                taken += key
+                if (e.reason != ErrorReasons.KEY_EXISTS) throw e
+                takenKeys += key
+                if (++tries >= KEY_TRIES) throw e
             }
         }
     }
