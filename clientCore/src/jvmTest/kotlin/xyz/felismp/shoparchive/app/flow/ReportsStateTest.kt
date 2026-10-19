@@ -118,7 +118,7 @@ class ReportsStateTest {
         export.setBranch("second")
         h.api.exportFile = ExportFile("shoparchive-2026-09-01_2026-09-30.xlsx", byteArrayOf(5, 6))
         export.export()
-        assertEquals(listOf(listOf("2026-09-01", "2026-09-30", "second", "xlsx")), h.api.exports)
+        assertEquals(listOf(listOf("2026-09-01", "2026-09-30", "second", "xlsx", "en")), h.api.exports)
         val ready = assertIs<ExportPhase.Ready>(export.ui.value.phase)
         assertEquals(listOf<Byte>(5, 6), ready.file.bytes.toList())
         assertEquals("shoparchive-2026-09-01_2026-09-30.xlsx", ready.file.fileName)
@@ -148,9 +148,9 @@ class ReportsStateTest {
         }
         var calls = 0
         val failing = object : xyz.felismp.shoparchive.app.client.RecordsApi by h.api {
-            override suspend fun export(from: String, to: String, branch: String, format: String): ExportFile {
+            override suspend fun export(from: String, to: String, branch: String, format: String, language: String): ExportFile {
                 if (++calls == 1) throw ClientError.Api(401, ErrorCode.REAUTH_REQUIRED, "Enter your PIN again.")
-                return h.api.export(from, to, branch, format)
+                return h.api.export(from, to, branch, format, language)
             }
         }
         val export = ExportState(Env(backgroundScope, failing, reauthing, h.canWrite, h.config, h.branch, h.refetch, h.messages, { h.date }, { h.millis }))

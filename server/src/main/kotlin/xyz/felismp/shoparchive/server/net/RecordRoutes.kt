@@ -188,7 +188,7 @@ internal fun Route.recordRoutes(services: ServiceRegistry) {
 
     get("/export") {
         val query = EntryQuery(call.query("from"), call.query("to"), call.query("branch"), null, null, null, includeDeleted = call.query("includeDeleted") == "true")
-        val file = blocking { services.require<ExportService>().export(call.principal, query, call.query("format") ?: "csv") }
+        val file = blocking { services.require<ExportService>().export(call.principal, query, call.query("format") ?: "csv", call.query("language")) }
         call.response.headers.append(HttpHeaders.ContentDisposition, ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, file.fileName).toString())
         call.respondBytes(file.bytes, ContentType.parse(file.contentType))
     }

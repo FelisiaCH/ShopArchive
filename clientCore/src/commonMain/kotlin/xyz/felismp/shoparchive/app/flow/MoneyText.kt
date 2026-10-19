@@ -23,6 +23,9 @@ expect fun localeGroupingSeparator(): Char
 /** The decimal separator of the device's language and region (`.` in en-US, `,` in de-DE). */
 expect fun localeDecimalSeparator(): Char
 
+/** The language of the device: `lo` or `th`, else `en` (the app's three). Where the person chose one in the app, that is the one the platform answers with. */
+expect fun systemLanguage(): String
+
 /** A total the server sent (`-700`, `1200.50`, `0`) in minor units; unlike [parseTypedAmount] it may be negative or zero. Null if it is not a number with at most [exponent] decimals. */
 fun parseSignedTotal(text: String, exponent: Int): Long? {
     val negative = text.startsWith("-")

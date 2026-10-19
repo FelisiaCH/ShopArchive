@@ -769,7 +769,7 @@ class AppFlow(
             savedBranch = try { prefs.load().branch } catch (_: Exception) { null },
             saveBranch = ::saveBranch, compressor = compressor, reader = reader,
             today = { Instant.fromEpochMilliseconds(now()).toLocalDateTime(TimeZone.currentSystemDefault()).date }, now = now,
-            updatesFactory = updatesFactory,
+            updatesFactory = updatesFactory, language = { language.value ?: systemLanguage() },
         )
     }
 
