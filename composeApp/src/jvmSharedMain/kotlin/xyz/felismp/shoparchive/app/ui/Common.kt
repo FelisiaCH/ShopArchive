@@ -7,7 +7,9 @@ import org.jetbrains.compose.resources.stringResource
 import xyz.felismp.shoparchive.app.flow.Failure
 import xyz.felismp.shoparchive.app.resources.*
 import xyz.felismp.shoparchive.shared.LocalizedName
+import java.time.Instant
 import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -31,6 +33,13 @@ internal fun clockTime(timestamp: String): String = try {
     OffsetDateTime.parse(timestamp).format(DateTimeFormatter.ofPattern("HH:mm"))
 } catch (_: Exception) {
     timestamp
+}
+
+/** `2026-10-19 09:47` in this device's time zone from a UTC instant like `2026-10-19T02:47:05Z`; the text itself if it is not one. */
+internal fun localTime(instant: String): String = try {
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(Instant.parse(instant).atZone(ZoneId.systemDefault()))
+} catch (_: Exception) {
+    instant
 }
 
 /** `+1,500` / `-1,500` for [minor] units of a currency with [exponent] decimals; a plain `0` for zero. */

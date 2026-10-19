@@ -29,7 +29,7 @@ struct SettingsView: View {
                     if let devices = state.devices {
                         ForEach(devices, id: \.id) { d in
                             VStack(alignment: .leading) {
-                                Text(text("device_info", d.label, d.platform, d.lastUsed) + (d.current ? " · " + text("device_this") : ""))
+                                Text(text("device_info", d.label, d.platform, localTime(d.lastUsed)) + (d.current ? " · " + text("device_this") : ""))
                                 if !d.current {
                                     Button(text("device_revoke")) { flow.revokeDevice(id: d.id) }
                                         .disabled(state.busy)
@@ -63,5 +63,15 @@ struct SettingsView: View {
             }
             .navigationTitle(text("nav_settings"))
         }
+    }
+
+    /// `2026-10-19 09:47` in this device's time zone from a UTC instant like `2026-10-19T02:47:05Z`; the text itself if it is not one.
+    private func localTime(_ instant: String) -> String {
+        guard let date = ISO8601DateFormatter().date(from: instant) else { return instant }
+        let out = DateFormatter()
+        out.locale = Locale(identifier: "en_US_POSIX")
+        out.timeZone = .current
+        out.dateFormat = "yyyy-MM-dd HH:mm"
+        return out.string(from: date)
     }
 }
