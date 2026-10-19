@@ -30,7 +30,7 @@ struct SettingsView: View {
                     if let devices = state.devices {
                         ForEach(devices, id: \.id) { d in
                             VStack(alignment: .leading) {
-                                Text(text("device_info", d.label, d.platform, localTime(d.lastUsed)) + (d.current ? " · " + text("device_this") : ""))
+                                Text(text("device_info", d.label, platformName(d.platform), localTime(d.lastUsed)) + (d.current ? " · " + text("device_this") : ""))
                                 if !d.current {
                                     Button(text("device_revoke")) { flow.revokeDevice(id: d.id) }
                                         .disabled(state.busy)
@@ -63,6 +63,18 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle(text("nav_settings"))
+        }
+    }
+
+    /// The platform a device told the server it is on (`android`, `windows`, `ios`, or the desktop's OS name) as a person says it; any other word as it came.
+    private func platformName(_ raw: String) -> String {
+        switch raw {
+        case "android": return "Android"
+        case "windows": return "Windows"
+        case "ios": return "iOS"
+        case "linux": return "Linux"
+        case "mac os x": return "macOS"
+        default: return raw
         }
     }
 

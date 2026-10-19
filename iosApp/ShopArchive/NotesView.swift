@@ -54,7 +54,7 @@ private struct NoteList: View {
 
     /// `3 notes`, and `3 notes · 2 unread` when some are.
     private func summary(_ notes: [NoteDto]) -> String {
-        let count = String.localizedStringWithFormat(text("notes_count"), Int32(notes.count))
+        let count = text("notes_count", Int32(notes.count))
         if ui.unreadCount > 0 { return "\(count) · \(text("notes_unread_n", ui.unreadCount))" }
         return count
     }

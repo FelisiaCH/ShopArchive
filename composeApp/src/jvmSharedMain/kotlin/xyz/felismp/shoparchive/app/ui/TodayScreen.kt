@@ -39,14 +39,14 @@ fun TodayScreen(ws: Workspace) {
             data == null -> ShopText(stringResource(Res.string.working), muted = true)
             else -> {
                 ui.failure?.let { ShopBanner(stringResource(Res.string.today_failed) + " " + it.text(), Tone.Error) }
-                TodayContent(data, canWrite, can, { ws.go(Destination.OPEN_DAY) }, { ws.openReports(ReportsTab.CLOSE_DAY) }, { ws.go(Destination.HISTORY) }, { ws.openNotes(data.oldestUnreadNote ?: data.date) })
+                TodayContent(ws, data, canWrite, can, { ws.go(Destination.OPEN_DAY) }, { ws.openReports(ReportsTab.CLOSE_DAY) }, { ws.go(Destination.HISTORY) }, { ws.openNotes(data.oldestUnreadNote ?: data.date) })
             }
         }
     }
 }
 
 @Composable
-private fun TodayContent(data: TodayData, canWrite: Boolean, can: Capabilities, openDay: () -> Unit, closeDay: () -> Unit, openHistory: () -> Unit, openNotes: () -> Unit) {
+private fun TodayContent(ws: Workspace, data: TodayData, canWrite: Boolean, can: Capabilities, openDay: () -> Unit, closeDay: () -> Unit, openHistory: () -> Unit, openNotes: () -> Unit) {
     when (val status = data.status) {
         DayStatus.NotOpened -> ShopCard {
             ShopText(stringResource(Res.string.openday_card_title), TextRole.Title)
@@ -70,7 +70,7 @@ private fun TodayContent(data: TodayData, canWrite: Boolean, can: Capabilities, 
         data.statsFailure?.let { ShopBanner(stringResource(Res.string.today_mine_failed) + " " + it.text(), Tone.Error) }
         data.mine?.let { mine ->
             ShopText(stringResource(Res.string.today_mine), TextRole.Title)
-            if (mine.isEmpty()) ShopText(stringResource(Res.string.today_empty), muted = true) else ShopCard { mine.forEach { RecentLine(it) } }
+            if (mine.isEmpty()) ShopText(stringResource(Res.string.today_empty), muted = true) else ShopCard { mine.forEach { RecentLine(ws, it) } }
         }
         return
     }
@@ -80,7 +80,7 @@ private fun TodayContent(data: TodayData, canWrite: Boolean, can: Capabilities, 
         if (data.statsFailure == null) ShopText(stringResource(Res.string.today_empty), muted = true)
     } else {
         ShopText(stringResource(Res.string.today_latest), TextRole.Title)
-        ShopCard { data.recent.take(10).forEach { RecentLine(it) } }
+        ShopCard { data.recent.take(10).forEach { RecentLine(ws, it) } }
     }
 }
 
@@ -135,11 +135,11 @@ private fun CurrencyCard(c: DashboardCurrency) {
 }
 
 @Composable
-private fun RecentLine(e: EntryDto) {
+private fun RecentLine(ws: Workspace, e: EntryDto) {
     val sign = if (e.type == EntryType.INCOME) "+" else "-"
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            ShopText(e.item.ifBlank { e.category ?: "—" })
+            ShopText(e.item.ifBlank { ws.categoryName(e.category) ?: "—" })
             ShopText(clockTime(e.createdAt) + " · " + e.createdBy.name, TextRole.Caption, muted = true)
         }
         Column(Modifier.weight(1f)) {

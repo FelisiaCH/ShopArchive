@@ -46,6 +46,16 @@ internal fun localTime(instant: String): String = try {
 internal fun signedAmount(minor: Long, exponent: Int): String =
     (if (minor > 0) "+" else "") + xyz.felismp.shoparchive.app.flow.displayAmount(minor, exponent)
 
+/** The platform a device told the server it is on (`android`, `windows`, `ios`, or the desktop's OS name) as a person says it; any other word as it came. */
+internal fun platformName(raw: String): String = when (raw) {
+    "android" -> "Android"
+    "windows" -> "Windows"
+    "ios" -> "iOS"
+    "linux" -> "Linux"
+    "mac os x" -> "macOS"
+    else -> raw
+}
+
 /** The name of category [key] in the app's language; the key itself when the shop no longer lists it. */
 internal fun xyz.felismp.shoparchive.app.flow.Workspace.categoryName(key: String?): String? {
     if (key == null) return null
