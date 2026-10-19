@@ -149,18 +149,6 @@ private struct TodayContent: View {
     }
 }
 
-struct AmountLine: View {
-    let label: String
-    let shown: String
-
-    var body: some View {
-        HStack {
-            Text(label).frame(maxWidth: .infinity, alignment: .leading)
-            Text(shown).font(.body.monospacedDigit()).frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-}
-
 private struct CurrencyCard: View {
     let currency: DashboardCurrency
 

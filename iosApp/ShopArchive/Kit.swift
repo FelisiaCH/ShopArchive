@@ -1,15 +1,54 @@
 import SwiftUI
 import ClientCore
 
-/// How loud a banner or chip is; the same three as Compose's Tone.
+/// The app's colors in one place, as in Compose's ShopColors: a near-black accent (near-white in dark mode) and the only two meaning colors, money in and money out.
+/// Everything else is a system color, so light and dark follow the device.
+enum Theme {
+    static let accent = pair(light: 0x171717, dark: 0xFAFAFA)
+    static let onAccent = pair(light: 0xFAFAFA, dark: 0x0A0A0A)
+    static let moneyIn = pair(light: 0x047857, dark: 0x34D399)
+    static let moneyOut = pair(light: 0xDC2626, dark: 0xF87171)
+
+    /// Green for a positive amount (sign 1), red for a negative one (-1), the plain text color for zero.
+    static func color(sign: Int) -> Color {
+        if sign > 0 { return moneyIn }
+        if sign < 0 { return moneyOut }
+        return .primary
+    }
+
+    /// The color of money that came in (an income) or went out (an expense).
+    static func color(of type: EntryType) -> Color {
+        type == .income ? moneyIn : moneyOut
+    }
+
+    private static func pair(light: UInt32, dark: UInt32) -> Color {
+        Color(UIColor { traits in
+            let rgb = traits.userInterfaceStyle == .dark ? dark : light
+            let red = CGFloat((rgb >> 16) & 0xFF) / 255
+            let green = CGFloat((rgb >> 8) & 0xFF) / 255
+            let blue = CGFloat(rgb & 0xFF) / 255
+            return UIColor(red: red, green: green, blue: blue, alpha: 1)
+        })
+    }
+}
+
+/// How loud a banner or chip is; the same three as Compose's Tone. Only success and error have a color of their own.
 enum Tone {
     case info, success, error
 
     var color: Color {
         switch self {
-        case .info: return .blue
-        case .success: return .green
-        case .error: return .red
+        case .info: return Color(.secondaryLabel)
+        case .success: return Theme.moneyIn
+        case .error: return Theme.moneyOut
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .info: return "info.circle.fill"
+        case .success: return "checkmark.circle.fill"
+        case .error: return "exclamationmark.triangle.fill"
         }
     }
 }
@@ -20,10 +59,15 @@ struct Banner: View {
     let tone: Tone
 
     var body: some View {
-        Text(text)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(tone.color.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: tone.symbol)
+                .foregroundColor(tone.color)
+                .accessibilityHidden(true)
+            Text(text).frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .font(.subheadline)
+        .padding(12)
+        .background(tone.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -31,39 +75,230 @@ struct Banner: View {
 struct Chip: View {
     let text: String
     let tone: Tone
+    var systemImage: String? = nil
 
     var body: some View {
-        Text(text)
-            .font(.subheadline)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(tone.color.opacity(0.15), in: Capsule())
+        HStack(spacing: 6) {
+            if let systemImage {
+                Image(systemName: systemImage).accessibilityHidden(true)
+            }
+            Text(text)
+        }
+        .font(.footnote.weight(.medium))
+        .foregroundColor(tone.color)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(tone.color.opacity(0.14), in: Capsule())
     }
 }
 
-/// A block that groups related content.
+/// A small title above a block, in the secondary color, as the header of an inset grouped section.
+struct SectionHeader: View {
+    let title: String
+
+    init(_ title: String) { self.title = title }
+
+    var body: some View {
+        Text(title)
+            .font(.footnote)
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 16)
+    }
+}
+
+private extension View {
+    /// The look of an inset grouped section: a rounded block on the grouped background.
+    func groupedBlock() -> some View {
+        background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+/// A block that groups related content, with an optional title above it.
 struct Card<Content: View>: View {
-    @ViewBuilder let content: Content
+    let title: String?
+    let content: Content
+
+    init(title: String? = nil, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) { content }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+        VStack(alignment: .leading, spacing: 6) {
+            if let title { SectionHeader(title) }
+            VStack(alignment: .leading, spacing: 8) { content }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .groupedBlock()
+        }
     }
 }
 
-/// A scrollable column for one screen inside the shell.
+/// Rows in one block with a hairline between them, inset 16pt as in a grouped list. Each row pads itself with `rowInset()`, so a row that is a button is pressed over its whole width.
+struct RowsCard<Item, ID: Hashable, Row: View>: View {
+    let title: String?
+    let items: [Item]
+    let id: KeyPath<Item, ID>
+    let row: (Item) -> Row
+
+    init(title: String? = nil, _ items: [Item], id: KeyPath<Item, ID>, @ViewBuilder row: @escaping (Item) -> Row) {
+        self.title = title
+        self.items = items
+        self.id = id
+        self.row = row
+    }
+
+    var body: some View {
+        let last = items.last.map { $0[keyPath: id] }
+        VStack(alignment: .leading, spacing: 6) {
+            if let title { SectionHeader(title) }
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(items, id: id) { item in
+                    row(item)
+                    if item[keyPath: id] != last {
+                        Divider().padding(.leading, 16)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .groupedBlock()
+        }
+    }
+}
+
+extension View {
+    /// The padding of a row in a `RowsCard`.
+    func rowInset() -> some View {
+        padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// A field inside a card: a filled rounded box instead of the bordered one.
+    func field() -> some View {
+        padding(12)
+            .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+/// A scrollable column for one screen inside the shell. The grouped background is the shell's.
 struct Page<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) { content }
+            VStack(alignment: .leading, spacing: 20) { content }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
         }
     }
+}
+
+/// An amount in a color, with digits of one width so a column of them lines up.
+struct Amount: View {
+    let shown: String
+    var color: Color = .primary
+    var font: Font = .body
+
+    var body: some View {
+        Text(verbatim: shown)
+            .font(font.monospacedDigit())
+            .foregroundColor(color)
+    }
+}
+
+/// A row of a block: the label on the left, the value on the right.
+struct AmountLine: View {
+    let label: String
+    let shown: String
+    var color: Color = .primary
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label).frame(maxWidth: .infinity, alignment: .leading)
+            Amount(shown: shown, color: color).multilineTextAlignment(.trailing)
+        }
+    }
+}
+
+/// A row that leads somewhere: an icon, the title and a chevron.
+struct NavRow: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundColor(Color(.tertiaryLabel))
+                .accessibilityHidden(true)
+        }
+        .rowInset()
+        .contentShape(Rectangle())
+    }
+}
+
+/// Filled (the main action of a screen) or tonal (any other), 44pt at least, rounded like the buttons of the system. A destructive role turns it red.
+struct ActionButtonStyle: ButtonStyle {
+    let filled: Bool
+    let wide: Bool
+    @Environment(\.isEnabled) private var enabled
+
+    init(filled: Bool, wide: Bool) {
+        self.filled = filled
+        self.wide = wide
+    }
+
+    func makeBody(configuration: Configuration) -> some View {
+        let destructive = configuration.role == .destructive
+        configuration.label
+            .font(.body.weight(.medium))
+            .multilineTextAlignment(.center)
+            .foregroundColor(foreground(destructive: destructive))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(maxWidth: wide ? .infinity : nil, minHeight: 44)
+            .background(background(destructive: destructive), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .opacity(opacity(pressed: configuration.isPressed))
+            .contentShape(Rectangle())
+    }
+
+    private func foreground(destructive: Bool) -> Color {
+        if filled { return destructive ? .white : Theme.onAccent }
+        return destructive ? Theme.moneyOut : .primary
+    }
+
+    private func background(destructive: Bool) -> Color {
+        if filled { return destructive ? Theme.moneyOut : Theme.accent }
+        return destructive ? Theme.moneyOut.opacity(0.12) : Color(.secondarySystemFill)
+    }
+
+    private func opacity(pressed: Bool) -> Double {
+        if !enabled { return 0.4 }
+        return pressed ? 0.7 : 1
+    }
+}
+
+extension ButtonStyle where Self == ActionButtonStyle {
+    static var filled: ActionButtonStyle { ActionButtonStyle(filled: true, wide: false) }
+    static var filledFull: ActionButtonStyle { ActionButtonStyle(filled: true, wide: true) }
+    static var tonal: ActionButtonStyle { ActionButtonStyle(filled: false, wide: false) }
+    static var tonalFull: ActionButtonStyle { ActionButtonStyle(filled: false, wide: true) }
+}
+
+/// A button that is a whole row: it is shaded while pressed.
+struct RowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(configuration.isPressed ? Color(.systemFill) : Color.clear)
+    }
+}
+
+extension ButtonStyle where Self == RowButtonStyle {
+    static var row: RowButtonStyle { RowButtonStyle() }
 }
 
 extension View {
@@ -103,6 +338,18 @@ func groupThousands(_ amount: String) -> String {
     MoneyTextKt.groupThousands(amount: amount, grouping: MoneyText_iosKt.localeGroupingSeparator(), decimal: MoneyText_iosKt.localeDecimalSeparator())
 }
 
+/// 1, 0 or -1 for an amount the server sent: positive, zero (`0`, `0.00`) or negative.
+func amountSign(_ amount: String) -> Int {
+    if amount.trimmingCharacters(in: CharacterSet(charactersIn: "-+0.,")).isEmpty { return 0 }
+    return amount.hasPrefix("-") ? -1 : 1
+}
+
+/// `groupThousands` with a `+` in front of a positive amount.
+func signedText(_ amount: String) -> String {
+    let grouped = groupThousands(amount)
+    return amountSign(amount) > 0 ? "+\(grouped)" : grouped
+}
+
 /// `minor` units of a currency with `exponent` decimals, written for the screen: `1,500,000` for LAK, `1,200.50` for THB.
 func displayAmount(minor: Int64, exponent: Int32) -> String {
     MoneyTextKt.displayAmount(minor: minor, exponent: exponent, grouping: MoneyText_iosKt.localeGroupingSeparator(), decimal: MoneyText_iosKt.localeDecimalSeparator())
@@ -122,12 +369,46 @@ struct Choice: View {
     var body: some View {
         Button(action: action) {
             Text(name)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .foregroundColor(selected ? .white : .primary)
-                .background(selected ? Color.accentColor : Color(.secondarySystemBackground), in: Capsule())
+                .font(.subheadline)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .foregroundColor(selected ? Theme.onAccent : .primary)
+                .background(selected ? Theme.accent : Color(.tertiarySystemFill), in: Capsule())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// The picture in a slip's bytes, off the main thread (the bytes go over one by one); `nil` if they are not a picture. With `side` it is cut down to fit a square of that many points.
+func decodeSlip(_ bytes: KotlinByteArray, side: CGFloat? = nil) async -> UIImage? {
+    await Task.detached { () -> UIImage? in
+        var data = Data(count: Int(bytes.size))
+        for i in 0..<data.count { data[i] = UInt8(bitPattern: bytes.get(index: Int32(i))) }
+        guard let image = UIImage(data: data) else { return nil }
+        guard let side else { return image }
+        return image.preparingThumbnail(of: CGSize(width: side, height: side)) ?? image
+    }.value
+}
+
+/// A slip's picture as a small page, gray until it has been read.
+struct SlipThumbnail: View {
+    let bytes: KotlinByteArray
+    @State private var image: UIImage?
+
+    var body: some View {
+        ZStack {
+            Color(.tertiarySystemFill)
+            if let image {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                Image(systemName: "doc.text").foregroundColor(.secondary)
+            }
+        }
+        .frame(width: 56, height: 72)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color(.separator), lineWidth: 0.5))
+        .task(id: ObjectIdentifier(bytes)) { image = await decodeSlip(bytes, side: 240) }
+        .accessibilityHidden(true)
     }
 }
 
