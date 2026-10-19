@@ -3,6 +3,8 @@ package xyz.felismp.shoparchive.app.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,6 +37,7 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
     val branch by ws.branch.collectAsState()
     val can by ws.capabilities.collectAsState()
     val status by s.connection.collectAsState()
+    val unreadNotes = ws.today.ui.collectAsState().value.data?.unreadNotes
     val today = stringResource(Res.string.nav_today)
     val record = stringResource(Res.string.nav_record)
     val history = stringResource(Res.string.nav_history)
@@ -75,7 +78,7 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
             destination == Destination.CONSOLE || destination == Destination.ADMIN -> Destination.MORE
             else -> destination
         }
-        ShopNavigation(items, Destination::icon, selected, ::open, wide = wide, footer = footer, account = account) {
+        ShopNavigation(items, Destination::icon, selected, ::open, wide = wide, footer = footer, account = account, badge = { if (it == Destination.NOTES) unreadNotes else null }) {
             Column(Modifier.fillMaxSize()) {
                 // Only when the server has a newer app for this platform (or a download is going on): never a button without an update.
                 if (settings == null) ws.updates?.let { UpdatePanel(it, modifier = Modifier.padding(horizontal = shellInset, vertical = 4.dp)) }
@@ -86,11 +89,11 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
                 }
                 val branches = ws.branches
                 if (settings == null && branches.size > 1) {
-                    FlowRow(
-                        Modifier.fillMaxWidth().padding(horizontal = shellInset, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        branches.forEach { b -> ShopChoice(b.displayName, b.key == branch, { ws.selectBranch(b.key) }) }
+                    Row(Modifier.fillMaxWidth().padding(horizontal = shellInset, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ShopText(stringResource(Res.string.branch_label), TextRole.Caption, muted = true)
+                        FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            branches.forEach { b -> ShopChoice(b.displayName, b.key == branch, { ws.selectBranch(b.key) }) }
+                        }
                     }
                 }
                 when {
