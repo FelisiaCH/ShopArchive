@@ -2,7 +2,6 @@ package xyz.felismp.shoparchive.server.auth
 
 import xyz.felismp.shoparchive.api.ApiError
 import xyz.felismp.shoparchive.api.AuthService
-import xyz.felismp.shoparchive.api.EventService
 import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.api.ServiceRegistry
 import xyz.felismp.shoparchive.api.UserAdminService
@@ -13,7 +12,6 @@ import xyz.felismp.shoparchive.server.users.isUsableCredential
 import xyz.felismp.shoparchive.server.users.joinedBranches
 import xyz.felismp.shoparchive.shared.AdminRoleDto
 import xyz.felismp.shoparchive.shared.AdminUserDto
-import xyz.felismp.shoparchive.shared.ConfigChangedMessage
 import xyz.felismp.shoparchive.shared.CreateUserRequest
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
@@ -31,6 +29,8 @@ internal class DefaultUserAdminService(
     /** The keys of the branches not archived (see [xyz.felismp.shoparchive.server.users.registerUserCommands]). */
     private val activeBranches: () -> List<String>,
 ) : UserAdminService {
+    private val lock = Any()
+
     private val auth: AuthService
         get() = services.get(AuthService::class.java) ?: throw ApiError(500, ErrorCode.INTERNAL, "AuthService is not registered")
 
@@ -61,13 +61,11 @@ internal class DefaultUserAdminService(
     override fun addBranch(principal: Principal, name: String, branch: String, ip: String): AdminUserDto = change(principal, "admin.user.branch-add", name, ip) {
         checkBranch(branch)
         users.addBranch(name, branch)
-        tellUser(name)
         name
     }
 
     override fun removeBranch(principal: Principal, name: String, branch: String, ip: String): AdminUserDto = change(principal, "admin.user.branch-remove", name, ip) {
         users.removeBranch(name, branch)
-        tellUser(name)
         name
     }
 
@@ -103,14 +101,17 @@ internal class DefaultUserAdminService(
         dto(name)
     }
 
-    /** An op who entered the PIN or password recently; a rule the admin broke ([UserException]) becomes the refusal the app words. */
-    private fun <T> admin(principal: Principal, block: () -> T): T {
+    /**
+     * An op (the PIN or password was asked for by the route); a rule the admin broke ([UserException]) becomes the refusal the app words. The whole change runs under [lock]:
+     * the op is checked, the last-op and self guards read the accounts and the write is made with no other admin change in between, so two ops
+     * disabling each other at the same moment cannot both pass the guard.
+     */
+    private fun <T> admin(principal: Principal, block: () -> T): T = synchronized(lock) {
         if (!auth.hasPermission(principal, OP_NODE)) {
             throw ApiError(403, ErrorCode.FORBIDDEN, "This needs an admin (op).", reason = ErrorReasons.PERMISSION_MISSING)
         }
-        auth.requireRecentAuth(principal)
         try {
-            return block()
+            block()
         } catch (e: UserException) {
             val code = when (e.status) {
                 404 -> ErrorCode.NOT_FOUND
@@ -134,11 +135,6 @@ internal class DefaultUserAdminService(
 
     private fun checkBranch(key: String) {
         if (!isSlug(key)) throw UserException("A branch key is 1 to 32 characters from a-z, 0-9 and -.", ErrorReasons.KEY_INVALID)
-    }
-
-    /** The branches an account works in are in its `GET /config`: its open apps ask again. */
-    private fun tellUser(name: String) {
-        services.get(EventService::class.java)?.notifyUser(users.user(name).id, ConfigChangedMessage)
     }
 
     private fun dto(name: String): AdminUserDto {

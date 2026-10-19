@@ -86,9 +86,10 @@ interface DeviceService {
 }
 
 /**
- * The accounts, for an op in the app: what the console's `user` command does. Every method needs the caller to be an op and to have entered the PIN or password
- * recently, and answers the account as it is afterwards. [ip] goes to the audit log. A user is named as the console names it, by name.
- * @throws ApiError 403 for a caller who is no op; 401 [xyz.felismp.shoparchive.shared.ErrorCode.REAUTH_REQUIRED]; 404 for an unknown user or role; 409 for a name taken
+ * The accounts, for an op in the app: what the console's `user` command does. Every method needs the caller to be an op and answers the account as it is afterwards.
+ * The routes have already required the PIN or password entered recently (401 [xyz.felismp.shoparchive.shared.ErrorCode.REAUTH_REQUIRED]) before they call it, whatever service is
+ * registered. [ip] goes to the audit log. A user is named as the console names it, by name.
+ * @throws ApiError 403 for a caller who is no op; 404 for an unknown user or role; 409 for a name taken
  */
 interface UserAdminService {
     fun users(principal: Principal): List<AdminUserDto>

@@ -103,26 +103,13 @@ internal class DefaultBranchService(private val branches: BranchStore, private v
     override fun list(principal: Principal): List<BranchDto> =
         branches.all().filter { access.canBranch(principal, it.key) }.map { it.toDto() }
 
-    override fun create(principal: Principal, request: CreateBranchRequest): BranchDto = create(principal, request, "-")
-
-    override fun create(principal: Principal, request: CreateBranchRequest, ip: String): BranchDto {
+    override fun create(principal: Principal, request: CreateBranchRequest): BranchDto {
         access.require(principal, BRANCHES_MANAGE_NODE)
-        // Like every command from the app, a change to the shop's setup needs the PIN or password entered recently.
-        access.requireRecentAuth(principal)
-        val branch = branches.add(request.key, request.displayName)
-        access.audit(principal, "branch.add", ip, "ok,key=${branch.key}")
-        access.configChanged()
-        return branch.toDto()
+        return branches.add(request.key, request.displayName).toDto()
     }
 
-    override fun update(principal: Principal, key: String, request: UpdateBranchRequest): BranchDto = update(principal, key, request, "-")
-
-    override fun update(principal: Principal, key: String, request: UpdateBranchRequest, ip: String): BranchDto {
+    override fun update(principal: Principal, key: String, request: UpdateBranchRequest): BranchDto {
         access.require(principal, BRANCHES_MANAGE_NODE)
-        access.requireRecentAuth(principal)
-        val branch = branches.update(key, request.displayName, request.archived)
-        access.audit(principal, "branch.update", ip, "ok,key=$key")
-        access.configChanged()
-        return branch.toDto()
+        return branches.update(key, request.displayName, request.archived).toDto()
     }
 }

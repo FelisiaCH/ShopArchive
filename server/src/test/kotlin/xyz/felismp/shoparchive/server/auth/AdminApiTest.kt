@@ -8,7 +8,10 @@ import kotlinx.serialization.builtins.ListSerializer
 import org.junit.jupiter.api.io.TempDir
 import xyz.felismp.shoparchive.api.ApiError
 import xyz.felismp.shoparchive.api.AuthService
+import xyz.felismp.shoparchive.api.BranchService
+import xyz.felismp.shoparchive.api.CategoryService
 import xyz.felismp.shoparchive.api.Principal
+import xyz.felismp.shoparchive.api.UserAdminService
 import xyz.felismp.shoparchive.server.Services
 import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.LoginResponse
@@ -23,6 +26,8 @@ import xyz.felismp.shoparchive.shared.AddUserBranchRequest
 import xyz.felismp.shoparchive.shared.AdminRoleDto
 import xyz.felismp.shoparchive.shared.AdminUserDto
 import xyz.felismp.shoparchive.shared.AppliesTo
+import xyz.felismp.shoparchive.shared.BranchDto
+import xyz.felismp.shoparchive.shared.CategoryDto
 import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.CreateBranchRequest
 import xyz.felismp.shoparchive.shared.CreateCategoryRequest
@@ -39,6 +44,8 @@ import xyz.felismp.shoparchive.shared.UpdateCategoryRequest
 import java.nio.file.Path
 import java.time.Duration
 import kotlin.test.assertFailsWith
+import java.util.concurrent.CountDownLatch
+import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -336,6 +343,92 @@ class AdminApiTest {
         // Someone who is no op is not held back by it.
         addUser("noy")
         assertEquals("clerk", service.setRole(caller, "noy", "clerk", "ip").role)
+    }
+
+    @Test
+    fun twoOpsDisablingEachOtherAtTheSameMomentNeverLeaveNoEnabledOp() = env().run {
+        addUser("opa", op = true)
+        addUser("opb", op = true)
+        val services = Services().also { it.register(AuthService::class.java, AnyOp, 0, "test") }
+        val service = DefaultUserAdminService(users, auth.accounts, auth.audit, services) { emptyList() }
+        fun caller(name: String) = Principal(users.user(name).id, name, "device", "session")
+        val callers = mapOf("opa" to caller("opa"), "opb" to caller("opb"))
+
+        repeat(60) {
+            users.setEnabled("opa", true)
+            users.setEnabled("opb", true)
+            val start = CountDownLatch(1)
+            val threads = listOf("opa" to "opb", "opb" to "opa").map { (by, target) ->
+                thread { start.await(); runCatching { service.setEnabled(callers.getValue(by), target, false, "ip") } }
+            }
+            start.countDown()
+            threads.forEach { it.join() }
+            assertTrue(users.userNames().any { name -> users.user(name).let { u -> u.op && u.enabled } }, "round $it: no enabled op is left")
+        }
+    }
+
+    private fun stubBranches() = object : BranchService {
+        override fun list(principal: Principal) = emptyList<BranchDto>()
+        override fun create(principal: Principal, request: CreateBranchRequest) = BranchDto(request.key, request.displayName, false)
+        override fun update(principal: Principal, key: String, request: UpdateBranchRequest) = BranchDto(key, request.displayName ?: key, request.archived ?: false)
+    }
+
+    private fun stubCategories() = object : CategoryService {
+        override fun list(principal: Principal) = emptyList<CategoryDto>()
+        override fun create(principal: Principal, request: CreateCategoryRequest) = CategoryDto(request.key, request.name, request.appliesTo, false)
+        override fun update(principal: Principal, key: String, request: UpdateCategoryRequest) = CategoryDto(key, request.name ?: LocalizedName("a", "b", "c"), AppliesTo.BOTH, false)
+    }
+
+    @Test
+    fun theRoutesAskForThePinAndWriteTheAuditLineAndPushWhateverServiceAPluginRegistered() = env().run {
+        // Services that know nothing of reauth, audit or the live message, in place of the core's.
+        services.register(BranchService::class.java, stubBranches(), 10, "plugin")
+        services.register(CategoryService::class.java, stubCategories(), 10, "plugin")
+        services.register(UserAdminService::class.java, object : UserAdminService {
+            override fun users(principal: Principal) = emptyList<AdminUserDto>()
+            override fun roles(principal: Principal) = emptyList<AdminRoleDto>()
+            override fun add(principal: Principal, request: CreateUserRequest, ip: String): AdminUserDto = error("unused")
+            override fun rename(principal: Principal, name: String, newName: String, ip: String): AdminUserDto = error("unused")
+            override fun setRole(principal: Principal, name: String, role: String, ip: String): AdminUserDto = error("unused")
+            override fun addBranch(principal: Principal, name: String, branch: String, ip: String): AdminUserDto = error("unused")
+            override fun removeBranch(principal: Principal, name: String, branch: String, ip: String): AdminUserDto = error("unused")
+            override fun setEnabled(principal: Principal, name: String, enabled: Boolean, ip: String): AdminUserDto = error("unused")
+            override fun unlock(principal: Principal, name: String, ip: String): AdminUserDto = error("unused")
+            override fun reset(principal: Principal, name: String, ip: String): AdminUserDto = error("unused")
+        }, 10, "plugin")
+        val boss = login("boss", op = true)
+        val noy = login("noy")
+        val seen = mutableListOf<String>()
+        val name = LocalizedName("a", "b", "c")
+        auth.events.register(authService().authenticate(noy)!!) { seen += it; true }.use {
+            api {
+                clock.advance(Duration.ofMinutes(6))
+                val asked = listOf(
+                    postJson("/api/v1/branches", CreateBranchRequest.serializer(), CreateBranchRequest("kiosk", "Kiosk"), boss),
+                    putJson("/api/v1/branches/kiosk", UpdateBranchRequest.serializer(), UpdateBranchRequest(archived = true), boss),
+                    postJson("/api/v1/categories", CreateCategoryRequest.serializer(), CreateCategoryRequest("tips", name, AppliesTo.BOTH), boss),
+                    putJson("/api/v1/categories/tips", UpdateCategoryRequest.serializer(), UpdateCategoryRequest(archived = true), boss),
+                    getPath(admin, boss),
+                    postRaw("$admin/noy/reset", "", boss),
+                )
+                for (response in asked) {
+                    assertEquals(HttpStatusCode.Unauthorized, response.status)
+                    assertEquals(ErrorCode.REAUTH_REQUIRED, response.errorCode())
+                }
+                assertEquals(emptyList(), seen)
+                assertFalse(" branch." in audit() || " category." in audit())
+
+                reauth(boss)
+                val created = postJson("/api/v1/branches", CreateBranchRequest.serializer(), CreateBranchRequest("kiosk", "Kiosk"), boss)
+                assertEquals(HttpStatusCode.Created, created.status)
+                assertEquals(BranchDto("kiosk", "Kiosk", false), created.parsed(BranchDto.serializer()))
+                putJson("/api/v1/categories/tips", UpdateCategoryRequest.serializer(), UpdateCategoryRequest(archived = true), boss)
+            }
+        }
+
+        assertEquals(List(2) { """{"type":"config.changed"}""" }, seen)
+        assertTrue(audit().lines().any { " branch.add user=boss " in it && it.endsWith("result=ok,key=kiosk") }, audit())
+        assertTrue(audit().lines().any { " category.update user=boss " in it && it.endsWith("result=ok,key=tips") }, audit())
     }
 
     @Test

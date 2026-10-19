@@ -99,25 +99,37 @@ internal fun Route.recordRoutes(services: ServiceRegistry) {
     get("/branches") { call.respond(blocking { services.require<BranchService>().list(call.principal) }) }
 
     post("/branches") {
+        services.requireRecentAuth(call.principal)
         val body = call.receive<CreateBranchRequest>()
-        call.respond(HttpStatusCode.Created, blocking { services.require<BranchService>().create(call.principal, body, call.ip) })
+        val branch = blocking { services.require<BranchService>().create(call.principal, body) }
+        services.configChanged(call.principal, "branch.add", call.ip, "ok,key=${branch.key}")
+        call.respond(HttpStatusCode.Created, branch)
     }
 
     put("/branches/{key}") {
+        services.requireRecentAuth(call.principal)
         val body = call.receive<UpdateBranchRequest>()
-        call.respond(blocking { services.require<BranchService>().update(call.principal, call.param("key"), body, call.ip) })
+        val branch = blocking { services.require<BranchService>().update(call.principal, call.param("key"), body) }
+        services.configChanged(call.principal, "branch.update", call.ip, "ok,key=${call.param("key")}")
+        call.respond(branch)
     }
 
     get("/categories") { call.respond(blocking { services.require<CategoryService>().list(call.principal) }) }
 
     post("/categories") {
+        services.requireRecentAuth(call.principal)
         val body = call.receive<CreateCategoryRequest>()
-        call.respond(HttpStatusCode.Created, blocking { services.require<CategoryService>().create(call.principal, body, call.ip) })
+        val category = blocking { services.require<CategoryService>().create(call.principal, body) }
+        services.configChanged(call.principal, "category.add", call.ip, "ok,key=${category.key}")
+        call.respond(HttpStatusCode.Created, category)
     }
 
     put("/categories/{key}") {
+        services.requireRecentAuth(call.principal)
         val body = call.receive<UpdateCategoryRequest>()
-        call.respond(blocking { services.require<CategoryService>().update(call.principal, call.param("key"), body, call.ip) })
+        val category = blocking { services.require<CategoryService>().update(call.principal, call.param("key"), body) }
+        services.configChanged(call.principal, "category.update", call.ip, "ok,key=${call.param("key")}")
+        call.respond(category)
     }
 
     // 201 when this call opened the day; 200 with `alreadyOpenBy` when it was open already.
