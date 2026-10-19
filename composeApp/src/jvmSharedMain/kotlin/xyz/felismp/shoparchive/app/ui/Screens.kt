@@ -226,8 +226,10 @@ private fun ColumnScope.SettingsBody(s: AppState.Settings, flow: AppFlow) {
         if (s.problem == null) ShopText(stringResource(Res.string.working), muted = true)
     } else {
         devices.forEach { d ->
-            ShopText(stringResource(Res.string.device_info, d.label, platformName(d.platform), localTime(d.lastUsed)) + if (d.current) " · " + stringResource(Res.string.device_this) else "")
-            if (!d.current) ShopButton(stringResource(Res.string.device_revoke), { flow.revokeDevice(d.id) }, primary = false, enabled = !s.busy)
+            ShopCard {
+                ShopText(stringResource(Res.string.device_info, d.label, platformName(d.platform), localTime(d.lastUsed)) + if (d.current) " · " + stringResource(Res.string.device_this) else "")
+                if (!d.current) ShopButton(stringResource(Res.string.device_revoke), { flow.revokeDevice(d.id) }, primary = false, enabled = !s.busy)
+            }
         }
     }
     Status(s.busy, s.problem)

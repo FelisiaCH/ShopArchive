@@ -57,7 +57,10 @@ private fun NoteList(ws: Workspace, ui: NotesUi) {
             ShopText(stringResource(Res.string.notes_empty_h), TextRole.Title)
             ShopText(stringResource(Res.string.notes_empty_p), muted = true)
         } else {
-            notes.forEach { Note(ws, ui, it) }
+            notes.forEachIndexed { i, note ->
+                if (i > 0) ShopDivider()
+                Note(ws, ui, note)
+            }
         }
     }
 }
