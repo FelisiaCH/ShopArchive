@@ -32,7 +32,7 @@ struct SettingsView: View {
                             VStack(alignment: .leading) {
                                 Text(text("device_info", d.label, platformName(d.platform), localTime(d.lastUsed)) + (d.current ? " · " + text("device_this") : ""))
                                 if !d.current {
-                                    Button(text("device_revoke")) { flow.revokeDevice(id: d.id) }
+                                    Button(text("device_revoke"), role: .destructive) { flow.revokeDevice(id: d.id) }
                                         .disabled(state.busy)
                                 }
                             }
@@ -48,11 +48,11 @@ struct SettingsView: View {
 
                 Section {
                     if confirmRemove {
-                        Text(text("remove_confirm_body")).foregroundColor(.red)
+                        Text(text("remove_confirm_body")).foregroundColor(Theme.moneyOut)
                         Button(text("remove_confirm"), role: .destructive) { flow.removeServer() }
                         Button(text("cancel")) { confirmRemove = false }
                     } else {
-                        Button(text("remove_server")) { confirmRemove = true }
+                        Button(text("remove_server"), role: .destructive) { confirmRemove = true }
                     }
                 }
                 .disabled(state.busy)

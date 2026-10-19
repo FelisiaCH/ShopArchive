@@ -16,7 +16,7 @@ struct CertChangedView: View {
                     }
                 }
                 Section {
-                    Text(text("cert_changed_body")).foregroundColor(.red)
+                    Text(text("cert_changed_body")).foregroundColor(Theme.moneyOut)
                 }
                 StatusSection(busy: state.busy, problem: state.problem)
                 Section {
@@ -38,7 +38,7 @@ struct ProtocolMismatchView: View {
         NavigationStack {
             Form {
                 Section {
-                    Text(text("proto_body")).foregroundColor(.red)
+                    Text(text("proto_body")).foregroundColor(Theme.moneyOut)
                 } footer: {
                     Text(text("proto_versions", String(PROTOCOL_VERSION), state.serverProtocol.map { String($0.intValue) } ?? text("proto_unknown")))
                 }
