@@ -216,4 +216,36 @@ class AdminStateTest {
         assertNull(s.admin.ui.value.failure)
         assertEquals(1, s.admin.ui.value.done)
     }
+
+    @Test fun manyHiddenKeysFailOneAddButTheNextStartsPastThem() = runTest(UnconfinedTestDispatcher()) {
+        val s = setup()
+        s.h.api.hiddenBranchKeys = (1..25).map { "branch-$it" }.toSet()
+        s.admin.addBranch("Kiosk")
+        assertEquals(Failure.Refused(ErrorCode.CONFLICT, ErrorReasons.KEY_EXISTS), s.admin.ui.value.failure)
+        assertEquals(20, s.h.api.adminCalls.size)
+
+        s.admin.addBranch("Kiosk")
+        assertEquals((21..26).map { "addBranch branch-$it Kiosk" }, s.h.api.adminCalls.drop(20))
+        assertNull(s.admin.ui.value.failure)
+    }
+
+    @Test fun noActionWhileTheUsersAreReadAndNoReadWhileAnActionRuns() = runTest(UnconfinedTestDispatcher()) {
+        val s = setup()
+        val gate = CompletableDeferred<Unit>()
+        s.h.api.adminGate = gate
+        s.admin.load()
+        assertTrue(s.admin.ui.value.loading)
+        s.admin.renameUser("noy", "zed")
+        gate.complete(Unit)
+        assertEquals(listOf("adminUsers", "adminRoles"), s.h.api.adminCalls, "the rename waited for nothing: it was not sent")
+
+        val second = CompletableDeferred<Unit>()
+        s.h.api.adminGate = second
+        s.admin.renameUser("noy", "zed")
+        assertTrue(s.admin.ui.value.busy)
+        s.admin.load()
+        second.complete(Unit)
+        assertEquals(listOf("adminUsers", "adminRoles", "renameUser noy zed"), s.h.api.adminCalls)
+        assertEquals(listOf("kham", "zed"), s.admin.ui.value.users.map { it.name })
+    }
 }
