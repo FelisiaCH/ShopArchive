@@ -9,7 +9,15 @@ import xyz.felismp.shoparchive.app.client.CreatedEntry
 import xyz.felismp.shoparchive.app.client.EntryFilter
 import xyz.felismp.shoparchive.app.client.ExportFile
 import xyz.felismp.shoparchive.app.client.RecordsApi
+import xyz.felismp.shoparchive.shared.AdminRoleDto
+import xyz.felismp.shoparchive.shared.AdminUserDto
 import xyz.felismp.shoparchive.shared.AuthPolicy
+import xyz.felismp.shoparchive.shared.CreateBranchRequest
+import xyz.felismp.shoparchive.shared.CreateCategoryRequest
+import xyz.felismp.shoparchive.shared.CreateUserRequest
+import xyz.felismp.shoparchive.shared.ErrorReasons
+import xyz.felismp.shoparchive.shared.UpdateBranchRequest
+import xyz.felismp.shoparchive.shared.UpdateCategoryRequest
 import xyz.felismp.shoparchive.shared.BranchDto
 import xyz.felismp.shoparchive.shared.AppliesTo
 import xyz.felismp.shoparchive.shared.CategoryDto
@@ -349,6 +357,99 @@ class FakeRecordsApi : RecordsApi {
         commandError?.let { throw it }
         return completions
     }
+
+    // ---- Admin ----
+
+    /** The accounts and roles the fake "server" holds; the user calls change [adminUserList] the way the server would and answer the account. */
+    var adminUserList: List<AdminUserDto> = emptyList()
+    var adminRoleList: List<AdminRoleDto> = emptyList()
+    /** Thrown by every admin call when set. */
+    var adminError: Exception? = null
+    var adminGate: CompletableDeferred<Unit>? = null
+    /** Every admin call as text, e.g. `addUser noy none [main]`, in order. */
+    val adminCalls = mutableListOf<String>()
+
+    private suspend fun admin(call: String) {
+        adminCalls += call
+        adminGate?.await()
+        adminError?.let { throw it }
+    }
+
+    private fun adminChange(name: String, change: (AdminUserDto) -> AdminUserDto): AdminUserDto {
+        val old = adminUserList.firstOrNull { it.name == name } ?: throw ClientError.Api(404, ErrorCode.NOT_FOUND, "No user.", reason = ErrorReasons.USER_NOT_FOUND)
+        return change(old).also { new -> adminUserList = adminUserList.map { if (it.id == old.id) new else it } }
+    }
+
+    override suspend fun adminUsers(): List<AdminUserDto> {
+        admin("adminUsers")
+        return adminUserList
+    }
+
+    override suspend fun adminRoles(): List<AdminRoleDto> {
+        admin("adminRoles")
+        return adminRoleList
+    }
+
+    override suspend fun addUser(request: CreateUserRequest): AdminUserDto {
+        admin("addUser ${request.name} ${request.role} ${request.branches}")
+        if (adminUserList.any { it.name == request.name }) throw ClientError.Api(409, ErrorCode.CONFLICT, "Exists.", reason = ErrorReasons.USER_EXISTS)
+        return AdminUserDto("id-${request.name}", request.name, true, role = request.role, branches = request.branches).also { adminUserList = adminUserList + it }
+    }
+
+    override suspend fun renameUser(name: String, to: String): AdminUserDto {
+        admin("renameUser $name $to")
+        return adminChange(name) { it.copy(name = to) }
+    }
+
+    override suspend fun setUserRole(name: String, role: String): AdminUserDto {
+        admin("setUserRole $name $role")
+        return adminChange(name) { it.copy(role = role) }
+    }
+
+    override suspend fun addUserBranch(name: String, branch: String): AdminUserDto {
+        admin("addUserBranch $name $branch")
+        return adminChange(name) { it.copy(branches = it.branches + branch) }
+    }
+
+    override suspend fun removeUserBranch(name: String, branch: String): AdminUserDto {
+        admin("removeUserBranch $name $branch")
+        return adminChange(name) { it.copy(branches = it.branches - branch) }
+    }
+
+    override suspend fun setUserEnabled(name: String, enabled: Boolean): AdminUserDto {
+        admin("setUserEnabled $name $enabled")
+        return adminChange(name) { it.copy(enabled = enabled, disabledReason = if (enabled) null else "admin") }
+    }
+
+    override suspend fun unlockUser(name: String): AdminUserDto {
+        admin("unlockUser $name")
+        return adminChange(name) { it.copy(enabled = true, disabledReason = null, failedLogins = 0, lockedUntil = null) }
+    }
+
+    override suspend fun resetUser(name: String): AdminUserDto {
+        admin("resetUser $name")
+        return adminChange(name) { it.copy(hasPin = false, hasPassword = false) }
+    }
+
+    override suspend fun addBranch(request: CreateBranchRequest): BranchDto {
+        admin("addBranch ${request.key} ${request.displayName}")
+        return BranchDto(request.key, request.displayName, false)
+    }
+
+    override suspend fun updateBranch(key: String, request: UpdateBranchRequest): BranchDto {
+        admin("updateBranch $key ${request.displayName} ${request.archived}")
+        return BranchDto(key, request.displayName ?: key, request.archived ?: false)
+    }
+
+    override suspend fun addCategory(request: CreateCategoryRequest): CategoryDto {
+        admin("addCategory ${request.key} ${request.name.en} ${request.appliesTo}")
+        return CategoryDto(request.key, request.name, request.appliesTo, false)
+    }
+
+    override suspend fun updateCategory(key: String, request: UpdateCategoryRequest): CategoryDto {
+        admin("updateCategory $key ${request.name?.en} ${request.appliesTo} ${request.archived}")
+        return CategoryDto(key, request.name ?: LocalizedName(key, key, key), request.appliesTo ?: AppliesTo.BOTH, request.archived ?: false)
+    }
 }
 
 val LAK = CurrencyInfo("LAK", 0)
@@ -360,6 +461,7 @@ fun testConfig(
     currencies: List<CurrencyInfo> = listOf(LAK, THB),
     permissions: List<String> = ALL_NODES,
     userId: String = "u1",
+    admin: Boolean = true,
 ) = ConfigResponse(
     AuthPolicy(6, false, 3, 15, false, 5), emptyList(), currencies, branches,
     listOf(
@@ -368,12 +470,12 @@ fun testConfig(
         CategoryDto("misc", LocalizedName("ອື່ນໆ", "อื่นๆ", "Misc"), AppliesTo.BOTH, false),
         CategoryDto("old", LocalizedName("old", "old", "Old"), AppliesTo.BOTH, true),
     ),
-    policy, permissions, userId,
+    policy, permissions, userId, admin,
 )
 
 /** Every node the app looks at, held: the person the screen tests play is allowed everything unless a test says otherwise. */
 val ALL_NODES = with(xyz.felismp.shoparchive.shared.PermissionNodes) {
-    listOf(ENTRY_CREATE, ENTRY_VIEW_OWN, ENTRY_VIEW_ALL, ENTRY_EDIT_OWN, ENTRY_EDIT_ALL, ENTRY_DELETE_OWN, ENTRY_DELETE_ALL, DAY_OPEN, DAY_CLOSE, EXPORT, DASHBOARD_VIEW, NOTE_CREATE, NOTE_READ, NOTIFICATIONS_VIEW, NOTIFICATIONS_SEND, COMMAND_PREFIX + "status")
+    listOf(ENTRY_CREATE, ENTRY_VIEW_OWN, ENTRY_VIEW_ALL, ENTRY_EDIT_OWN, ENTRY_EDIT_ALL, ENTRY_DELETE_OWN, ENTRY_DELETE_ALL, DAY_OPEN, DAY_CLOSE, EXPORT, DASHBOARD_VIEW, NOTE_CREATE, NOTE_READ, NOTIFICATIONS_VIEW, NOTIFICATIONS_SEND, BRANCHES_MANAGE, CATEGORIES_MANAGE, COMMAND_PREFIX + "status")
 }
 
 /** Everything a screen state holder needs, wired to fakes. */

@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import xyz.felismp.shoparchive.app.client.ServerApi
 import xyz.felismp.shoparchive.shared.BranchDto
+import xyz.felismp.shoparchive.shared.ConfigChangedMessage
 import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.WsMessage
 import kotlinx.datetime.LocalDate
@@ -70,6 +71,7 @@ class Workspace(
     val notifications = NotificationsState(env)
     val notes = NotesState(env)
     val console = ConsoleState(env)
+    val admin = AdminState(env) { load() }
 
     /** Looks for a newer app once now (so at every unlock) and when asked; null where the platform cannot install updates. */
     val updates: AppUpdates? = updatesFactory?.invoke(scope, api, env.calls)
@@ -84,6 +86,8 @@ class Workspace(
     init {
         scope.launch { load() }
         scope.launch { refetch.collect { load() } }
+        // Branches or categories were changed (by an admin on another device): the lists on screen are the new ones.
+        scope.launch { messages.collect { if (it is ConfigChangedMessage) load() } }
     }
 
     private suspend fun load() {

@@ -11,7 +11,7 @@ import kotlinx.datetime.minus
  * server would refuse instead of showing it disabled or failing on it. A person whose rights change gets the new set at the
  * next config load (the next unlock). Before the config has loaded nothing is allowed.
  */
-class Capabilities(private val held: Set<String>, private val editWindowDays: Int = 0, val userId: String = "") {
+class Capabilities(private val held: Set<String>, private val editWindowDays: Int = 0, val userId: String = "", private val isOp: Boolean = false) {
     val recordEntries: Boolean get() = PermissionNodes.ENTRY_CREATE in held
     val viewEntries: Boolean get() = PermissionNodes.ENTRY_VIEW_OWN in held || PermissionNodes.ENTRY_VIEW_ALL in held
     val openDay: Boolean get() = PermissionNodes.DAY_OPEN in held
@@ -22,6 +22,14 @@ class Capabilities(private val held: Set<String>, private val editWindowDays: In
     val noteRead: Boolean get() = PermissionNodes.NOTE_READ in held
     val viewNotifications: Boolean get() = PermissionNodes.NOTIFICATIONS_VIEW in held
     val sendNotifications: Boolean get() = PermissionNodes.NOTIFICATIONS_SEND in held
+
+    /** Users: only an op may (the server says so in `GET /config`; a node cannot, as any user can be given one). */
+    val manageUsers: Boolean get() = isOp
+    val manageBranches: Boolean get() = PermissionNodes.BRANCHES_MANAGE in held
+    val manageCategories: Boolean get() = PermissionNodes.CATEGORIES_MANAGE in held
+
+    /** The person may do at least one thing in the admin area (users, branches, categories): the server refuses every other call. */
+    val admin: Boolean get() = manageUsers || manageBranches || manageCategories
 
     /** The person holds the node of at least one console command: the server refuses every other line, so the screen is left out without one. */
     val console: Boolean get() = held.any { it.startsWith(PermissionNodes.COMMAND_PREFIX) }
@@ -71,4 +79,4 @@ class Capabilities(private val held: Set<String>, private val editWindowDays: In
 }
 
 /** The capabilities the loaded config grants; none while it has not loaded. */
-internal fun ConfigState.capabilities(): Capabilities = (this as? ConfigState.Ready)?.let { Capabilities(it.config.permissions.toSet(), it.config.records.editWindowDays, it.config.userId) } ?: Capabilities.NONE
+internal fun ConfigState.capabilities(): Capabilities = (this as? ConfigState.Ready)?.let { Capabilities(it.config.permissions.toSet(), it.config.records.editWindowDays, it.config.userId, it.config.admin) } ?: Capabilities.NONE

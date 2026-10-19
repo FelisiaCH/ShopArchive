@@ -52,6 +52,15 @@ class CapabilitiesTest {
         assertFalse(caps("shoparchive.commands").console, "only the node prefix counts")
     }
 
+    @Test fun theAdminAreaIsForAnOpAndForWhoeverHoldsTheBranchOrCategoryNode() {
+        assertFalse(caps(*clerk).admin)
+        assertTrue(Capabilities(emptySet(), isOp = true).run { manageUsers && admin && !manageBranches })
+        assertTrue(caps(PermissionNodes.BRANCHES_MANAGE).run { manageBranches && admin && !manageUsers && !manageCategories })
+        assertTrue(caps(PermissionNodes.CATEGORIES_MANAGE).run { manageCategories && admin && !manageUsers && !manageBranches })
+        assertFalse(caps("shoparchive.users.manage").admin, "a node cannot make an op")
+        assertFalse(Capabilities.NONE.admin)
+    }
+
     @Test fun nothingIsAllowedBeforeTheConfigHasLoaded() {
         assertFalse(ConfigState.Loading.capabilities().recordEntries)
         assertTrue(ConfigState.Ready(testConfig(permissions = listOf(PermissionNodes.EXPORT))).capabilities().export)

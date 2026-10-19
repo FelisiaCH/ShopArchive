@@ -134,6 +134,10 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
     var protocol = PROTOCOL_VERSION
     val unlocks = mutableListOf<UnlockRequest>()
     var onOpen: (() -> Unit)? = null
+    /** Where a test pushes a message the server sends on the socket. */
+    var onText: ((String) -> Unit)? = null
+    /** What `GET /config` says about the person being an op. */
+    var isOp = true
 
     override val isUnlocked get() = token
     override var endpoints: List<String> = emptyList()
@@ -155,7 +159,7 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
         return ConfigResponse(
             AuthPolicy(6, false, sharedMinutes, personalMinutes, false, 5, unlockWithoutPin), announced, emptyList(),
             records.configBranches.map { xyz.felismp.shoparchive.shared.BranchDto(it, it, false) },
-            permissions = permissions,
+            permissions = permissions, admin = isOp,
         )
     }
     var reauthGate: CompletableDeferred<Unit>? = null
@@ -179,7 +183,7 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
         if (wsLocked) throw ClientError.Locked()
         if (wsLockedOnce) { wsLockedOnce = false; token = false; throw ClientError.Locked() }
         reach()
-        this.onOpen = onOpen; onOpen()
+        this.onOpen = onOpen; this.onText = onText; onOpen()
         while (dropSocket?.isCompleted != true) delay(20) // open until cancelled, or until a test drops it
         dropSocket = null
     }
@@ -1441,6 +1445,46 @@ class AppFlowTest {
         assertNull(f.reauth.value)
         assertEquals(listOf("e1", "e1"), api.records.deletes, "tried once more after the PIN")
         assertIs<AppState.Unlocked>(f.state.value)
+    }
+
+    @Test fun anAdminActionAsksForThePinWhenTheServerDoesAndIsTriedOnceMore() {
+        api.records.configBranches = listOf("main")
+        val f = withoutPinFlow()
+        val ws = assertNotNull(f.workspace)
+        api.records.adminError = ClientError.Api(401, ErrorCode.REAUTH_REQUIRED, "Enter your PIN again.")
+        ws.admin.addBranch("kiosk", "Kiosk")
+        assertEquals(ReauthPrompt(needsPassword = false), f.reauth.value)
+        assertTrue(ws.admin.ui.value.busy)
+        api.records.adminError = null
+        f.submitReauth("483926")
+        assertNull(f.reauth.value)
+        assertEquals(listOf("addBranch kiosk Kiosk", "addBranch kiosk Kiosk"), api.records.adminCalls)
+        assertFalse(ws.admin.ui.value.busy)
+        assertNull(ws.admin.ui.value.failure)
+    }
+
+    @Test fun anAdminChangeOnAnotherDeviceMakesTheWorkspaceReadTheConfigAgain() {
+        api.records.configBranches = listOf("main")
+        store.stored = storedAlice()
+        val f = flow(); f.unlock("483926")
+        val ws = assertNotNull(f.workspace)
+        assertEquals(listOf("main"), ws.branches.map { it.key })
+        api.records.configBranches = listOf("main", "market")
+        api.onText!!("""{"type":"say","message":"hi","from":"x"}""")
+        assertEquals(listOf("main"), ws.branches.map { it.key }, "other messages read nothing")
+        api.onText!!("""{"type":"config.changed"}""")
+        assertEquals(listOf("main", "market"), ws.branches.map { it.key })
+    }
+
+    @Test fun onlyAnOpSeesTheUsersOfTheAdminArea() {
+        api.records.configBranches = listOf("main")
+        api.isOp = false
+        api.permissions = listOf(xyz.felismp.shoparchive.shared.PermissionNodes.CATEGORIES_MANAGE)
+        store.stored = storedAlice()
+        val f = flow(); f.unlock("483926")
+        val caps = assertNotNull(f.workspace).capabilities.value
+        assertFalse(caps.manageUsers || caps.manageBranches)
+        assertTrue(caps.manageCategories && caps.admin)
     }
 
     @Test fun theConfigKeepsWhetherThePinIsNeededAndAnOldFileReadsAsNeedingIt() {

@@ -1,6 +1,15 @@
 package xyz.felismp.shoparchive.app.client
 
+import xyz.felismp.shoparchive.shared.AdminRoleDto
+import xyz.felismp.shoparchive.shared.AdminUserDto
+import xyz.felismp.shoparchive.shared.BranchDto
+import xyz.felismp.shoparchive.shared.CategoryDto
+import xyz.felismp.shoparchive.shared.CreateBranchRequest
+import xyz.felismp.shoparchive.shared.CreateCategoryRequest
 import xyz.felismp.shoparchive.shared.CreateEntryRequest
+import xyz.felismp.shoparchive.shared.CreateUserRequest
+import xyz.felismp.shoparchive.shared.UpdateBranchRequest
+import xyz.felismp.shoparchive.shared.UpdateCategoryRequest
 import xyz.felismp.shoparchive.shared.CreateNoteRequest
 import xyz.felismp.shoparchive.shared.DashboardDto
 import xyz.felismp.shoparchive.shared.CloseSessionRequest
@@ -127,4 +136,40 @@ interface RecordsApi {
 
     /** The words that could end [line], from the commands the person may run; same needs as [runCommand]. */
     suspend fun completeCommand(line: String): List<String>
+
+    // ---- Admin: what the console's `user`, `branch` and `category` commands do. Each needs a recent PIN or password; the users need an op. ----
+
+    suspend fun adminUsers(): List<AdminUserDto>
+
+    suspend fun adminRoles(): List<AdminRoleDto>
+
+    /** Every user call answers the account as it is afterwards. */
+    suspend fun addUser(request: CreateUserRequest): AdminUserDto
+
+    suspend fun renameUser(name: String, to: String): AdminUserDto
+
+    /** [role] is a role name or `none`. */
+    suspend fun setUserRole(name: String, role: String): AdminUserDto
+
+    suspend fun addUserBranch(name: String, branch: String): AdminUserDto
+
+    suspend fun removeUserBranch(name: String, branch: String): AdminUserDto
+
+    suspend fun setUserEnabled(name: String, enabled: Boolean): AdminUserDto
+
+    /** Forgets the wrong tries and the lock; an account the server disabled for them is enabled again. */
+    suspend fun unlockUser(name: String): AdminUserDto
+
+    /** Takes the user off every device and clears the PIN and password, so the user sets a new PIN at the next login. */
+    suspend fun resetUser(name: String): AdminUserDto
+
+    /** Needs `shoparchive.branches.manage`. */
+    suspend fun addBranch(request: CreateBranchRequest): BranchDto
+
+    suspend fun updateBranch(key: String, request: UpdateBranchRequest): BranchDto
+
+    /** Needs `shoparchive.categories.manage`. */
+    suspend fun addCategory(request: CreateCategoryRequest): CategoryDto
+
+    suspend fun updateCategory(key: String, request: UpdateCategoryRequest): CategoryDto
 }
