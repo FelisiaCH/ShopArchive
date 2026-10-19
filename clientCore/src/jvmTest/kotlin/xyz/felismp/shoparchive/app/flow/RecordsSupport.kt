@@ -80,9 +80,11 @@ class FakeRecordsApi : RecordsApi {
     var pastSessions: List<SessionDto> = emptyList()
     var pastSessionsError: Exception? = null
     val rangeCalls = mutableListOf<Triple<String, String, String>>()
+    var pastSessionsGate: CompletableDeferred<Unit>? = null
 
     override suspend fun sessionsBetween(branch: String, from: String, to: String): List<SessionDto> {
         rangeCalls += Triple(branch, from, to)
+        pastSessionsGate?.await()
         pastSessionsError?.let { throw it }
         return pastSessions.filter { it.branch == branch && it.businessDate in from..to }
     }

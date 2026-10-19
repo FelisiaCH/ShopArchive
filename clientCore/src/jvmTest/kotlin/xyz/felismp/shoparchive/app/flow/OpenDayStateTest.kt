@@ -1,5 +1,6 @@
 package xyz.felismp.shoparchive.app.flow
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -194,5 +195,45 @@ class OpenDayStateTest {
         h.branch.value = "second"
         assertTrue(day.ui.value.prefill.isEmpty())
         assertEquals(listOf("main", "second"), h.api.rangeCalls.map { it.first }.distinct())
+    }
+
+    @Test fun confirmWaitsForTheLastCloseToBeRead() = runTest(UnconfinedTestDispatcher()) {
+        val (h, day) = setup()
+        val gate = CompletableDeferred<Unit>()
+        h.api.pastSessionsGate = gate
+        h.api.pastSessions = listOf(h.api.closedDay("s1", "2026-10-03", mapOf("LAK" to "100000"), mapOf("LAK" to "0")))
+        h.refetch.tryEmit(Unit) // the read is slow
+        assertEquals(OpenDayBlock.LOADING, day.ui.value.blocked)
+        day.confirm()
+        assertTrue(h.api.opened.isEmpty())
+        gate.complete(Unit)
+        assertEquals(null, day.ui.value.blocked)
+        day.confirm()
+        assertEquals(mapOf("LAK" to "100000"), h.api.opened.single().second.float)
+    }
+
+    @Test fun aReadThatFailsUnblocksConfirm() = runTest(UnconfinedTestDispatcher()) {
+        val (h, day) = setup()
+        val gate = CompletableDeferred<Unit>()
+        h.api.pastSessionsGate = gate
+        h.api.pastSessionsError = ClientError.Api(500, ErrorCode.INTERNAL, "Something went wrong.")
+        h.refetch.tryEmit(Unit)
+        assertEquals(OpenDayBlock.LOADING, day.ui.value.blocked)
+        gate.complete(Unit)
+        assertEquals(null, day.ui.value.blocked)
+        day.confirm()
+        assertTrue(h.api.opened.single().second.float.isEmpty())
+    }
+
+    @Test fun theReadOfABranchNoLongerChosenIsDropped() = runTest(UnconfinedTestDispatcher()) {
+        val (h, day) = setup()
+        val gate = CompletableDeferred<Unit>()
+        h.api.pastSessionsGate = gate
+        h.refetch.tryEmit(Unit)          // reading "main"
+        h.branch.value = "second"        // another branch is chosen while it is on its way
+        gate.complete(Unit)
+        assertEquals(null, day.ui.value.blocked)
+        day.confirm()
+        assertEquals("second", h.api.opened.single().first)
     }
 }
