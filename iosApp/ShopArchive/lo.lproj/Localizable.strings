@@ -19,11 +19,7 @@
 "pin_field" = "PIN";
 "unlock_pin" = "ປົດລັອກດ້ວຍ PIN";
 "unlock_password" = "ປົດລັອກດ້ວຍລະຫັດຜ່ານ";
-"unlocked_title" = "ເຊື່ອມຕໍ່ແລ້ວ";
-"unlocked_body" = "ເຂົ້າສູ່ລະບົບເປັນ %1$@ ເທິງ %2$@";
-"status_connected" = "ເຊື່ອມຕໍ່ແລ້ວ";
 "status_connecting" = "ກຳລັງເຊື່ອມຕໍ່…";
-"status_offline" = "ອອບໄລນ໌";
 "pinmm_title" = "ກະແຈຂອງເຊີບເວີປ່ຽນໄປ";
 "pinmm_body" = "ອຸປະກອນນີ້ເຊື່ອຖືກະແຈເຊີບເວີອັນອື່ນ ຈຶ່ງບໍ່ໄດ້ສົ່ງຂໍ້ມູນໃດໆ. ຢ່າໄປຕໍ່. ຕິດຕໍ່ຜູ້ດູແລເຊີບເວີ.";
 "proto_title" = "ແອັບ ຫຼື ເຊີບເວີເກົ່າເກີນໄປ";
@@ -86,7 +82,6 @@
 "no_branch" = "ທ່ານບໍ່ມີສາຂາທີ່ຈະເຮັດວຽກ. ຂໍໃຫ້ເຈົ້າຂອງເພີ່ມທ່ານເຂົ້າສາຂາ.";
 "more_signed_in" = "ເຂົ້າສູ່ລະບົບເປັນ %1$@";
 "today_title" = "ມື້ນີ້";
-"day_not_opened" = "ຍັງບໍ່ເປີດວັນ";
 "day_open_by" = "ເປີດຕັ້ງແຕ່ %1$@ ໂດຍ %2$@";
 "day_closed" = "ປິດຍອດແລ້ວ";
 "day_stale" = "ວັນທີ່ເປີດຢູ່ເລີ່ມເມື່ອ %1$@ ແລະ ຍັງບໍ່ປິດ.";
@@ -204,6 +199,7 @@
 "history_action_edit" = "ແກ້ໄຂ";
 "history_action_delete" = "ລຶບ";
 "history_action_move" = "ຍ້າຍ";
+"history_action_manual_edit" = "ແກ້ໄຂດ້ວຍມື";
 "history_field_category" = "ໝວດໝູ່";
 "history_field_date" = "ວັນທີ";
 "history_field_item" = "ລາຍການ";

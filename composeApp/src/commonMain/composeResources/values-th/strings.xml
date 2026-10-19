@@ -19,11 +19,7 @@
     <string name="pin_field">PIN</string>
     <string name="unlock_pin">ปลดล็อกด้วย PIN</string>
     <string name="unlock_password">ปลดล็อกด้วยรหัสผ่าน</string>
-    <string name="unlocked_title">เชื่อมต่อแล้ว</string>
-    <string name="unlocked_body">เข้าสู่ระบบเป็น %1$s บน %2$s</string>
-    <string name="status_connected">เชื่อมต่อแล้ว</string>
     <string name="status_connecting">กำลังเชื่อมต่อ…</string>
-    <string name="status_offline">ออฟไลน์</string>
     <string name="pinmm_title">กุญแจของเซิร์ฟเวอร์เปลี่ยนไป</string>
     <string name="pinmm_body">อุปกรณ์นี้เชื่อถือกุญแจเซิร์ฟเวอร์อื่น จึงไม่ได้ส่งข้อมูลใดๆ อย่าไปต่อ ติดต่อผู้ดูแลเซิร์ฟเวอร์</string>
     <string name="proto_title">แอปหรือเซิร์ฟเวอร์เก่าเกินไป</string>
@@ -88,7 +84,6 @@
     <string name="no_branch">คุณไม่มีสาขาให้ทำงาน ขอให้เจ้าของเพิ่มคุณเข้าสาขา</string>
     <string name="more_signed_in">เข้าสู่ระบบเป็น %1$s</string>
     <string name="today_title">วันนี้</string>
-    <string name="day_not_opened">ยังไม่เปิดวัน</string>
     <string name="day_open_by">เปิดตั้งแต่ %1$s โดย %2$s</string>
     <string name="day_closed">ปิดยอดแล้ว</string>
     <string name="day_stale">วันที่เปิดอยู่เริ่มเมื่อ %1$s และยังไม่ปิด</string>
@@ -206,6 +201,7 @@
     <string name="history_action_edit">แก้ไข</string>
     <string name="history_action_delete">ลบ</string>
     <string name="history_action_move">ย้าย</string>
+    <string name="history_action_manual_edit">แก้ไขด้วยมือ</string>
     <string name="history_field_category">หมวดหมู่</string>
     <string name="history_field_date">วันที่</string>
     <string name="history_field_item">รายการ</string>

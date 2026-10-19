@@ -267,6 +267,7 @@ private fun SlipImage(n: Int, load: Load<ByteArray>) {
 private val ACTION_WORDS = mapOf(
     "create" to Res.string.history_action_create, "edit" to Res.string.history_action_edit,
     "delete" to Res.string.history_action_delete, "move" to Res.string.history_action_move,
+    "manual-edit" to Res.string.history_action_manual_edit,
 )
 private val FIELD_WORDS = mapOf(
     "category" to Res.string.history_field_category, "date" to Res.string.history_field_date, "item" to Res.string.history_field_item,

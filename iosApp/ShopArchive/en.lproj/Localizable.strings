@@ -19,11 +19,7 @@
 "pin_field" = "PIN";
 "unlock_pin" = "Unlock with PIN";
 "unlock_password" = "Unlock with password";
-"unlocked_title" = "Connected";
-"unlocked_body" = "Signed in as %1$@ on %2$@";
-"status_connected" = "Connected";
 "status_connecting" = "Connecting…";
-"status_offline" = "Offline";
 "pinmm_title" = "The server's key has changed";
 "pinmm_body" = "This device trusts a different server key, so nothing was sent. Do not continue. Contact the server administrator.";
 "proto_title" = "Outdated app or server";
@@ -86,7 +82,6 @@
 "no_branch" = "You have no branch to work in. Ask the owner to add you to one.";
 "more_signed_in" = "Signed in as %1$@";
 "today_title" = "Today";
-"day_not_opened" = "Day not opened";
 "day_open_by" = "Open since %1$@, opened by %2$@";
 "day_closed" = "Day closed";
 "day_stale" = "The open day started on %1$@ and was never closed.";
@@ -204,6 +199,7 @@
 "history_action_edit" = "Changed";
 "history_action_delete" = "Deleted";
 "history_action_move" = "Moved";
+"history_action_manual_edit" = "Edited by hand";
 "history_field_category" = "Category";
 "history_field_date" = "Date";
 "history_field_item" = "Item";

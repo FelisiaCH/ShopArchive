@@ -19,11 +19,7 @@
     <string name="pin_field">PIN</string>
     <string name="unlock_pin">ປົດລັອກດ້ວຍ PIN</string>
     <string name="unlock_password">ປົດລັອກດ້ວຍລະຫັດຜ່ານ</string>
-    <string name="unlocked_title">ເຊື່ອມຕໍ່ແລ້ວ</string>
-    <string name="unlocked_body">ເຂົ້າສູ່ລະບົບເປັນ %1$s ເທິງ %2$s</string>
-    <string name="status_connected">ເຊື່ອມຕໍ່ແລ້ວ</string>
     <string name="status_connecting">ກຳລັງເຊື່ອມຕໍ່…</string>
-    <string name="status_offline">ອອບໄລນ໌</string>
     <string name="pinmm_title">ກະແຈຂອງເຊີບເວີປ່ຽນໄປ</string>
     <string name="pinmm_body">ອຸປະກອນນີ້ເຊື່ອຖືກະແຈເຊີບເວີອັນອື່ນ ຈຶ່ງບໍ່ໄດ້ສົ່ງຂໍ້ມູນໃດໆ. ຢ່າໄປຕໍ່. ຕິດຕໍ່ຜູ້ດູແລເຊີບເວີ.</string>
     <string name="proto_title">ແອັບ ຫຼື ເຊີບເວີເກົ່າເກີນໄປ</string>
@@ -88,7 +84,6 @@
     <string name="no_branch">ທ່ານບໍ່ມີສາຂາທີ່ຈະເຮັດວຽກ. ຂໍໃຫ້ເຈົ້າຂອງເພີ່ມທ່ານເຂົ້າສາຂາ.</string>
     <string name="more_signed_in">ເຂົ້າສູ່ລະບົບເປັນ %1$s</string>
     <string name="today_title">ມື້ນີ້</string>
-    <string name="day_not_opened">ຍັງບໍ່ເປີດວັນ</string>
     <string name="day_open_by">ເປີດຕັ້ງແຕ່ %1$s ໂດຍ %2$s</string>
     <string name="day_closed">ປິດຍອດແລ້ວ</string>
     <string name="day_stale">ວັນທີ່ເປີດຢູ່ເລີ່ມເມື່ອ %1$s ແລະ ຍັງບໍ່ປິດ.</string>
@@ -206,6 +201,7 @@
     <string name="history_action_edit">ແກ້ໄຂ</string>
     <string name="history_action_delete">ລຶບ</string>
     <string name="history_action_move">ຍ້າຍ</string>
+    <string name="history_action_manual_edit">ແກ້ໄຂດ້ວຍມື</string>
     <string name="history_field_category">ໝວດໝູ່</string>
     <string name="history_field_date">ວັນທີ</string>
     <string name="history_field_item">ລາຍການ</string>

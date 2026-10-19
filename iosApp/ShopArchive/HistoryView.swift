@@ -471,9 +471,15 @@ private struct HistoryLine: View {
     }
 
     private var headline: String {
-        let action = known(["create", "edit", "delete", "move"], item.action, prefix: "history_action_")
+        let action = actionWord()
         let at = item.at.replacingOccurrences(of: "T", with: " ").prefix(16)
         return "\(action) · \(at) · \(item.by.name)"
+    }
+
+    /// The key of "manual-edit" has an underscore where the server's word has a hyphen, so it is not found by prefix.
+    private func actionWord() -> String {
+        if item.action == "manual-edit" { return text("history_action_manual_edit") }
+        return known(["create", "edit", "delete", "move"], item.action, prefix: "history_action_")
     }
 
     private func change(_ c: HistoryChange) -> String {
