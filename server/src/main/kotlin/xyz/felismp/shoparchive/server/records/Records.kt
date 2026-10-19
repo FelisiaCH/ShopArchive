@@ -64,7 +64,7 @@ internal class Records(
         services.register(NoteService::class.java, noteService, CORE_SERVICE_PRIORITY, "core")
         services.register(EntryService::class.java, entryService, CORE_SERVICE_PRIORITY, "core")
         services.register(NotificationImages::class.java, DefaultNotificationImages(store), CORE_SERVICE_PRIORITY, "core")
-        services.register(ExportService::class.java, DefaultExportService(config, access, services), CORE_SERVICE_PRIORITY, "core")
+        services.register(ExportService::class.java, DefaultExportService(config, access, services, branches, categories), CORE_SERVICE_PRIORITY, "core")
         services.register(DashboardService::class.java, DefaultDashboardService(config, store, access, services, clock), CORE_SERVICE_PRIORITY, "core")
     }
 

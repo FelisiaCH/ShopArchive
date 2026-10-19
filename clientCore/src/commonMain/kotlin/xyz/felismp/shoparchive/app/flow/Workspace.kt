@@ -41,6 +41,8 @@ class Workspace(
     private val onConfig: (ConfigResponse) -> Unit = {},
     /** Makes what installs a newer app from the server's `downloads/`; null where the platform cannot (nothing about updates is shown then). */
     updatesFactory: UpdatesFactory? = null,
+    /** The language the app shows now (see [Env.language]). */
+    language: () -> String = { "en" },
 ) {
     private val _config = MutableStateFlow<ConfigState>(ConfigState.Loading)
     val config: StateFlow<ConfigState> = _config.asStateFlow()
@@ -57,7 +59,7 @@ class Workspace(
     private val _destination = MutableStateFlow(Destination.TODAY)
     val destination: StateFlow<Destination> = _destination.asStateFlow()
 
-    private val env = Env(scope, api, calls, canWrite, config, branch, refetch, messages, today, now)
+    private val env = Env(scope, api, calls, canWrite, config, branch, refetch, messages, today, now, language)
     val today = TodayState(env)
     val openDay = OpenDayState(env, this.today)
     val record = RecordState(env, this.today, compressor, reader)

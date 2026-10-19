@@ -147,6 +147,12 @@ interface ExportService {
      * @throws ApiError 400 for a bad range or format; 403
      */
     fun export(principal: Principal, query: EntryQuery, format: String): ExportFile
+
+    /**
+     * Like the above, with the headers, sheet names and enum words in [language] (`lo`, `th` or `en`) and categories and branches by display name.
+     * A null [language], or an implementation that does not know the parameter, gives the English of the first versions.
+     */
+    fun export(principal: Principal, query: EntryQuery, format: String, language: String?): ExportFile = export(principal, query, format)
 }
 
 /** The numbers of the dashboard, worked out from the entries when asked. */

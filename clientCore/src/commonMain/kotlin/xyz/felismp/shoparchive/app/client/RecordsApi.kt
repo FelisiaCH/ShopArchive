@@ -104,8 +104,8 @@ interface RecordsApi {
     /** Puts the summary of a closed day into the outbox again. */
     suspend fun notifyDay(branch: String, sessionId: String): NotificationDto
 
-    /** The entries of the range as a CSV or XLSX file. [format] is `csv` or `xlsx`. */
-    suspend fun export(from: String, to: String, branch: String, format: String): ExportFile
+    /** The entries of the range as a CSV or XLSX file. [format] is `csv` or `xlsx`; [language] (`en`, `lo`, `th`) is the one the file is written in. */
+    suspend fun export(from: String, to: String, branch: String, format: String, language: String): ExportFile
 
     /** The day notes of [branch] on [date] (`yyyy-MM-dd`) the signed-in user may see, oldest first. */
     suspend fun notes(branch: String, date: String): List<NoteDto>

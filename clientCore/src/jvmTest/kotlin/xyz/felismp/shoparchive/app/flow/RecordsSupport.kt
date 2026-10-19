@@ -262,8 +262,8 @@ class FakeRecordsApi : RecordsApi {
         return queuedCopy("", "20261004-AAAAA")
     }
 
-    override suspend fun export(from: String, to: String, branch: String, format: String): ExportFile {
-        exports += listOf(from, to, branch, format)
+    override suspend fun export(from: String, to: String, branch: String, format: String, language: String): ExportFile {
+        exports += listOf(from, to, branch, format, language)
         exportError?.let { throw it }
         return exportFile
     }
