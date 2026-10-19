@@ -21,7 +21,7 @@ struct TodayView: View {
                 if let failure = ui.failure {
                     Banner(text: text("today_failed") + " " + failureText(failure), tone: .error)
                 }
-                TodayContent(data: data, can: can, canWrite: canWrite, openDay: { ws.go(to: .openDay) }, closeDay: { ws.openReports(tab: .closeDay) }, openHistory: { ws.go(to: .history) }, openNotes: { ws.openNotes(day: data.oldestUnreadNote ?? data.date) })
+                TodayContent(ws: ws, data: data, can: can, canWrite: canWrite, openDay: { ws.go(to: .openDay) }, closeDay: { ws.openReports(tab: .closeDay) }, openHistory: { ws.go(to: .history) }, openNotes: { ws.openNotes(day: data.oldestUnreadNote ?? data.date) })
             } else if let failure = ui.failure {
                 Banner(text: text("today_failed") + " " + failureText(failure), tone: .error)
                 Button(text("retry")) { ws.today.reload() }
@@ -38,6 +38,7 @@ struct TodayView: View {
 }
 
 private struct TodayContent: View {
+    let ws: Workspace
     let data: TodayData
     let can: Capabilities
     let canWrite: Bool
@@ -92,7 +93,7 @@ private struct TodayContent: View {
                 if mine.isEmpty {
                     Text(text("today_empty")).foregroundColor(.secondary)
                 } else {
-                    Card { ForEach(mine, id: \.id) { RecentLine(entry: $0) } }
+                    Card { ForEach(mine, id: \.id) { RecentLine(ws: ws, entry: $0) } }
                 }
             }
         } else {
@@ -106,7 +107,7 @@ private struct TodayContent: View {
                 }
             } else {
                 Text(text("today_latest")).font(.headline)
-                Card { ForEach(Array(data.recent.prefix(10)), id: \.id) { RecentLine(entry: $0) } }
+                Card { ForEach(Array(data.recent.prefix(10)), id: \.id) { RecentLine(ws: ws, entry: $0) } }
             }
         }
     }
@@ -184,13 +185,18 @@ private struct CurrencyCard: View {
 }
 
 private struct RecentLine: View {
+    let ws: Workspace
     let entry: EntryDto
+
+    private var title: String {
+        isBlank(entry.item) ? (categoryTitle(ws, entry.category) ?? "—") : entry.item
+    }
 
     var body: some View {
         let sign = entry.type == .income ? "+" : "-"
         HStack {
             VStack(alignment: .leading) {
-                Text(entry.item.trimmingCharacters(in: .whitespaces).isEmpty ? (entry.category ?? "—") : entry.item)
+                Text(verbatim: title)
                 Text(clockTime(entry.createdAt) + " · " + entry.createdBy.name).font(.caption).foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
