@@ -156,3 +156,20 @@ struct FlowLayout: Layout {
         return (CGSize(width: widest, height: y + rowHeight), frames)
     }
 }
+
+// Kotlin hands the Ints of its sets and maps over as plain NSNumber, not the KotlinInt the Swift type names:
+// reading such a set or map through its Swift type casts each one and crashes. These read them as NSNumber.
+
+/// The Ints of a Kotlin Set<Int>.
+func ints(_ set: Set<KotlinInt>) -> Set<Int> {
+    Set((set as NSSet).compactMap { ($0 as? NSNumber)?.intValue })
+}
+
+/// A Kotlin Map<Int, V> with Int keys.
+func intKeyed<V>(_ map: [KotlinInt: V]) -> [Int: V] {
+    var out: [Int: V] = [:]
+    for (key, value) in map as NSDictionary {
+        if let key = key as? NSNumber, let value = value as? V { out[key.intValue] = value }
+    }
+    return out
+}

@@ -109,7 +109,7 @@ struct RecordView: View {
         }
         // An amount read off a slip goes in its line; for any other line what is typed stands.
         .onChange(of: draft.tenders.map(\.amount)) { _ in
-            for row in draft.tenders where ui.amountFromSlip.contains(KotlinInt(int: row.key)) && amounts[row.key] != row.amount {
+            for row in draft.tenders where ints(ui.amountFromSlip).contains(Int(row.key)) && amounts[row.key] != row.amount {
                 amounts[row.key] = row.amount
             }
         }
@@ -160,10 +160,10 @@ struct RecordView: View {
                 Text(text("record_amount_shown", displayAmount(minor: minor.int64Value, exponent: currency.exponent) + " " + currency.code))
                     .font(.body.monospacedDigit())
                     .frame(maxWidth: .infinity, alignment: .trailing)
-            } else if ui.badRows.contains(KotlinInt(int: row.key)) {
+            } else if ints(ui.badRows).contains(Int(row.key)) {
                 Text(text("issue_amount_invalid")).font(.caption).foregroundColor(.red)
             }
-            if ui.amountFromSlip.contains(KotlinInt(int: row.key)) {
+            if ints(ui.amountFromSlip).contains(Int(row.key)) {
                 Text(text("amount_from_slip")).font(.caption).foregroundColor(.secondary)
             }
             if draft.tenders.count > 1 {

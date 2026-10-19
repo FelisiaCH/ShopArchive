@@ -229,8 +229,8 @@ private struct EntryDetailView: View {
                 if e.slips.isEmpty {
                     Text(text("detail_no_slips")).foregroundColor(.secondary)
                 }
-                ForEach(ui.slips.sorted { $0.key.intValue < $1.key.intValue }, id: \.key) { n, load in
-                    SlipImage(n: n.intValue, load: load)
+                ForEach(intKeyed(ui.slips).sorted { $0.key < $1.key }, id: \.key) { n, load in
+                    SlipImage(n: n, load: load)
                 }
                 if !e.transfers.isEmpty {
                     Text(text("detail_transfers")).font(.headline)
@@ -583,7 +583,7 @@ private struct EditFormView: View {
                 Text(text("record_amount_shown", displayAmount(minor: minor.int64Value, exponent: currency.exponent) + " " + currency.code))
                     .font(.body.monospacedDigit())
                     .frame(maxWidth: .infinity, alignment: .trailing)
-            } else if edit.badRows.contains(KotlinInt(int: row.key)) {
+            } else if ints(edit.badRows).contains(Int(row.key)) {
                 Text(text("issue_amount_invalid")).font(.caption)
             }
             if f.tenders.count > 1 {
