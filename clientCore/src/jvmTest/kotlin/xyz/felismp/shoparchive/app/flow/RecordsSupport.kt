@@ -431,8 +431,12 @@ class FakeRecordsApi : RecordsApi {
         return adminChange(name) { it.copy(hasPin = false, hasPassword = false) }
     }
 
+    /** Branch keys the server has that the person's config does not show. */
+    var hiddenBranchKeys: Set<String> = emptySet()
+
     override suspend fun addBranch(request: CreateBranchRequest): BranchDto {
         admin("addBranch ${request.key} ${request.displayName}")
+        if (request.key in hiddenBranchKeys) throw ClientError.Api(409, ErrorCode.CONFLICT, "Exists.", reason = ErrorReasons.KEY_EXISTS)
         return BranchDto(request.key, request.displayName, false)
     }
 

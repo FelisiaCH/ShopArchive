@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import xyz.felismp.shoparchive.app.client.ClientError
 import xyz.felismp.shoparchive.shared.AdminRoleDto
 import xyz.felismp.shoparchive.shared.AdminUserDto
 import xyz.felismp.shoparchive.shared.AppliesTo
@@ -15,6 +16,7 @@ import xyz.felismp.shoparchive.shared.CategoryDto
 import xyz.felismp.shoparchive.shared.CreateBranchRequest
 import xyz.felismp.shoparchive.shared.CreateCategoryRequest
 import xyz.felismp.shoparchive.shared.CreateUserRequest
+import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.LocalizedName
 import xyz.felismp.shoparchive.shared.UpdateBranchRequest
 import xyz.felismp.shoparchive.shared.UpdateCategoryRequest
@@ -136,7 +138,10 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
     }
 
     /** A new branch under the next free key `branch-N`, so nobody types a slug. */
-    fun addBranch(displayName: String) = addBranch(nextKey("branch", ui.value.branches.map { it.key }), displayName)
+    fun addBranch(displayName: String) = act(env.can.manageBranches) {
+        withFreeKey("branch", ui.value.branches.map { it.key }) { key -> env.calls.run { env.api.addBranch(CreateBranchRequest(key, displayName)) } }
+        reloadConfig()
+    }
 
     /** Renames the branch ([displayName] not null) and/or archives or restores it ([archived] not null). The key never changes. */
     fun updateBranch(key: String, displayName: String?, archived: Boolean?) = act(env.can.manageBranches) {
@@ -150,7 +155,27 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
     }
 
     /** A new category under the next free key `category-N`. */
-    fun addCategory(name: LocalizedName, appliesTo: AppliesTo) = addCategory(nextKey("category", ui.value.categories.map { it.key }), name, appliesTo)
+    fun addCategory(name: LocalizedName, appliesTo: AppliesTo) = act(env.can.manageCategories) {
+        withFreeKey("category", ui.value.categories.map { it.key }) { key -> env.calls.run { env.api.addCategory(CreateCategoryRequest(key, name, appliesTo)) } }
+        reloadConfig()
+    }
+
+    /**
+     * Calls [create] with the next free `prefix-N` of [known]. The lists hold only what this person may see, so a key the
+     * server already has (another branch's) is skipped and the next one tried, a few times at most.
+     */
+    private suspend fun withFreeKey(prefix: String, known: List<String>, create: suspend (String) -> Unit) {
+        val taken = known.toMutableList()
+        while (true) {
+            val key = nextKey(prefix, taken)
+            try {
+                return create(key)
+            } catch (e: ClientError.Api) {
+                if (e.reason != ErrorReasons.KEY_EXISTS || taken.size - known.size >= KEY_TRIES) throw e
+                taken += key
+            }
+        }
+    }
 
     /** Changes only what is not null: the names, what the category is for, archived or restored. The key never changes. */
     fun updateCategory(key: String, name: LocalizedName?, appliesTo: AppliesTo?, archived: Boolean?) = act(env.can.manageCategories) {
@@ -158,6 +183,8 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
         reloadConfig()
     }
 }
+
+private const val KEY_TRIES = 20
 
 /** The lowest `prefix-N` (N from 1) that is not in [taken]: a slug of a-z, 0-9 and `-`, as the server wants a key. */
 internal fun nextKey(prefix: String, taken: List<String>): String = generateSequence(1) { it + 1 }.map { "$prefix-$it" }.first { it !in taken }
