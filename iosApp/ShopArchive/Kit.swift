@@ -87,7 +87,10 @@ func clockTime(_ timestamp: String) -> String {
 
 /// `2026-10-19 09:47` in this device's time zone from a UTC instant like `2026-10-19T02:47:05Z`; the text itself if it is not one.
 func localTime(_ instant: String) -> String {
-    guard let date = ISO8601DateFormatter().date(from: instant) else { return instant }
+    let fractional = ISO8601DateFormatter()
+    fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    // Java's Instant.toString() adds a fraction when the instant has one (`...:05.123Z`).
+    guard let date = ISO8601DateFormatter().date(from: instant) ?? fractional.date(from: instant) else { return instant }
     let out = DateFormatter()
     out.locale = Locale(identifier: "en_US_POSIX")
     out.timeZone = .current
