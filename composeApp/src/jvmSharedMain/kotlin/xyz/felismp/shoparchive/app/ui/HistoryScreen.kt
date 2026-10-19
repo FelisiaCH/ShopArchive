@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
 import xyz.felismp.shoparchive.app.flow.ActionPhase
 import xyz.felismp.shoparchive.app.flow.ConfigState
@@ -262,11 +263,31 @@ private fun SlipImage(n: Int, load: Load<ByteArray>) {
     }
 }
 
+// The server writes these English words into the history; the screen says them in the user's language and shows any word it does not know as it came.
+private val ACTION_WORDS = mapOf(
+    "create" to Res.string.history_action_create, "edit" to Res.string.history_action_edit,
+    "delete" to Res.string.history_action_delete, "move" to Res.string.history_action_move,
+)
+private val FIELD_WORDS = mapOf(
+    "category" to Res.string.history_field_category, "date" to Res.string.history_field_date, "item" to Res.string.history_field_item,
+    "note" to Res.string.history_field_note, "slips" to Res.string.history_field_slips, "tenders" to Res.string.history_field_tenders,
+    "transfers" to Res.string.history_field_transfers, "type" to Res.string.history_field_type,
+)
+private val TYPE_WORDS = mapOf("income" to Res.string.type_income, "expense" to Res.string.type_expense)
+
+@Composable
+private fun wordFor(words: Map<String, StringResource>, raw: String): String = words[raw]?.let { stringResource(it) } ?: raw
+
 @Composable
 private fun HistoryLine(item: HistoryItem) {
     ShopCard {
-        ShopText(item.action + " · " + item.at.replace('T', ' ').take(16) + " · " + item.by.name, TextRole.Caption, muted = true)
-        item.changes.forEach { c -> ShopText(c.field + ": " + c.from.ifEmpty { "—" } + " → " + c.to.ifEmpty { "—" }, TextRole.Caption) }
+        ShopText(wordFor(ACTION_WORDS, item.action) + " · " + item.at.replace('T', ' ').take(16) + " · " + item.by.name, TextRole.Caption, muted = true)
+        item.changes.forEach { c ->
+            // Only a change of type has words as values; the others (an item, a note, payments) are the text itself.
+            val from = if (c.field == "type") wordFor(TYPE_WORDS, c.from) else c.from
+            val to = if (c.field == "type") wordFor(TYPE_WORDS, c.to) else c.to
+            ShopText(wordFor(FIELD_WORDS, c.field) + ": " + from.ifEmpty { "—" } + " → " + to.ifEmpty { "—" }, TextRole.Caption)
+        }
     }
 }
 

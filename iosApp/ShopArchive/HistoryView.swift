@@ -462,12 +462,35 @@ private struct HistoryLine: View {
 
     var body: some View {
         Card {
-            Text(verbatim: "\(item.action) · \(item.at.replacingOccurrences(of: "T", with: " ").prefix(16)) · \(item.by.name)")
+            Text(verbatim: headline)
                 .font(.caption).foregroundColor(.secondary)
             ForEach(Array(item.changes.enumerated()), id: \.offset) { _, c in
-                Text(verbatim: "\(c.field): \(c.from.isEmpty ? "—" : c.from) → \(c.to.isEmpty ? "—" : c.to)").font(.caption)
+                Text(verbatim: change(c)).font(.caption)
             }
         }
+    }
+
+    private var headline: String {
+        let action = known(["create", "edit", "delete", "move"], item.action, prefix: "history_action_")
+        let at = item.at.replacingOccurrences(of: "T", with: " ").prefix(16)
+        return "\(action) · \(at) · \(item.by.name)"
+    }
+
+    private func change(_ c: HistoryChange) -> String {
+        let field = known(["category", "date", "item", "note", "slips", "tenders", "transfers", "type"], c.field, prefix: "history_field_")
+        return "\(field): \(value(c.from, of: c.field)) → \(value(c.to, of: c.field))"
+    }
+
+    /// The server's English word in the user's language; a word this app does not know is shown as it came.
+    private func known(_ words: [String], _ raw: String, prefix: String) -> String {
+        words.contains(raw) ? text(prefix + raw) : raw
+    }
+
+    /// Only a change of type has words as values; the others (an item, a note, payments) are the text itself.
+    private func value(_ raw: String, of field: String) -> String {
+        if raw.isEmpty { return "—" }
+        if field == "type" { return known(["income", "expense"], raw, prefix: "type_") }
+        return raw
     }
 }
 
