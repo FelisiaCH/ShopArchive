@@ -196,7 +196,7 @@
 "detail_delete_body" = "ยังอยู่ในประวัติโดยทำเครื่องหมายว่าลบแล้ว และไม่นับในยอดรวม";
 "detail_delete_yes" = "ใช่ ลบเลย";
 "detail_move_to" = "ย้ายไปวันไหน";
-"detail_move_date" = "วันที่ (yyyy-MM-dd)";
+"detail_move_date" = "วันที่";
 "detail_move_yes" = "ย้าย";
 "detail_failed" = "ยังไม่ได้ทำ";
 "detail_history" = "การเปลี่ยนแปลง";
@@ -224,8 +224,8 @@
 "export_write_failed" = "เขียนไฟล์ที่นั่นไม่ได้ ลองที่อื่น";
 "filter_all" = "ทั้งหมด";
 "filter_deleted" = "แสดงที่ลบแล้ว";
-"filter_from" = "ตั้งแต่วันที่ (yyyy-MM-dd)";
-"filter_to" = "ถึงวันที่ (yyyy-MM-dd)";
+"filter_from" = "ตั้งแต่วันที่";
+"filter_to" = "ถึงวันที่";
 "filter_range" = "วันที่";
 "history_deleted" = "ลบแล้ว";
 "history_empty" = "ไม่มีรายการที่ตรงกับตัวกรอง";

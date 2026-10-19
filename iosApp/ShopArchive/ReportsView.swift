@@ -160,7 +160,7 @@ private struct OverviewSection: View {
     }
 }
 
-/// The two dates of a custom range. What is typed is kept here as well (see HistoryList): a field bound to the flow alone loses characters while the flow's answer is on its way back.
+/// The two dates of a custom range. The picked dates are kept here as well (see HistoryList).
 /// Only there while the range is Custom, so each time it starts from the flow's dates, which a quick range changes.
 private struct CustomRange: View {
     let r: ReportsState
@@ -175,14 +175,8 @@ private struct CustomRange: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            TextField(text("filter_from"), text: Binding(get: { from }, set: { from = $0; r.setFrom(text: $0) }))
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            TextField(text("filter_to"), text: Binding(get: { to }, set: { to = $0; r.setTo(text: $0) }))
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+            DateField(label: text("filter_from"), value: from) { from = $0; r.setFrom(text: $0) }
+            DateField(label: text("filter_to"), value: to) { to = $0; r.setTo(text: $0) }
         }
     }
 }
@@ -408,7 +402,7 @@ private struct ShareSheet: UIViewControllerRepresentable {
 private struct ExportSection: View {
     let ws: Workspace
     @State private var ui: ExportUi
-    // What is typed is kept here as well (see CustomRange). Only the person changes these dates, so they never need to follow the flow.
+    // The picked dates are kept here as well (see CustomRange). Only the person changes these dates, so they never need to follow the flow.
     @State private var from: String
     @State private var to: String
     @State private var shared: SharedFile?
@@ -430,14 +424,8 @@ private struct ExportSection: View {
         let x = ws.export
         VStack(alignment: .leading, spacing: 12) {
             Text(text("export_hint")).foregroundColor(.secondary)
-            TextField(text("filter_from"), text: Binding(get: { from }, set: { from = $0; x.setFrom(text: $0) }))
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            TextField(text("filter_to"), text: Binding(get: { to }, set: { to = $0; x.setTo(text: $0) }))
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+            DateField(label: text("filter_from"), value: from) { from = $0; x.setFrom(text: $0) }
+            DateField(label: text("filter_to"), value: to) { to = $0; x.setTo(text: $0) }
             if let problem = ui.rangeProblem {
                 Text(rangeText(problem)).font(.caption)
             }

@@ -198,7 +198,7 @@
     <string name="detail_delete_body">It stays in the history, marked as deleted, and is left out of the totals.</string>
     <string name="detail_delete_yes">Yes, delete</string>
     <string name="detail_move_to">Move to which day?</string>
-    <string name="detail_move_date">Date (yyyy-MM-dd)</string>
+    <string name="detail_move_date">Date</string>
     <string name="detail_move_yes">Move</string>
     <string name="detail_failed">Not done.</string>
     <string name="detail_history">Changes</string>
@@ -226,8 +226,8 @@
     <string name="export_write_failed">The file could not be written there. Try another place.</string>
     <string name="filter_all">All</string>
     <string name="filter_deleted">Show deleted</string>
-    <string name="filter_from">From (yyyy-MM-dd)</string>
-    <string name="filter_to">To (yyyy-MM-dd)</string>
+    <string name="filter_from">From</string>
+    <string name="filter_to">To</string>
     <string name="filter_range">Dates</string>
     <string name="history_deleted">Deleted</string>
     <string name="history_empty">Nothing matches these filters.</string>

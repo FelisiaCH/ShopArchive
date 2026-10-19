@@ -196,7 +196,7 @@
 "detail_delete_body" = "It stays in the history, marked as deleted, and is left out of the totals.";
 "detail_delete_yes" = "Yes, delete";
 "detail_move_to" = "Move to which day?";
-"detail_move_date" = "Date (yyyy-MM-dd)";
+"detail_move_date" = "Date";
 "detail_move_yes" = "Move";
 "detail_failed" = "Not done.";
 "detail_history" = "Changes";
@@ -224,8 +224,8 @@
 "export_write_failed" = "The file could not be written there. Try another place.";
 "filter_all" = "All";
 "filter_deleted" = "Show deleted";
-"filter_from" = "From (yyyy-MM-dd)";
-"filter_to" = "To (yyyy-MM-dd)";
+"filter_from" = "From";
+"filter_to" = "To";
 "filter_range" = "Dates";
 "history_deleted" = "Deleted";
 "history_empty" = "Nothing matches these filters.";

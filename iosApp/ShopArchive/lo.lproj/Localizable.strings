@@ -196,7 +196,7 @@
 "detail_delete_body" = "ຍັງຢູ່ໃນປະຫວັດ ໂດຍໝາຍວ່າລຶບແລ້ວ ແລະ ບໍ່ນັບໃນຍອດລວມ.";
 "detail_delete_yes" = "ແມ່ນ, ລຶບເລີຍ";
 "detail_move_to" = "ຍ້າຍໄປວັນໃດ?";
-"detail_move_date" = "ວັນທີ (yyyy-MM-dd)";
+"detail_move_date" = "ວັນທີ";
 "detail_move_yes" = "ຍ້າຍ";
 "detail_failed" = "ຍັງບໍ່ໄດ້ເຮັດ.";
 "detail_history" = "ການປ່ຽນແປງ";
@@ -224,8 +224,8 @@
 "export_write_failed" = "ຂຽນໄຟລ໌ບ່ອນນັ້ນບໍ່ໄດ້. ລອງບ່ອນອື່ນ.";
 "filter_all" = "ທັງໝົດ";
 "filter_deleted" = "ສະແດງທີ່ລຶບແລ້ວ";
-"filter_from" = "ແຕ່ວັນທີ (yyyy-MM-dd)";
-"filter_to" = "ຮອດວັນທີ (yyyy-MM-dd)";
+"filter_from" = "ແຕ່ວັນທີ";
+"filter_to" = "ຮອດວັນທີ";
 "filter_range" = "ວັນທີ";
 "history_deleted" = "ລຶບແລ້ວ";
 "history_empty" = "ບໍ່ມີລາຍການທີ່ກົງກັບຕົວກອງ.";

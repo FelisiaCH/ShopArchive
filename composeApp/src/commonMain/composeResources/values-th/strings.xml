@@ -198,7 +198,7 @@
     <string name="detail_delete_body">ยังอยู่ในประวัติโดยทำเครื่องหมายว่าลบแล้ว และไม่นับในยอดรวม</string>
     <string name="detail_delete_yes">ใช่ ลบเลย</string>
     <string name="detail_move_to">ย้ายไปวันไหน</string>
-    <string name="detail_move_date">วันที่ (yyyy-MM-dd)</string>
+    <string name="detail_move_date">วันที่</string>
     <string name="detail_move_yes">ย้าย</string>
     <string name="detail_failed">ยังไม่ได้ทำ</string>
     <string name="detail_history">การเปลี่ยนแปลง</string>
@@ -226,8 +226,8 @@
     <string name="export_write_failed">เขียนไฟล์ที่นั่นไม่ได้ ลองที่อื่น</string>
     <string name="filter_all">ทั้งหมด</string>
     <string name="filter_deleted">แสดงที่ลบแล้ว</string>
-    <string name="filter_from">ตั้งแต่วันที่ (yyyy-MM-dd)</string>
-    <string name="filter_to">ถึงวันที่ (yyyy-MM-dd)</string>
+    <string name="filter_from">ตั้งแต่วันที่</string>
+    <string name="filter_to">ถึงวันที่</string>
     <string name="filter_range">วันที่</string>
     <string name="history_deleted">ลบแล้ว</string>
     <string name="history_empty">ไม่มีรายการที่ตรงกับตัวกรอง</string>

@@ -198,7 +198,7 @@
     <string name="detail_delete_body">ຍັງຢູ່ໃນປະຫວັດ ໂດຍໝາຍວ່າລຶບແລ້ວ ແລະ ບໍ່ນັບໃນຍອດລວມ.</string>
     <string name="detail_delete_yes">ແມ່ນ, ລຶບເລີຍ</string>
     <string name="detail_move_to">ຍ້າຍໄປວັນໃດ?</string>
-    <string name="detail_move_date">ວັນທີ (yyyy-MM-dd)</string>
+    <string name="detail_move_date">ວັນທີ</string>
     <string name="detail_move_yes">ຍ້າຍ</string>
     <string name="detail_failed">ຍັງບໍ່ໄດ້ເຮັດ.</string>
     <string name="detail_history">ການປ່ຽນແປງ</string>
@@ -226,8 +226,8 @@
     <string name="export_write_failed">ຂຽນໄຟລ໌ບ່ອນນັ້ນບໍ່ໄດ້. ລອງບ່ອນອື່ນ.</string>
     <string name="filter_all">ທັງໝົດ</string>
     <string name="filter_deleted">ສະແດງທີ່ລຶບແລ້ວ</string>
-    <string name="filter_from">ແຕ່ວັນທີ (yyyy-MM-dd)</string>
-    <string name="filter_to">ຮອດວັນທີ (yyyy-MM-dd)</string>
+    <string name="filter_from">ແຕ່ວັນທີ</string>
+    <string name="filter_to">ຮອດວັນທີ</string>
     <string name="filter_range">ວັນທີ</string>
     <string name="history_deleted">ລຶບແລ້ວ</string>
     <string name="history_empty">ບໍ່ມີລາຍການທີ່ກົງກັບຕົວກອງ.</string>
