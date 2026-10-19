@@ -57,6 +57,7 @@ private fun Status(busy: Boolean, problem: Problem?) {
 /** A saved server showed another key: Cancel is the safe default, trusting the new key is the secondary choice. */
 @Composable
 private fun CertChangedScreen(s: AppState.CertChanged, flow: AppFlow) {
+    OnBackPress(true, flow::cancelCertChanged) // a no-op while busy, like the disabled Cancel
     ScreenFrame(stringResource(Res.string.pinmm_title)) {
         ShopText(s.name.ifBlank { s.address }, TextRole.Title)
         ShopText(s.address, TextRole.Caption, muted = true)
@@ -109,6 +110,8 @@ private fun LoginScreen(s: AppState.Login, flow: AppFlow) {
     var pin by remember { mutableStateOf("") }
     var newPin by remember(s.needsNewPin) { mutableStateOf("") }
     var newPinRepeat by remember(s.needsNewPin) { mutableStateOf("") }
+    // Back steps back as the visible buttons do (both are no-ops while busy): to the lock screen when adding a user, else to the servers.
+    OnBackPress(true) { if (s.adding) flow.cancelLogin() else flow.showServers() }
     ScreenFrame(stringResource(if (s.adding) Res.string.add_user_title else Res.string.login_title)) {
         ShopText(s.serverName.ifBlank { s.server }, TextRole.Title)
         ShopText(s.server, TextRole.Caption, muted = true)
@@ -137,6 +140,7 @@ private fun LoginScreen(s: AppState.Login, flow: AppFlow) {
 private fun LockedScreen(s: AppState.Locked, flow: AppFlow) {
     // A new field when the server asks for the password instead, or another user is picked: what was typed is not the next secret.
     var secret by remember(s.needsPassword, s.username) { mutableStateOf("") }
+    OnBackPress(true, flow::showServers) // a no-op while busy, like the disabled button
     ScreenFrame(stringResource(Res.string.locked_title)) {
         val username = s.username
         if (username == null) {
@@ -168,7 +172,8 @@ private fun LockedScreen(s: AppState.Locked, flow: AppFlow) {
 @Composable
 private fun ReauthScreen(p: ReauthPrompt, flow: AppFlow) {
     var secret by remember(p.needsPassword) { mutableStateOf("") }
-    OnBackPress(!p.busy, flow::cancelReauth)
+    // Always taken, so Back never leaves the app mid-prompt; it cancels only when the Cancel button is enabled.
+    OnBackPress(true) { if (!p.busy) flow.cancelReauth() }
     ScreenFrame(stringResource(Res.string.reauth_title)) {
         ShopText(stringResource(if (p.needsPassword) Res.string.reauth_body_password else Res.string.reauth_body_pin))
         ShopTextField(
@@ -210,6 +215,8 @@ internal fun SettingsPage(s: AppState.Settings, flow: AppFlow) {
 private fun ColumnScope.SettingsBody(s: AppState.Settings, flow: AppFlow) {
     val language by flow.language.collectAsState()
     var confirmRemove by remember { mutableStateOf(false) }
+    // Later than the screen's own handler, so it wins while the confirmation shows: Back dismisses it, as its Cancel does.
+    OnBackPress(confirmRemove) { if (!s.busy) confirmRemove = false }
     ShopText(stringResource(Res.string.language_label), TextRole.Title)
     ShopSegmented(LANGUAGES.map { (tag, name) -> tag to stringResource(name) }, language, flow::setLanguage)
 
