@@ -179,7 +179,7 @@ internal class AuthEnv(
             hasher ?: Hasher(settings.auth.hashConcurrency, TEST_COST), records ?: NoRecords, barrier,
             activeBranches = { records?.branches?.activeKeys().orEmpty() },
         )
-        services.register(CommandService::class.java, DefaultCommandService(commands, auth.audit, services), 0, "core")
+        services.register(CommandService::class.java, DefaultCommandService(commands, auth.audit, services, users), 0, "core")
         registerCoreCommands(
             commands, settings, mapOf("devices" to auth.devices::load) + (if (records != null) mapOf("data" to records::loadData) else emptyMap()),
             alsoOnReload = setOf("devices"),

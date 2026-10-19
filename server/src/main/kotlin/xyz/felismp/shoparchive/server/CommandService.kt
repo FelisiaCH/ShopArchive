@@ -10,6 +10,7 @@ import xyz.felismp.shoparchive.api.PermissionNodeRegistry
 import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.api.ServiceRegistry
 import xyz.felismp.shoparchive.server.auth.AuditLog
+import xyz.felismp.shoparchive.server.users.UserStore
 import xyz.felismp.shoparchive.shared.CommandResponse
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
@@ -30,9 +31,6 @@ internal val CONSOLE_ONLY_COMMANDS = emptySet<String>()
  * `perm` or `op` a user would become the op. Like every command from the app, these need the PIN or password entered recently.
  */
 internal val OP_ONLY_COMMANDS = setOf("user", "perm", "role", "devices", "op", "deop")
-
-/** The word an op alone holds: [xyz.felismp.shoparchive.server.users.UserStore] gives an op every node, registered or not (as `auth.password.required-for` reads it). */
-internal const val OP_NODE = "op"
 
 /** At most this many characters of a line go into the audit log. */
 private const val AUDITED_CHARS = 200
@@ -81,6 +79,7 @@ internal class DefaultCommandService(
     private val commands: Commands,
     private val audit: AuditLog,
     private val services: ServiceRegistry,
+    private val users: UserStore,
 ) : CommandService {
     private val auth: AuthService
         get() = services.get(AuthService::class.java) ?: throw ApiError(500, ErrorCode.INTERNAL, "AuthService is not registered")
@@ -133,5 +132,5 @@ internal class DefaultCommandService(
 
     private fun mayRun(principal: Principal, command: Command): Boolean =
         auth.hasPermission(principal, command.permission) &&
-            (command.name.lowercase(Locale.ROOT) !in OP_ONLY_COMMANDS || auth.hasPermission(principal, OP_NODE))
+            (command.name.lowercase(Locale.ROOT) !in OP_ONLY_COMMANDS || users.isOpById(principal.userId))
 }
