@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import xyz.felismp.shoparchive.app.client.ClientError
 import xyz.felismp.shoparchive.shared.AdminRoleDto
 import xyz.felismp.shoparchive.shared.AdminUserDto
 import xyz.felismp.shoparchive.shared.AppliesTo
@@ -15,6 +16,7 @@ import xyz.felismp.shoparchive.shared.CategoryDto
 import xyz.felismp.shoparchive.shared.CreateBranchRequest
 import xyz.felismp.shoparchive.shared.CreateCategoryRequest
 import xyz.felismp.shoparchive.shared.CreateUserRequest
+import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.LocalizedName
 import xyz.felismp.shoparchive.shared.UpdateBranchRequest
 import xyz.felismp.shoparchive.shared.UpdateCategoryRequest
@@ -72,9 +74,9 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
         core.value = next(core.value)
     }
 
-    /** Reads the users and the roles. Does nothing for a person who is no op. */
+    /** Reads the users and the roles. Does nothing for a person who is no op, or while an action runs (its answer would be overwritten by an older list). */
     fun load() {
-        if (!env.can.manageUsers || core.value.loading) return
+        if (!env.can.manageUsers || core.value.loading || core.value.busy) return
         change { it.copy(loading = true, failure = null) }
         env.scope.launch {
             try {
@@ -90,9 +92,9 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
 
     fun clearFailure() = change { it.copy(failure = null) }
 
-    /** Runs [work] when [allowed], the connection is up and no other action is running. */
+    /** Runs [work] when [allowed], the connection is up and no other action or read of the users is running. */
     private fun act(allowed: Boolean, work: suspend () -> Unit) {
-        if (!allowed || !env.canWrite.value || core.value.busy) return
+        if (!allowed || !env.canWrite.value || core.value.busy || core.value.loading) return
         change { it.copy(busy = true, failure = null) }
         env.scope.launch {
             try {
@@ -135,6 +137,12 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
         reloadConfig()
     }
 
+    /** A new branch under the next free key `branch-N`, so nobody types a slug. */
+    fun addBranch(displayName: String) = act(env.can.manageBranches) {
+        withFreeKey("branch", ui.value.branches.map { it.key }) { key -> env.calls.run { env.api.addBranch(CreateBranchRequest(key, displayName)) } }
+        reloadConfig()
+    }
+
     /** Renames the branch ([displayName] not null) and/or archives or restores it ([archived] not null). The key never changes. */
     fun updateBranch(key: String, displayName: String?, archived: Boolean?) = act(env.can.manageBranches) {
         env.calls.run { env.api.updateBranch(key, UpdateBranchRequest(displayName, archived)) }
@@ -146,9 +154,41 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
         reloadConfig()
     }
 
+    /** A new category under the next free key `category-N`. */
+    fun addCategory(name: LocalizedName, appliesTo: AppliesTo) = act(env.can.manageCategories) {
+        withFreeKey("category", ui.value.categories.map { it.key }) { key -> env.calls.run { env.api.addCategory(CreateCategoryRequest(key, name, appliesTo)) } }
+        reloadConfig()
+    }
+
+    /** Keys the server said it already has though this person's lists do not show them, so the next add starts past them. */
+    private val takenKeys = mutableSetOf<String>()
+
+    /**
+     * Calls [create] with the next free `prefix-N` of [known]. The lists hold only what this person may see, so a key the
+     * server already has (another branch's) is skipped and the next one tried, a few times per add.
+     */
+    private suspend fun withFreeKey(prefix: String, known: List<String>, create: suspend (String) -> Unit) {
+        var tries = 0
+        while (true) {
+            val key = nextKey(prefix, known + takenKeys)
+            try {
+                return create(key)
+            } catch (e: ClientError.Api) {
+                if (e.reason != ErrorReasons.KEY_EXISTS) throw e
+                takenKeys += key
+                if (++tries >= KEY_TRIES) throw e
+            }
+        }
+    }
+
     /** Changes only what is not null: the names, what the category is for, archived or restored. The key never changes. */
     fun updateCategory(key: String, name: LocalizedName?, appliesTo: AppliesTo?, archived: Boolean?) = act(env.can.manageCategories) {
         env.calls.run { env.api.updateCategory(key, UpdateCategoryRequest(name, appliesTo, archived)) }
         reloadConfig()
     }
 }
+
+private const val KEY_TRIES = 20
+
+/** The lowest `prefix-N` (N from 1) that is not in [taken]: a slug of a-z, 0-9 and `-`, as the server wants a key. */
+internal fun nextKey(prefix: String, taken: List<String>): String = generateSequence(1) { it + 1 }.map { "$prefix-$it" }.first { it !in taken }

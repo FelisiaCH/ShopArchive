@@ -3,6 +3,8 @@ package xyz.felismp.shoparchive.app.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,6 +37,7 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
     val branch by ws.branch.collectAsState()
     val can by ws.capabilities.collectAsState()
     val status by s.connection.collectAsState()
+    val unreadNotes = ws.today.ui.collectAsState().value.data?.unreadNotes
     val today = stringResource(Res.string.nav_today)
     val record = stringResource(Res.string.nav_record)
     val history = stringResource(Res.string.nav_history)
@@ -42,6 +45,7 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
     val notes = stringResource(Res.string.nav_notes)
     val more = stringResource(Res.string.nav_more)
     val console = stringResource(Res.string.nav_console)
+    val manage = stringResource(Res.string.nav_manage)
     val settingsLabel = stringResource(Res.string.nav_settings)
     val lockNow = stringResource(Res.string.lock_now)
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -60,8 +64,9 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
         val items = listOf(Destination.TODAY to today, Destination.RECORD to record, Destination.HISTORY to history, Destination.REPORTS to reports, Destination.NOTES to notes)
             .filter { (d, _) -> (config is ConfigState.Ready || (d == Destination.TODAY && !navigationBottomBar)) && can.allows(d) && ((d != Destination.REPORTS && d != Destination.NOTES) || !folded) }
             .let { if (navigationBottomBar) it + (Destination.MORE to more) else it }
-        // Windows has no More: the console, Settings and Lock now sit at the foot of the pane.
+        // Windows has no More: Manage shop, the console, Settings and Lock now sit at the foot of the pane.
         val footer = if (navigationBottomBar) emptyList() else listOfNotNull(
+            if (can.admin) NavAction(manage, ShopIcon.Manage, settings == null && destination == Destination.ADMIN) { open(Destination.ADMIN) } else null,
             if (can.console) NavAction(console, ShopIcon.Console, settings == null && destination == Destination.CONSOLE) { open(Destination.CONSOLE) } else null,
             NavAction(settingsLabel, ShopIcon.Settings, settings != null) { if (settings == null) flow.openSettings() },
         )
@@ -70,10 +75,10 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
             settings != null -> null
             destination == Destination.OPEN_DAY -> Destination.TODAY
             (destination == Destination.REPORTS || destination == Destination.NOTES) && folded -> Destination.MORE
-            destination == Destination.CONSOLE -> Destination.MORE
+            destination == Destination.CONSOLE || destination == Destination.ADMIN -> Destination.MORE
             else -> destination
         }
-        ShopNavigation(items, Destination::icon, selected, ::open, wide = wide, footer = footer, account = account) {
+        ShopNavigation(items, Destination::icon, selected, ::open, wide = wide, footer = footer, account = account, badge = { if (it == Destination.NOTES) unreadNotes else null }) {
             Column(Modifier.fillMaxSize()) {
                 // Only when the server has a newer app for this platform (or a download is going on): never a button without an update.
                 if (settings == null) ws.updates?.let { UpdatePanel(it, modifier = Modifier.padding(horizontal = shellInset, vertical = 4.dp)) }
@@ -84,17 +89,18 @@ fun Shell(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, settings: AppState
                 }
                 val branches = ws.branches
                 if (settings == null && branches.size > 1) {
-                    FlowRow(
-                        Modifier.fillMaxWidth().padding(horizontal = shellInset, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        branches.forEach { b -> ShopChoice(b.displayName, b.key == branch, { ws.selectBranch(b.key) }) }
+                    Row(Modifier.fillMaxWidth().padding(horizontal = shellInset, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ShopText(stringResource(Res.string.branch_label), TextRole.Caption, muted = true)
+                        FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            branches.forEach { b -> ShopChoice(b.displayName, b.key == branch, { ws.selectBranch(b.key) }) }
+                        }
                     }
                 }
                 when {
                     settings != null -> SettingsPage(settings, flow)
                     destination == Destination.MORE -> MoreScreen(s, flow, ws, can)
                     destination == Destination.CONSOLE -> ConsoleScreen(ws)
+                    destination == Destination.ADMIN -> AdminScreen(ws)
                     config is ConfigState.Loading -> ShopPage("") { ShopText(stringResource(Res.string.working), muted = true) }
                     config is ConfigState.Failed -> ShopPage("") {
                         ShopBanner(stringResource(Res.string.cfg_failed), Tone.Error)
@@ -121,6 +127,7 @@ private fun Destination.icon() = when (this) {
     Destination.REPORTS -> ShopIcon.Reports
     Destination.NOTES -> ShopIcon.Notes
     Destination.CONSOLE -> ShopIcon.Console
+    Destination.ADMIN -> ShopIcon.Manage
     Destination.MORE -> ShopIcon.More
 }
 
@@ -133,6 +140,7 @@ private fun MoreScreen(s: AppState.Unlocked, flow: AppFlow, ws: Workspace, can: 
             ShopButton(stringResource(Res.string.nav_reports), { ws.openReports(first) }, Modifier.fillWidthOnPhone(), primary = false, icon = ShopIcon.Reports)
         }
         if (can.allows(Destination.NOTES)) ShopButton(stringResource(Res.string.nav_notes), { ws.go(Destination.NOTES) }, Modifier.fillWidthOnPhone(), primary = false, icon = ShopIcon.Notes)
+        if (can.admin) ShopButton(stringResource(Res.string.nav_manage), { ws.go(Destination.ADMIN) }, Modifier.fillWidthOnPhone(), primary = false, icon = ShopIcon.Manage)
         if (can.console) ShopButton(stringResource(Res.string.nav_console), { ws.go(Destination.CONSOLE) }, Modifier.fillWidthOnPhone(), primary = false, icon = ShopIcon.Console)
         ShopButton(stringResource(Res.string.nav_settings), flow::openSettings, Modifier.fillWidthOnPhone(), primary = false, icon = ShopIcon.Settings)
         ShopButton(stringResource(Res.string.lock_now), { flow.lockNow() }, Modifier.fillWidthOnPhone(), icon = ShopIcon.LockNow)

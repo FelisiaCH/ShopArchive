@@ -16,6 +16,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import org.jetbrains.compose.resources.Font
 import xyz.felismp.shoparchive.app.resources.Res
@@ -82,14 +83,15 @@ private fun rememberGoogleSans(): FontFamily {
 }
 
 internal fun materialTypography(family: FontFamily): Typography {
-    // Tabular figures on every style, as the design does at its root.
-    fun TextStyle.shop() = copy(fontFamily = family, fontFeatureSettings = "tnum")
+    // Tabular figures on every style, as the design does at its root. Lao stacks marks above and below the line, so the text styles get at least
+    // 1.5 times their size as line height (Material's own 1.33 to 1.43 would clip them).
+    fun TextStyle.shop(lines: Float = 1f) = copy(fontFamily = family, fontFeatureSettings = "tnum", lineHeight = maxOf(lineHeight.value, fontSize.value * lines).sp)
     val d = Typography()
     return Typography(
         displayLarge = d.displayLarge.shop(), displayMedium = d.displayMedium.shop(), displaySmall = d.displaySmall.shop(),
         headlineLarge = d.headlineLarge.shop(), headlineMedium = d.headlineMedium.shop(), headlineSmall = d.headlineSmall.shop(),
-        titleLarge = d.titleLarge.shop(), titleMedium = d.titleMedium.shop(), titleSmall = d.titleSmall.shop(),
-        bodyLarge = d.bodyLarge.shop(), bodyMedium = d.bodyMedium.shop(), bodySmall = d.bodySmall.shop(),
-        labelLarge = d.labelLarge.shop(), labelMedium = d.labelMedium.shop(), labelSmall = d.labelSmall.shop(),
+        titleLarge = d.titleLarge.shop(1.5f), titleMedium = d.titleMedium.shop(1.5f), titleSmall = d.titleSmall.shop(1.5f),
+        bodyLarge = d.bodyLarge.shop(1.5f), bodyMedium = d.bodyMedium.shop(1.5f), bodySmall = d.bodySmall.shop(1.5f),
+        labelLarge = d.labelLarge.shop(1.5f), labelMedium = d.labelMedium.shop(1.5f), labelSmall = d.labelSmall.shop(1.5f),
     )
 }

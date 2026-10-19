@@ -3,6 +3,7 @@ package xyz.felismp.shoparchive.app.ui
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import xyz.felismp.shoparchive.app.flow.ThisDevice
 import xyz.felismp.shoparchive.app.client.PlatformContext
@@ -12,8 +13,11 @@ import xyz.felismp.shoparchive.app.client.PlatformContext
  * Only what these screens use.
  */
 
-/** [Amount] is for money: right-aligned (give it the width) and in figures that line up in a column. */
-enum class TextRole { Title, Body, Caption, Mono, Amount }
+/**
+ * [Title] heads a section or a card. [Display] is a figure that stands out (a count, a net total). [Amount] is for money: bold, right-aligned
+ * (give it the width) and in figures that line up in a column.
+ */
+enum class TextRole { Title, Body, Caption, Mono, Amount, Display }
 
 enum class FieldKind { Text, Multiline, Password, Pin, Amount }
 
@@ -28,7 +32,7 @@ expect fun ShopSkin(content: @Composable () -> Unit)
 expect fun ScreenFrame(title: String, content: @Composable ColumnScope.() -> Unit)
 
 @Composable
-expect fun ShopText(text: String, role: TextRole = TextRole.Body, muted: Boolean = false, modifier: Modifier = Modifier)
+expect fun ShopText(text: String, role: TextRole = TextRole.Body, muted: Boolean = false, modifier: Modifier = Modifier, color: Color = Color.Unspecified)
 
 /** A button; [icon], when given, goes before the text. */
 @Composable
@@ -64,9 +68,9 @@ expect fun <T> ShopSegmented(options: List<Pair<T, String>>, selected: T, onSele
 @Composable
 expect fun ShopPage(title: String, content: @Composable ColumnScope.() -> Unit)
 
-/** A bordered block that groups related content. */
+/** A bordered block that groups related content. Without [padded] the content runs to the edges (rows with their own padding and dividers); with [onClick] the whole card is one target. */
 @Composable
-expect fun ShopCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit)
+expect fun ShopCard(modifier: Modifier = Modifier, padded: Boolean = true, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit)
 
 /** A chip that can be on or off, for picking one of a few (category, currency, suggestion). */
 @Composable
@@ -92,8 +96,8 @@ class NavAccount(val name: String, val server: String, val lock: NavAction)
 
 /**
  * The app's navigation. [wide]: a pane on the left, each item with [icon] and label. Not [wide]: a bottom bar on Android, a narrow strip of icons
- * on Windows (the label shows when the pointer rests on one). Only Windows shows [footer] and [account], at the foot of the pane apart from the
- * items; Android ignores them. [selected] is null when none of the items is the current page (Settings on Windows). [content] fills the rest.
+ * on Windows (the label shows when the pointer rests on one). Only Windows shows [footer], [account] and [badge] (a count beside an item, none when
+ * null), at the foot of the pane apart from the items; Android ignores them. [selected] is null when none of the items is the current page (Settings on Windows). [content] fills the rest.
  */
 @Composable
 expect fun <T> ShopNavigation(
@@ -104,6 +108,7 @@ expect fun <T> ShopNavigation(
     wide: Boolean,
     footer: List<NavAction> = emptyList(),
     account: NavAccount? = null,
+    badge: (T) -> Int? = { null },
     content: @Composable () -> Unit,
 )
 

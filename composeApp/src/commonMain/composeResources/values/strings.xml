@@ -419,4 +419,36 @@
         <item quantity="one">%1$d note</item>
         <item quantity="other">%1$d notes</item>
     </plurals>
+    <string name="nav_manage">Manage shop</string>
+    <string name="manage_staff">Staff</string>
+    <string name="manage_branches">Branches</string>
+    <string name="manage_categories">Categories</string>
+    <string name="manage_add">Add</string>
+    <string name="manage_rename">Rename</string>
+    <string name="manage_staff_add">Add staff</string>
+    <string name="manage_staff_hint">The new person sets their own PIN the first time they log in.</string>
+    <string name="manage_role">Role</string>
+    <string name="manage_role_none">No role</string>
+    <string name="manage_admin">Admin</string>
+    <string name="manage_off">Switched off</string>
+    <string name="manage_no_pin">No PIN yet</string>
+    <string name="manage_disable">Switch off</string>
+    <string name="manage_enable">Switch on</string>
+    <string name="manage_unlock">Unlock</string>
+    <string name="manage_reset">Reset PIN</string>
+    <string name="manage_reset_ask">Reset the PIN of %1$s?</string>
+    <string name="manage_reset_body">%1$s is signed out of every device and sets a new PIN at the next login.</string>
+    <string name="manage_reset_yes">Yes, reset</string>
+    <string name="manage_branch_add">Add branch</string>
+    <string name="manage_branch_name">Branch name</string>
+    <string name="manage_category_add">Add category</string>
+    <string name="manage_name_lo">Name in Lao</string>
+    <string name="manage_name_th">Name in Thai</string>
+    <string name="manage_name_en">Name in English</string>
+    <string name="manage_names_hint">Write at least one name. A language left empty uses the name you wrote.</string>
+    <string name="manage_applies_to">Used for</string>
+    <string name="manage_both">Both</string>
+    <string name="manage_archive">Archive</string>
+    <string name="manage_archived">Archived</string>
+    <string name="manage_unarchive">Bring back</string>
 </resources>

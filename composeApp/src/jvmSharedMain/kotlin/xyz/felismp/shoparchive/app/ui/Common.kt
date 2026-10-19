@@ -65,21 +65,25 @@ internal fun xyz.felismp.shoparchive.app.flow.Workspace.categoryName(key: String
 
 internal fun xyz.felismp.shoparchive.app.flow.Workspace.branchName(key: String): String = branches.firstOrNull { it.key == key }?.displayName ?: key
 
-/** One row of a table: the first cell is text, the others are amounts that line up on the right. */
+/** One row of a table: the first cell is text, the others are amounts that line up on the right. The header has a hairline under it. */
 @Composable
 internal fun TableLine(cells: List<String>, header: Boolean = false) {
-    androidx.compose.foundation.layout.Row(
-        androidx.compose.ui.Modifier.fillMaxWidth(),
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-    ) {
-        cells.forEachIndexed { i, cell ->
-            val mod = androidx.compose.ui.Modifier.weight(if (i == 0) 1.3f else 1f)
-            when {
-                header -> ShopText(cell, TextRole.Caption, muted = true, modifier = mod)
-                i == 0 -> ShopText(cell, modifier = mod)
-                else -> ShopText(cell, TextRole.Amount, modifier = mod)
+    androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.fillMaxWidth(), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+        androidx.compose.foundation.layout.Row(
+            androidx.compose.ui.Modifier.fillMaxWidth(),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            cells.forEachIndexed { i, cell ->
+                val mod = androidx.compose.ui.Modifier.weight(if (i == 0) 1.3f else 1f)
+                when {
+                    header && i == 0 -> ShopText(cell, TextRole.Caption, muted = true, modifier = mod)
+                    header -> androidx.compose.foundation.layout.Box(mod, contentAlignment = androidx.compose.ui.Alignment.CenterEnd) { ShopText(cell, TextRole.Caption, muted = true) }
+                    i == 0 -> ShopText(cell, modifier = mod)
+                    else -> ShopText(cell, TextRole.Amount, modifier = mod)
+                }
             }
         }
+        if (header) ShopDivider()
     }
 }

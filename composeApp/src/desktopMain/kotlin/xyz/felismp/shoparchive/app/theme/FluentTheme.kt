@@ -54,17 +54,24 @@ class FluentTypography(
     val bodyStrong: TextStyle,
     val subtitle: TextStyle,
     val title: TextStyle,
+    /** Heads a section or a card. */
+    val section: TextStyle,
+    /** A figure that stands out (a count, a net total). */
+    val display: TextStyle,
 )
 
 internal fun fluentTypography(fonts: ShopFonts): FluentTypography {
     // Prompt has no `tnum` feature, so figures are proportional (amount columns will not align).
+    // The line heights are generous (1.5 and up) because Lao stacks marks above and below the line.
     val base = TextStyle(fontFamily = fonts.sans)
     return FluentTypography(
-        caption = base.copy(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal),
-        body = base.copy(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal),
-        bodyStrong = base.copy(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
-        subtitle = base.copy(fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
-        title = base.copy(fontSize = 28.sp, lineHeight = 36.sp, fontWeight = FontWeight.SemiBold),
+        caption = base.copy(fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.Normal),
+        body = base.copy(fontSize = 14.sp, lineHeight = 22.sp, fontWeight = FontWeight.Normal),
+        bodyStrong = base.copy(fontSize = 14.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
+        subtitle = base.copy(fontSize = 20.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold),
+        title = base.copy(fontSize = 28.sp, lineHeight = 42.sp, fontWeight = FontWeight.SemiBold),
+        section = base.copy(fontSize = 18.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
+        display = base.copy(fontSize = 26.sp, lineHeight = 38.sp, fontWeight = FontWeight.SemiBold),
     )
 }
 

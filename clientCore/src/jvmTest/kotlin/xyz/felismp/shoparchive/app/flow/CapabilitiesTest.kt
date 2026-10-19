@@ -59,6 +59,8 @@ class CapabilitiesTest {
         assertTrue(caps(PermissionNodes.CATEGORIES_MANAGE).run { manageCategories && admin && !manageUsers && !manageBranches })
         assertFalse(caps("shoparchive.users.manage").admin, "a node cannot make an op")
         assertFalse(Capabilities.NONE.admin)
+        assertFalse(caps(*clerk).allows(Destination.ADMIN))
+        assertTrue(caps(PermissionNodes.BRANCHES_MANAGE).allows(Destination.ADMIN))
     }
 
     @Test fun nothingIsAllowedBeforeTheConfigHasLoaded() {

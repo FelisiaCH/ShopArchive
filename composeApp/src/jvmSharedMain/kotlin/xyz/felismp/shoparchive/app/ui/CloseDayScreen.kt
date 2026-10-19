@@ -81,12 +81,7 @@ private fun CurrencyCount(ws: Workspace, row: CloseRow, enabled: Boolean) {
 }
 
 @Composable
-private fun Line(label: String, shown: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ShopText(label, modifier = Modifier.weight(1f))
-        ShopText(shown, TextRole.Amount, modifier = Modifier.weight(1f))
-    }
-}
+private fun Line(label: String, shown: String) = AmountRow(label, shown)
 
 /** What the server worked out when the day closed: the figures are the server's. */
 @Composable
