@@ -52,6 +52,8 @@ fun TodayScreen(ws: Workspace) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TodayContent(ws: Workspace, data: TodayData, canWrite: Boolean, can: Capabilities, openDay: () -> Unit, closeDay: () -> Unit, openHistory: () -> Unit, openNotes: () -> Unit) {
+    // Business dates come from the server's clock, so a wrong one is worth saying before anything else.
+    data.clockOffMinutes?.let { ShopBanner(stringResource(Res.string.clock_off, it.toString()), Tone.Error) }
     when (val status = data.status) {
         DayStatus.NotOpened -> ShopCard {
             ShopText(stringResource(Res.string.openday_card_title), TextRole.Title)

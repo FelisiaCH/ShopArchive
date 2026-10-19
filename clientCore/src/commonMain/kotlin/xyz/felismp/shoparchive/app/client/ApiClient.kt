@@ -80,6 +80,7 @@ import kotlin.concurrent.Volatile
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.update
+import kotlin.time.Clock
 
 @PublishedApi
 internal val clientJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -107,6 +108,10 @@ class ApiClient(
     private var token: String? = null
 
     override val isUnlocked: Boolean get() = token != null
+
+    @Volatile
+    override var serverClockOffsetMillis: Long? = null
+        private set
 
     /** Forgets the access token (lock). */
     override fun lock() {
@@ -343,6 +348,7 @@ class ApiClient(
                 content()?.let { setBody(it) }
             }
         }
+        serverClockOffsetMillis = clockOffsetMillis(response.headers[HttpHeaders.Date], Clock.System.now().toEpochMilliseconds())
         val bytes = response.readRawBytes()
         if (response.status.isSuccess()) return Reply(response.status.value, bytes, response.headers[HttpHeaders.ContentDisposition])
         raise(response.status.value, bytes.decodeToString(), response.headers[HttpHeaders.RetryAfter], bearer, path)

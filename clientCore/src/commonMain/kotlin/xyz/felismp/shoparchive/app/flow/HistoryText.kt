@@ -24,3 +24,8 @@ fun historyTransfers(text: String): String = text.split(PARTS).joinToString(PART
 /** The N of every file in "slip-1.jpg; slip-2.jpg", or null if the text holds anything else. */
 fun historySlipNumbers(text: String): List<Int>? =
     text.split(PARTS).map { SLIP.matchEntire(it)?.groupValues?.get(1)?.toInt() ?: return null }
+
+private val BANK_TIME = Regex("(\\d{4}-\\d{2}-\\d{2}) (\\d{2}:\\d{2}):\\d{2}")
+
+/** A bank's "2026-09-18 19:18:42" as "2026-09-18 19:18"; anything else as it came. */
+fun bankTimeText(time: String): String = BANK_TIME.matchEntire(time)?.destructured?.let { (day, hm) -> "$day $hm" } ?: time

@@ -21,7 +21,7 @@ struct CloseDayView: View {
             } else {
                 Text(text("closeday_none")).foregroundColor(.secondary)
                 Button(text("go_today")) { ws.go(to: .today) }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.tonalFull)
             }
         }
         .collect(ws.closeDay.ui, into: $ui)
@@ -58,12 +58,13 @@ private struct CloseForm: View {
             ForEach(ui.rows, id: \.currency.code) { row in
                 CurrencyCount(ws: ws, row: row, enabled: !saving, counted: $counted)
             }
-            TextField(text(ui.noteRequired ? "closeday_note_required" : "closeday_note"), text: Binding(get: { note }, set: { note = $0; ws.closeDay.setNote(text: $0) }), axis: .vertical)
-                .lineLimit(1...5)
-                .textFieldStyle(.roundedBorder)
-                .disabled(saving)
-            if ui.noteRequired && isBlank(ui.note) {
-                Text(text("closeday_note_needed")).font(.caption)
+            Card {
+                TextField(text(ui.noteRequired ? "closeday_note_required" : "closeday_note"), text: Binding(get: { note }, set: { note = $0; ws.closeDay.setNote(text: $0) }), axis: .vertical)
+                    .lineLimit(1...5)
+                    .disabled(saving)
+                if ui.noteRequired && isBlank(ui.note) {
+                    Text(text("closeday_note_needed")).font(.caption).foregroundColor(Theme.moneyOut)
+                }
             }
             if case .failed(let p) = onEnum(of: ui.phase) {
                 Banner(text: text("closeday_failed") + " " + failureText(p.failure), tone: .error)
@@ -75,7 +76,7 @@ private struct CloseForm: View {
                 Text(text("needs_connection")).font(.caption).foregroundColor(.secondary)
             }
             Button(text("closeday_confirm")) { ws.closeDay.confirm() }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.filledFull)
                 .disabled(!ui.canClose)
         }
     }
@@ -103,19 +104,21 @@ private struct CurrencyCount: View {
                 }
             ))
             .keyboardType(.decimalPad)
-            .textFieldStyle(.roundedBorder)
+            .font(.title3.monospacedDigit())
+            .field()
             .disabled(!enabled)
             if row.invalid {
-                Text(text("openday_invalid", code)).font(.caption)
+                Text(text("openday_invalid", code)).font(.caption).foregroundColor(Theme.moneyOut)
             }
             if let expected = row.expected {
                 AmountLine(label: text("closeday_expected"), shown: money(expected.int64Value))
             }
             if let variance = row.variance?.int64Value {
                 let words = variance == 0 ? text("closeday_matches") : variance < 0 ? text("closeday_short", money(-variance)) : text("closeday_over", money(variance))
-                AmountLine(label: text("closeday_variance"), shown: variance == 0 ? words : signedAmount(minor: variance, exponent: row.currency.exponent) + " " + code)
+                let color = Theme.color(sign: Int(variance.signum()))
+                AmountLine(label: text("closeday_variance"), shown: variance == 0 ? words : signedAmount(minor: variance, exponent: row.currency.exponent) + " " + code, color: color)
                 if variance != 0 {
-                    Text(words).font(.caption)
+                    Text(words).font(.caption).foregroundColor(color)
                 }
             }
             if row.counted != nil {
@@ -147,7 +150,7 @@ private struct ClosedResult: View {
                     Text(code).font(.headline)
                     AmountLine(label: text("closeday_counted_short"), shown: money(close.counted))
                     AmountLine(label: text("closeday_expected"), shown: money(close.expected))
-                    AmountLine(label: text("closeday_variance"), shown: sign + groupThousands(variance) + " " + code)
+                    AmountLine(label: text("closeday_variance"), shown: sign + groupThousands(variance) + " " + code, color: Theme.color(sign: amountSign(variance)))
                     AmountLine(label: text("closeday_handover"), shown: money(close.handover))
                     if close.belowFloor.contains(code) {
                         Banner(text: text("closeday_below_float_done"), tone: .error)
@@ -161,7 +164,7 @@ private struct ClosedResult: View {
                 ws.closeDay.reset()
                 ws.go(to: .today)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.filledFull)
         }
     }
 }

@@ -38,10 +38,10 @@ struct OpenDayView: View {
             }
             HStack(spacing: 8) {
                 Button(text("openday_btn")) { ws.openDay.confirm() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.filledFull)
                     .disabled(ui.blocked != nil || saving)
                 Button(text("cancel")) { leave() }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.tonalFull)
             }
         }
         .navigationTitle(text("openday_btn"))
@@ -61,22 +61,25 @@ struct OpenDayView: View {
         let code = currency.code
         // Until a field is typed in it shows what the last close left in the drawer.
         let value = typed[code] ?? ui.prefill[code] ?? ""
-        TextField(text("openday_amount", code), text: Binding(
-            get: { typed[code] ?? ui.prefill[code] ?? "" },
-            set: {
-                typed[code] = $0
-                ws.openDay.setAmount(code: code, text: $0)
-            }
-        ))
-        .keyboardType(.decimalPad)
-        .textFieldStyle(.roundedBorder)
-        .disabled(saving)
         let minor = MoneyTextKt.parseTypedAmount(text: value, exponent: currency.exponent, allowZero: true)
-        if ui.invalid.contains(code) || (!value.isEmpty && minor == nil) {
-            Text(text("openday_invalid", code)).font(.caption).foregroundColor(.red)
-        } else if let minor, !value.isEmpty {
-            Text(text("record_amount_shown", displayAmount(minor: minor.int64Value, exponent: currency.exponent) + " " + code))
-                .font(.caption).foregroundColor(.secondary)
+        Card {
+            TextField(text("openday_amount", code), text: Binding(
+                get: { typed[code] ?? ui.prefill[code] ?? "" },
+                set: {
+                    typed[code] = $0
+                    ws.openDay.setAmount(code: code, text: $0)
+                }
+            ))
+            .keyboardType(.decimalPad)
+            .font(.title3.monospacedDigit())
+            .field()
+            .disabled(saving)
+            if ui.invalid.contains(code) || (!value.isEmpty && minor == nil) {
+                Text(text("openday_invalid", code)).font(.caption).foregroundColor(Theme.moneyOut)
+            } else if let minor, !value.isEmpty {
+                Text(text("record_amount_shown", displayAmount(minor: minor.int64Value, exponent: currency.exponent) + " " + code))
+                    .font(.subheadline.monospacedDigit()).foregroundColor(.secondary)
+            }
         }
     }
 
@@ -88,7 +91,7 @@ struct OpenDayView: View {
         case .alreadyOpen(let p):
             Banner(text: text("openday_already", p.by.name), tone: .info)
             Button(text("go_today")) { leave() }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.filledFull)
         case .previousOpen(let p):
             Banner(text: text("openday_previous", p.session.businessDate, p.session.openedBy.name), tone: .error)
             if can.closeDay {
@@ -96,7 +99,7 @@ struct OpenDayView: View {
                     ws.openDay.reset()
                     ws.openReports(tab: .closeDay)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.filledFull)
             }
         case .failed(let p):
             Banner(text: failureText(p.failure), tone: .error)

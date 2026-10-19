@@ -36,4 +36,12 @@ class HistoryTextTest {
         assertEquals(null, historySlipNumbers("slip-0.jpg"))
         assertEquals(null, historySlipNumbers(""))
     }
+
+    @Test fun aBankTimeLosesItsSecondsAndAnythingElseStays() {
+        assertEquals("2026-09-18 19:18", bankTimeText("2026-09-18 19:18:42"))
+        assertEquals("2026-09-18T19:18:42", bankTimeText("2026-09-18T19:18:42"))
+        assertEquals("2026-09-18 19:18", bankTimeText("2026-09-18 19:18"))
+        assertEquals("18/09 19:18", bankTimeText("18/09 19:18"))
+        assertEquals("", bankTimeText(""))
+    }
 }

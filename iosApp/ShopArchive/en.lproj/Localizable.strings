@@ -86,6 +86,7 @@
 "day_closed" = "Day closed";
 "day_stale" = "The open day started on %1$@ and was never closed.";
 "day_stale_other" = "The open day started on %1$@ and was never closed. Ask the manager to close it.";
+"clock_off" = "The server's clock is %1$@ minutes off, so dates may be wrong. Fix the time on the server computer.";
 "today_in" = "Money in";
 "today_out" = "Money out";
 "today_net" = "Net";

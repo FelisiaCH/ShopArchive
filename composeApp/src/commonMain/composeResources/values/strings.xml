@@ -88,6 +88,7 @@
     <string name="day_closed">Day closed</string>
     <string name="day_stale">The open day started on %1$s and was never closed.</string>
     <string name="day_stale_other">The open day started on %1$s and was never closed. Ask the manager to close it.</string>
+    <string name="clock_off">The server's clock is %1$s minutes off, so dates may be wrong. Fix the time on the server computer.</string>
     <string name="today_in">Money in</string>
     <string name="today_out">Money out</string>
     <string name="today_net">Net</string>

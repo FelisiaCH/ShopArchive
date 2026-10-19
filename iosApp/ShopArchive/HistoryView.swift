@@ -52,18 +52,57 @@ func isBlank(_ s: String) -> Bool {
     s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 }
 
-/// The amounts of an entry, one line per payment, with the sign of its type.
+/// The amounts of an entry in a list, one per payment, with the sign and color of its type and the way it was paid under it.
 private struct TenderLines: View {
     let entry: EntryDto
 
     var body: some View {
         let sign = entry.type == .income ? "+" : "-"
-        ForEach(Array(entry.tenders.enumerated()), id: \.offset) { _, t in
-            Text(sign + groupThousands(t.amount) + " " + t.currency + " · " + methodText(t.method))
-                .font(.body.monospacedDigit())
-                .frame(maxWidth: .infinity, alignment: .trailing)
+        VStack(alignment: .trailing, spacing: 2) {
+            ForEach(Array(entry.tenders.enumerated()), id: \.offset) { _, t in
+                Amount(shown: "\(sign)\(groupThousands(t.amount)) \(t.currency)", color: Theme.color(of: entry.type), font: .body.weight(.semibold))
+                Text(methodText(t.method)).font(.caption).foregroundColor(.secondary)
+            }
         }
     }
+}
+
+/// An amount with a currency, as the server sent it.
+private struct Total {
+    let currency: String
+    let amount: String
+}
+
+/// The payments of an entry added up per currency, in the order the currencies first appear; the payments as they are if one amount is not a number.
+private func totals(_ entry: EntryDto) -> [Total] {
+    let each = entry.tenders.map { Total(currency: $0.currency, amount: $0.amount) }
+    var out: [Total] = []
+    for next in each {
+        guard let i = out.firstIndex(where: { $0.currency == next.currency }) else {
+            out.append(next)
+            continue
+        }
+        guard let sum = added(out[i].amount, next.amount) else { return each }
+        out[i] = Total(currency: next.currency, amount: sum)
+    }
+    return out
+}
+
+/// Two amounts the server sent added, with as many decimals as the longer one has.
+private func added(_ a: String, _ b: String) -> String? {
+    let posix = Locale(identifier: "en_US_POSIX")
+    guard let x = Decimal(string: a, locale: posix), let y = Decimal(string: b, locale: posix) else { return nil }
+    let format = NumberFormatter()
+    format.locale = posix
+    format.numberStyle = .decimal
+    format.usesGroupingSeparator = false
+    format.minimumFractionDigits = max(decimals(a), decimals(b))
+    format.maximumFractionDigits = format.minimumFractionDigits
+    return format.string(from: NSDecimalNumber(decimal: x + y))
+}
+
+private func decimals(_ amount: String) -> Int {
+    amount.split(separator: ".", omittingEmptySubsequences: false).dropFirst().first?.count ?? 0
 }
 
 // ---- the list ----
@@ -93,7 +132,7 @@ private struct HistoryList: View {
             if let failure = ui.failure {
                 Banner(text: text("history_failed") + " " + failureText(failure), tone: .error)
                 Button(text("retry")) { history.reload() }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.tonal)
             }
             if ui.rangeProblem == nil {
                 if let entries = ui.entries {
@@ -103,9 +142,9 @@ private struct HistoryList: View {
                         if ui.loading {
                             Text(text("working")).font(.caption).foregroundColor(.secondary)
                         }
-                        ForEach(entries, id: \.id) { e in
+                        RowsCard(entries, id: \.id) { e in
                             Button { history.open(entry: e) } label: { EntryRow(ws: ws, entry: e) }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.row)
                         }
                     }
                 } else if ui.failure == nil {
@@ -123,12 +162,12 @@ private struct HistoryList: View {
         let ready: ConfigResponse? = { if case .ready(let r) = onEnum(of: config) { return r.config } else { return nil } }()
         let currencies = (ready?.currencies ?? []).map(\.code)
         let categories = (ready?.categories ?? []).filter { !$0.archived }
-        Card {
-            Text(text("filter_range")).font(.headline)
+        Card(title: text("filter_range")) {
             DateField(label: text("filter_from"), value: from) { from = $0; history.setFrom(text: $0) }
+            Divider()
             DateField(label: text("filter_to"), value: to) { to = $0; history.setTo(text: $0) }
             if let problem = ui.rangeProblem {
-                Text(rangeText(problem)).font(.caption)
+                Text(rangeText(problem)).font(.caption).foregroundColor(Theme.moneyOut)
             }
             if ws.branches.count > 1 {
                 Text(text("branch_label")).font(.caption).foregroundColor(.secondary)
@@ -171,27 +210,25 @@ private struct EntryRow: View {
     let entry: EntryDto
 
     var body: some View {
-        Card {
-            HStack(spacing: 8) {
-                VStack(alignment: .leading) {
-                    Text(isBlank(entry.item) ? (categoryTitle(ws, entry.category) ?? "—") : entry.item)
-                    Text(entry.date + " " + clockTime(entry.createdAt) + " · " + entry.createdBy.name)
-                        .font(.caption).foregroundColor(.secondary)
-                    if ws.branches.count > 1 {
-                        Text(branchTitle(ws, entry.branch)).font(.caption).foregroundColor(.secondary)
-                    }
-                    if !entry.slips.isEmpty {
-                        Text(text("history_slips", String(entry.slips.count))).font(.caption).foregroundColor(.secondary)
-                    }
-                    if entry.deleted {
-                        Chip(text: text("history_deleted"), tone: .error)
-                    }
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(isBlank(entry.item) ? (categoryTitle(ws, entry.category) ?? "—") : entry.item)
+                Text(entry.date + " " + clockTime(entry.createdAt) + " · " + entry.createdBy.name)
+                    .font(.caption).foregroundColor(.secondary)
+                if ws.branches.count > 1 {
+                    Text(branchTitle(ws, entry.branch)).font(.caption).foregroundColor(.secondary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                VStack { TenderLines(entry: entry) }
-                    .frame(maxWidth: .infinity)
+                if !entry.slips.isEmpty {
+                    Label(text("history_slips", String(entry.slips.count)), systemImage: "paperclip").font(.caption).foregroundColor(.secondary)
+                }
+                if entry.deleted {
+                    Chip(text: text("history_deleted"), tone: .error)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            TenderLines(entry: entry)
         }
+        .rowInset()
         .contentShape(Rectangle())
     }
 }
@@ -212,39 +249,74 @@ private struct EntryDetailView: View {
     var body: some View {
         let e = ui.entry
         Page {
-            Button(text("back")) { ws.history.closeDetail() }
-                .buttonStyle(.bordered)
             if let edit = ui.edit {
                 EditFormView(ws: ws, state: state, ui: ui, edit: edit)
             } else {
                 EntryFacts(ws: ws, entry: e)
-                Actions(state: state, ui: ui)
-                Text(text("slips_title")).font(.headline)
-                if e.slips.isEmpty {
-                    Text(text("detail_no_slips")).foregroundColor(.secondary)
-                }
-                ForEach(intKeyed(ui.slips).sorted { $0.key < $1.key }, id: \.key) { n, load in
-                    SlipImage(n: n, load: load)
-                }
+                payments(e)
+                slips(e)
                 if !e.transfers.isEmpty {
-                    Text(text("detail_transfers")).font(.headline)
-                    ForEach(e.transfers, id: \.code) { TransferLine(transfer: $0) }
+                    VStack(alignment: .leading, spacing: 8) {
+                        SectionHeader(text("detail_transfers"))
+                        ForEach(e.transfers, id: \.code) { TransferLine(transfer: $0) }
+                    }
                 }
-                Text(text("detail_history")).font(.headline)
-                switch onEnum(of: ui.history) {
-                case .loading:
-                    Text(text("working")).foregroundColor(.secondary)
-                case .failed(let h):
-                    Banner(text: failureText(h.failure), tone: .error)
-                case .ready(let h):
-                    ForEach(Array(((h.value as? [HistoryItem]) ?? []).enumerated()), id: \.offset) { _, item in
-                        HistoryLine(ws: ws, item: item)
+                changes
+                Actions(state: state, ui: ui)
+            }
+        }
+        .navigationTitle(isBlank(e.item) ? (categoryTitle(ws, e.category) ?? text("nav_history")) : e.item)
+        .navigationBarTitleDisplayMode(.inline)
+        // The way back to the list, where the system puts it: top left, with the chevron.
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button { ws.history.closeDetail() } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left").font(.body.weight(.semibold))
+                        Text(text("back"))
                     }
                 }
             }
         }
-        .navigationTitle(isBlank(e.item) ? (categoryTitle(ws, e.category) ?? text("nav_history")) : e.item)
         .collect(state.ui, into: $ui)
+    }
+
+    /// How the entry was paid, a row each.
+    private func payments(_ e: EntryDto) -> some View {
+        RowsCard(title: text("tenders_title"), Array(e.tenders.enumerated()), id: \.offset) { pair in
+            HStack(spacing: 12) {
+                Text(methodText(pair.element.method)).frame(maxWidth: .infinity, alignment: .leading)
+                Amount(shown: "\(groupThousands(pair.element.amount)) \(pair.element.currency)").multilineTextAlignment(.trailing)
+            }
+            .rowInset()
+        }
+    }
+
+    private func slips(_ e: EntryDto) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionHeader(text("slips_title"))
+            if e.slips.isEmpty {
+                Card { Text(text("detail_no_slips")).foregroundColor(.secondary) }
+            }
+            ForEach(intKeyed(ui.slips).sorted { $0.key < $1.key }, id: \.key) { n, load in
+                SlipImage(n: n, load: load)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var changes: some View {
+        switch onEnum(of: ui.history) {
+        case .loading:
+            Card(title: text("detail_history")) { Text(text("working")).foregroundColor(.secondary) }
+        case .failed(let h):
+            Card(title: text("detail_history")) { Banner(text: failureText(h.failure), tone: .error) }
+        case .ready(let h):
+            let items = (h.value as? [HistoryItem]) ?? []
+            if !items.isEmpty {
+                RowsCard(title: text("detail_history"), Array(items.enumerated()), id: \.offset) { HistoryLine(ws: ws, item: $0.element) }
+            }
+        }
     }
 }
 
@@ -253,20 +325,28 @@ private struct EntryFacts: View {
     let entry: EntryDto
 
     var body: some View {
+        let sign = entry.type == .income ? "+" : "-"
         Card {
             if entry.deleted {
                 Chip(text: text("history_deleted"), tone: .error)
             }
-            Text(text(entry.type == .income ? "type_income" : "type_expense")).font(.headline)
+            // The hero: what the entry came to, one line per currency, in the color of its type.
+            ForEach(Array(totals(entry).enumerated()), id: \.offset) { _, total in
+                Amount(shown: "\(sign)\(groupThousands(total.amount)) \(total.currency)", color: Theme.color(of: entry.type), font: .title.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+            Text(text(entry.type == .income ? "type_income" : "type_expense")).font(.subheadline.weight(.semibold)).foregroundColor(.secondary)
             Text(entry.date + " · " + branchTitle(ws, entry.branch) + (categoryTitle(ws, entry.category).map { " · " + $0 } ?? ""))
+                .font(.subheadline)
+                .foregroundColor(.secondary)
             if !isBlank(entry.note) {
-                Text(entry.note).foregroundColor(.secondary)
+                Text(entry.note)
             }
-            Text(text("detail_created", clockTime(entry.createdAt), entry.createdBy.name)).font(.caption).foregroundColor(.secondary)
+            Text(text("detail_created", clockTime(entry.createdAt), entry.createdBy.name)).font(.footnote).foregroundColor(.secondary)
             if entry.updatedAt != entry.createdAt {
-                Text(text("detail_updated", clockTime(entry.updatedAt))).font(.caption).foregroundColor(.secondary)
+                Text(text("detail_updated", clockTime(entry.updatedAt))).font(.footnote).foregroundColor(.secondary)
             }
-            TenderLines(entry: entry)
         }
     }
 }
@@ -303,24 +383,25 @@ private struct Actions: View {
     var body: some View {
         let busy = isWorking(ui.action)
         if !ui.entry.deleted && (ui.canEdit || ui.canDelete) {
-            FlowLayout {
+            HStack(spacing: 10) {
                 if ui.canEdit {
                     Button(text("detail_edit")) { state.startEdit() }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.tonalFull)
                         .disabled(busy)
                     Button(text("detail_move")) {
                         state.openMove()
                         moveOpened += 1
                     }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.tonalFull)
                         .disabled(busy)
                 }
                 if ui.canDelete {
-                    Button(text("detail_delete")) { state.askDelete() }
-                        .buttonStyle(.bordered)
+                    Button(text("detail_delete"), role: .destructive) { state.askDelete() }
+                        .buttonStyle(.tonalFull)
                         .disabled(busy)
                 }
             }
+            .font(.subheadline)
             if !ui.canWrite {
                 Text(text("needs_connection")).font(.caption).foregroundColor(.secondary)
             }
@@ -330,11 +411,11 @@ private struct Actions: View {
                 Text(text("detail_delete_ask")).font(.headline)
                 Text(text("detail_delete_body")).foregroundColor(.secondary)
                 HStack(spacing: 8) {
-                    Button(text("detail_delete_yes")) { state.confirmDelete() }
-                        .buttonStyle(.borderedProminent)
+                    Button(text("detail_delete_yes"), role: .destructive) { state.confirmDelete() }
+                        .buttonStyle(.filledFull)
                         .disabled(busy || !ui.canWrite)
                     Button(text("cancel")) { state.cancelDelete() }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.tonalFull)
                 }
             }
         }
@@ -363,14 +444,14 @@ private struct MoveCard: View {
             Text(text("detail_move_to")).font(.headline)
             DateField(label: text("detail_move_date"), value: date) { date = $0; state.setMoveDate(text: $0) }
             if !ui.moveValid {
-                Text(text("range_not_a_date")).font(.caption)
+                Text(text("range_not_a_date")).font(.caption).foregroundColor(Theme.moneyOut)
             }
             HStack(spacing: 8) {
                 Button(text("detail_move_yes")) { state.confirmMove() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.filledFull)
                     .disabled(busy || !ui.moveValid || !ui.canWrite)
                 Button(text("cancel")) { state.cancelMove() }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.tonalFull)
             }
         }
     }
@@ -385,7 +466,7 @@ private struct TransferLine: View {
         let payer = t.from.map { name in name + (t.fromAccount.map { " (\($0))" } ?? "") }
         let line = [
             "\(t.source) ✓ \(groupThousands(t.amount)) \(t.currency)",
-            t.time,
+            HistoryTextKt.bankTimeText(time: t.time),
             [payer, "\(t.to) (\(t.toAccount))"].compactMap { $0 }.joined(separator: " → "),
         ].joined(separator: " · ")
         if t.toShop?.boolValue == false {
@@ -428,23 +509,16 @@ private struct SlipImage: View {
                         .resizable()
                         .scaledToFit()
                         .frame(maxWidth: .infinity, maxHeight: 420)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color(.separator), lineWidth: 0.5))
                         .accessibilityLabel(text("detail_slip", String(n)))
                 }
             }
         }
         .task(id: bytes.map(ObjectIdentifier.init)) {
             guard let bytes else { return }
-            picture = await decode(bytes)
+            picture = await decodeSlip(bytes).map(Picture.image) ?? .unreadable
         }
-    }
-
-    /// The bytes go over one by one, so off the main thread.
-    private func decode(_ bytes: KotlinByteArray) async -> Picture {
-        await Task.detached {
-            var data = Data(count: Int(bytes.size))
-            for i in 0..<data.count { data[i] = UInt8(bitPattern: bytes.get(index: Int32(i))) }
-            return UIImage(data: data).map(Picture.image) ?? .unreadable
-        }.value
     }
 }
 
@@ -453,13 +527,14 @@ private struct HistoryLine: View {
     let item: HistoryItem
 
     var body: some View {
-        Card {
+        VStack(alignment: .leading, spacing: 4) {
             Text(verbatim: headline)
-                .font(.caption).foregroundColor(.secondary)
+                .font(.footnote).foregroundColor(.secondary)
             ForEach(Array(item.changes.enumerated()), id: \.offset) { _, c in
-                Text(verbatim: change(c)).font(.caption)
+                Text(verbatim: change(c)).font(.subheadline)
             }
         }
+        .rowInset()
     }
 
     private var headline: String {
@@ -541,7 +616,24 @@ private struct EditFormView: View {
         .disabled(busy)
 
         if !edit.categories.isEmpty {
-            Text(text("category_label")).font(.headline)
+            categories
+        }
+        details
+        tenders
+
+        if edit.online || !f.keep.isEmpty || !f.added.isEmpty {
+            slips
+        }
+
+        if edit.stale {
+            Banner(text: text("detail_stale"), tone: .error)
+            EntryFacts(ws: ws, entry: ui.entry)
+        }
+        saveArea
+    }
+
+    private var categories: some View {
+        Card(title: text("category_label")) {
             FlowLayout {
                 if !edit.policy.requireCategory {
                     Choice(name: text("category_none"), selected: f.category == nil) { state.setCategory(key: nil) }
@@ -552,43 +644,48 @@ private struct EditFormView: View {
             }
             .disabled(busy)
         }
+    }
 
-        TextField(text("item_label"), text: Binding(get: { item }, set: { item = $0; state.setItem(text: $0) }))
-            .textFieldStyle(.roundedBorder)
-            .disabled(busy)
-        TextField(text("note_label"), text: Binding(get: { note }, set: { note = $0; state.setNote(text: $0) }), axis: .vertical)
-            .lineLimit(1...5)
-            .textFieldStyle(.roundedBorder)
-            .disabled(busy)
-
-        Text(text("tenders_title")).font(.headline)
-        ForEach(f.tenders, id: \.key) { tender($0) }
-        Button(text("tender_add")) { state.addTender() }
-            .buttonStyle(.bordered)
-            .disabled(busy)
-
-        if edit.online || !f.keep.isEmpty || !f.added.isEmpty {
-            slips
-        }
-
-        if edit.stale {
-            Banner(text: text("detail_stale"), tone: .error)
-            EntryFacts(ws: ws, entry: ui.entry)
-        }
-        if let issue = edit.issues.first {
-            Text(issueText(issue)).font(.caption).foregroundColor(.secondary)
-        }
-        actionBanner(ui.action)
-        if !ui.canWrite {
-            Text(text("needs_connection")).font(.caption).foregroundColor(.secondary)
-        }
-        HStack(spacing: 8) {
-            Button(text("record_save")) { state.saveEdit() }
-                .buttonStyle(.borderedProminent)
-                .disabled(!edit.issues.isEmpty || edit.compressing || edit.stale || busy || !ui.canWrite)
-            Button(text("cancel")) { state.cancelEdit() }
-                .buttonStyle(.bordered)
+    /// The item and the note, as two rows of one block.
+    private var details: some View {
+        Card {
+            TextField(text("item_label"), text: Binding(get: { item }, set: { item = $0; state.setItem(text: $0) }))
                 .disabled(busy)
+            Divider()
+            TextField(text("note_label"), text: Binding(get: { note }, set: { note = $0; state.setNote(text: $0) }), axis: .vertical)
+                .lineLimit(1...5)
+                .disabled(busy)
+        }
+    }
+
+    private var tenders: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionHeader(text("tenders_title"))
+            ForEach(f.tenders, id: \.key) { tender($0) }
+            Button { state.addTender() } label: { Label(text("tender_add"), systemImage: "plus") }
+                .buttonStyle(.tonalFull)
+                .disabled(busy)
+        }
+    }
+
+    /// What is missing or went wrong, then Save and Cancel.
+    private var saveArea: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let issue = edit.issues.first {
+                Text(issueText(issue)).font(.footnote).foregroundColor(.secondary)
+            }
+            actionBanner(ui.action)
+            if !ui.canWrite {
+                Text(text("needs_connection")).font(.footnote).foregroundColor(.secondary)
+            }
+            HStack(spacing: 8) {
+                Button(text("record_save")) { state.saveEdit() }
+                    .buttonStyle(.filledFull)
+                    .disabled(!edit.issues.isEmpty || edit.compressing || edit.stale || busy || !ui.canWrite)
+                Button(text("cancel")) { state.cancelEdit() }
+                    .buttonStyle(.tonalFull)
+                    .disabled(busy)
+            }
         }
     }
 
@@ -619,32 +716,73 @@ private struct EditFormView: View {
                 }
             ))
             .keyboardType(.decimalPad)
-            .textFieldStyle(.roundedBorder)
+            .font(.title3.monospacedDigit())
+            .field()
             .disabled(busy)
             if let currency, let minor = MoneyTextKt.parseTypedAmount(text: value, exponent: currency.exponent, allowZero: false) {
                 Text(text("record_amount_shown", displayAmount(minor: minor.int64Value, exponent: currency.exponent) + " " + currency.code))
-                    .font(.body.monospacedDigit())
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             } else if ints(edit.badRows).contains(Int(row.key)) {
-                Text(text("issue_amount_invalid")).font(.caption)
+                Text(text("issue_amount_invalid")).font(.caption).foregroundColor(Theme.moneyOut)
             }
             if f.tenders.count > 1 {
                 Button(text("tender_remove")) { state.removeTender(row: row.key) }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.tonal)
                     .disabled(busy)
             }
         }
     }
 
-    @ViewBuilder
+    /// "slip-1.jpg" as "Slip 1", like the history; a name that is not that stays as it is.
+    private func storedSlipLabel(_ file: String) -> String {
+        guard let numbers = HistoryTextKt.historySlipNumbers(text: file) else { return file }
+        // Kotlin's Ints in a list come over as plain NSNumber (see ints() in Kit.swift).
+        let ints = (numbers as NSArray).compactMap { ($0 as? NSNumber)?.intValue }
+        guard let n = ints.first else { return file }
+        return text("detail_slip", String(n))
+    }
+
     private var slips: some View {
-        Text(text("slips_title")).font(.headline)
-        Text(text("slips_count", String(f.keep.count + f.added.count), String(edit.policy.slipMaxCount))).font(.caption).foregroundColor(.secondary)
+        Card(title: text("slips_title")) {
+            Text(text("slips_count", String(f.keep.count + f.added.count), String(edit.policy.slipMaxCount))).font(.footnote).foregroundColor(.secondary)
+            slipButtons
+            if edit.compressing {
+                Text(text("slip_preparing")).foregroundColor(.secondary)
+            }
+            ForEach(f.keep, id: \.file) { slip in
+                let label = storedSlipLabel(slip.file)
+                HStack {
+                    Label { Text(verbatim: label) } icon: { Image(systemName: "doc.text") }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button(text("slip_remove", label)) { state.removeStoredSlip(file: slip.file) }
+                        .buttonStyle(.tonal)
+                        .disabled(busy)
+                }
+            }
+            // Numbered after the slips kept, as on Record.
+            ForEach(Array(f.added.enumerated()), id: \.element.key) { i, slip in
+                let label = text("detail_slip", String(f.keep.count + i + 1))
+                HStack(spacing: 12) {
+                    SlipThumbnail(bytes: slip.bytes)
+                    Text(label + " · \(Int(slip.bytes.size) / 1024 + 1) KB").frame(maxWidth: .infinity, alignment: .leading)
+                    Button(text("slip_remove", label)) { state.removeNewSlip(key: slip.key) }
+                        .buttonStyle(.tonal)
+                        .disabled(busy)
+                }
+            }
+            slipNoticeBanner
+        }
+    }
+
+    /// Where a slip comes from: the photo library, the camera.
+    private var slipButtons: some View {
         FlowLayout {
             PhotosPicker(selection: $picked, matching: .images) {
-                Text(text(cameraAvailable ? "slip_gallery" : "slip_file"))
+                Label(text(cameraAvailable ? "slip_gallery" : "slip_file"), systemImage: "photo")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.tonal)
             .disabled(busy)
             .onChange(of: picked) { photo in
                 guard let photo else { return }
@@ -652,8 +790,8 @@ private struct EditFormView: View {
                 add(photo)
             }
             if cameraAvailable {
-                Button(text("slip_camera")) { camera = true }
-                    .buttonStyle(.bordered)
+                Button { camera = true } label: { Label(text("slip_camera"), systemImage: "camera") }
+                    .buttonStyle(.tonal)
                     .disabled(busy)
             }
         }
@@ -664,28 +802,11 @@ private struct EditFormView: View {
             }
             .ignoresSafeArea()
         }
-        if edit.compressing {
-            Text(text("slip_preparing")).foregroundColor(.secondary)
-        }
-        ForEach(f.keep, id: \.file) { slip in
-            HStack {
-                Text(slip.file).frame(maxWidth: .infinity, alignment: .leading)
-                Button(text("slip_remove", slip.file)) { state.removeStoredSlip(file: slip.file) }
-                    .buttonStyle(.bordered)
-                    .disabled(busy)
-            }
-        }
-        // Numbered after the slips kept, as on Record.
-        ForEach(Array(f.added.enumerated()), id: \.element.key) { i, slip in
-            let label = text("detail_slip", String(f.keep.count + i + 1))
-            HStack {
-                Text(label + " · \(Int(slip.bytes.size) / 1024 + 1) KB").frame(maxWidth: .infinity, alignment: .leading)
-                Button(text("slip_remove", label)) { state.removeNewSlip(key: slip.key) }
-                    .buttonStyle(.bordered)
-                    .disabled(busy)
-            }
-        }
-        // Only Record scans a QR code, so the other notices are not shown here.
+    }
+
+    // Only Record scans a QR code, so the other notices are not shown here.
+    @ViewBuilder
+    private var slipNoticeBanner: some View {
         switch edit.notice {
         case .tooMany: Banner(text: text("notice_too_many", String(edit.policy.slipMaxCount)), tone: .error)
         case .tooBig: Banner(text: text("notice_too_big", String(edit.policy.slipMaxSizeKb)), tone: .error)

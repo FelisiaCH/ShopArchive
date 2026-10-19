@@ -56,19 +56,26 @@ struct ReportsView: View {
 private struct TableLine: View {
     let cells: [String]
     var header = false
+    /// The color of the amounts (every cell but the first).
+    var amounts: Color = .primary
 
     var body: some View {
         HStack(spacing: 8) {
             ForEach(Array(cells.enumerated()), id: \.offset) { i, cell in
                 Text(cell)
                     .font(font(i))
-                    .foregroundColor(header ? .secondary : .primary)
+                    .foregroundColor(color(i))
                     .lineLimit(i == 0 ? nil : 1)
                     .minimumScaleFactor(0.6)
                     .multilineTextAlignment(i == 0 ? .leading : .trailing)
                     .frame(maxWidth: .infinity, alignment: i == 0 ? .leading : .trailing)
             }
         }
+    }
+
+    private func color(_ i: Int) -> Color {
+        if header { return .secondary }
+        return i == 0 ? .primary : amounts
     }
 
     private func font(_ i: Int) -> Font {
@@ -83,8 +90,7 @@ private struct ReportSection<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        Text(title).font(.headline)
-        Card { content }
+        Card(title: title) { content }
     }
 }
 
@@ -118,7 +124,7 @@ private struct OverviewSection: View {
                 Text(ui.from + " – " + ui.to).font(.caption).foregroundColor(.secondary)
             }
             if let problem = ui.rangeProblem {
-                Text(rangeText(problem)).font(.caption)
+                Text(rangeText(problem)).font(.caption).foregroundColor(Theme.moneyOut)
             }
             if ws.branches.count > 1 {
                 FlowLayout {
@@ -138,7 +144,7 @@ private struct OverviewSection: View {
             if let failure = ui.failure {
                 Banner(text: text("reports_failed") + " " + failureText(failure), tone: .error)
                 Button(text("retry")) { r.reload() }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.tonalFull)
             }
             if ui.rangeProblem != nil || ui.failure != nil {
                 EmptyView()
@@ -174,8 +180,9 @@ private struct CustomRange: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        Card {
             DateField(label: text("filter_from"), value: from) { from = $0; r.setFrom(text: $0) }
+            Divider()
             DateField(label: text("filter_to"), value: to) { to = $0; r.setTo(text: $0) }
         }
     }
@@ -197,11 +204,11 @@ private struct CurrencyReport: View {
         let p = c.previous
         let change = t.count - p.count
         VStack(alignment: .leading, spacing: 12) {
-            Text(c.currency).font(.headline)
+            Text(c.currency).font(.title3.weight(.semibold))
             Card {
                 TableLine(cells: ["", text("reports_this"), text("reports_before"), text("reports_change")], header: true)
-                TableLine(cells: [text("today_in"), money(t.income), money(p.income), delta(t.income, p.income)])
-                TableLine(cells: [text("today_out"), money(t.expense), money(p.expense), delta(t.expense, p.expense)])
+                TableLine(cells: [text("today_in"), money(t.income), money(p.income), delta(t.income, p.income)], amounts: Theme.moneyIn)
+                TableLine(cells: [text("today_out"), money(t.expense), money(p.expense), delta(t.expense, p.expense)], amounts: Theme.moneyOut)
                 TableLine(cells: [text("today_net"), money(t.net), money(p.net), delta(t.net, p.net)])
                 TableLine(cells: [text("today_cash"), money(t.cashNet), money(p.cashNet), delta(t.cashNet, p.cashNet)])
                 TableLine(cells: [text("reports_entries"), String(t.count), String(p.count), (change > 0 ? "+" : "") + String(change)])
@@ -289,11 +296,11 @@ private struct NotificationsSection: View {
                 Banner(text: text("notif_resend_failed") + " " + failureText(failure), tone: .error)
             }
             if ui.canSend && !ui.closedDays.isEmpty {
-                Text(text("notif_closed_days")).font(.headline)
+                SectionHeader(text("notif_closed_days"))
                 ForEach(ui.closedDays, id: \.id) { day in
                     let enabled = !ui.blocked && !ui.working.contains(day.id) && !ui.dayWaiting(session: day)
                     Button(text("notif_send_day", day.businessDate)) { n.sendDay(session: day) }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.tonalFull)
                         .disabled(!enabled)
                 }
             }
@@ -312,7 +319,7 @@ private struct NotificationsSection: View {
                 Text(text("needs_connection")).font(.caption).foregroundColor(.secondary)
             }
             Button(text("notif_refresh")) { n.reload() }
-                .buttonStyle(.bordered)
+                .buttonStyle(.tonalFull)
                 .disabled(ui.loading)
         }
         .collect(n.ui, into: $ui)
@@ -377,7 +384,7 @@ private struct Message: View {
             }
             if canSend {
                 Button(text("notif_resend")) { ws.notifications.resend(id: n.id) }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.tonalFull)
                     .disabled(!enabled)
             }
         }
@@ -433,10 +440,13 @@ private struct ExportSection: View {
         let x = ws.export
         VStack(alignment: .leading, spacing: 12) {
             Text(text("export_hint")).foregroundColor(.secondary)
-            DateField(label: text("filter_from"), value: from) { from = $0; x.setFrom(text: $0) }
-            DateField(label: text("filter_to"), value: to) { to = $0; x.setTo(text: $0) }
-            if let problem = ui.rangeProblem {
-                Text(rangeText(problem)).font(.caption)
+            Card {
+                DateField(label: text("filter_from"), value: from) { from = $0; x.setFrom(text: $0) }
+                Divider()
+                DateField(label: text("filter_to"), value: to) { to = $0; x.setTo(text: $0) }
+                if let problem = ui.rangeProblem {
+                    Text(rangeText(problem)).font(.caption).foregroundColor(Theme.moneyOut)
+                }
             }
             if ws.branches.count > 1 {
                 FlowLayout {
@@ -455,7 +465,7 @@ private struct ExportSection: View {
                 Text(text("needs_connection")).font(.caption).foregroundColor(.secondary)
             }
             Button(text("export_make")) { x.export() }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.filledFull)
                 .disabled(!ui.canExport)
         }
         .collect(x.ui, into: $ui)
@@ -482,7 +492,7 @@ private struct ExportSection: View {
             case .cancelled, .none: Banner(text: text("export_ready", p.file.fileName), tone: .info)
             }
             Button(text("export_save")) { Task { await share(p.file) } }
-                .buttonStyle(.bordered)
+                .buttonStyle(.tonalFull)
         case .idle:
             EmptyView()
         }

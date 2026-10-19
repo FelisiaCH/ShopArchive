@@ -32,6 +32,7 @@ import xyz.felismp.shoparchive.app.flow.RecordIssue
 import xyz.felismp.shoparchive.app.flow.SlipNotice
 import xyz.felismp.shoparchive.app.flow.TenderRow
 import xyz.felismp.shoparchive.app.flow.Workspace
+import xyz.felismp.shoparchive.app.flow.bankTimeText
 import xyz.felismp.shoparchive.app.flow.displayAmount
 import xyz.felismp.shoparchive.app.flow.groupThousands
 import xyz.felismp.shoparchive.app.flow.historySlipNumbers
@@ -243,7 +244,7 @@ private fun Actions(state: EntryDetailState, ui: DetailUi) {
 private fun TransferLine(t: TransferDto) {
     val payer = t.from?.let { name -> name + (t.fromAccount?.let { " ($it)" } ?: "") }
     val text = listOfNotNull(
-        "${t.source} ✓ ${groupThousands(t.amount)} ${t.currency}", t.time,
+        "${t.source} ✓ ${groupThousands(t.amount)} ${t.currency}", bankTimeText(t.time),
         listOfNotNull(payer, "${t.to} (${t.toAccount})").joinToString(" → "),
     ).joinToString(" · ")
     if (t.toShop == false) ShopBanner(stringResource(Res.string.slip_check_not_shop, t.to) + "\n" + text, Tone.Error) else ShopBanner(text, Tone.Success)
@@ -340,10 +341,12 @@ private fun EditForm(ws: Workspace, state: EntryDetailState, ui: DetailUi, edit:
         }
         if (edit.compressing) ShopText(stringResource(Res.string.slip_preparing), muted = true)
         f.keep.forEach { slip ->
+            // "slip-1.jpg" as "Slip 1", like the history; a name that is not that stays as it is.
+            val label = historySlipNumbers(slip.file)?.let { stringResource(Res.string.detail_slip, it.single().toString()) } ?: slip.file
             ShopCard {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    ShopText(slip.file, modifier = Modifier.weight(1f))
-                    ShopButton(stringResource(Res.string.slip_remove, slip.file), { state.removeStoredSlip(slip.file) }, primary = false, enabled = !busy)
+                    ShopText(label, modifier = Modifier.weight(1f))
+                    ShopButton(stringResource(Res.string.slip_remove, label), { state.removeStoredSlip(slip.file) }, primary = false, enabled = !busy)
                 }
             }
         }
