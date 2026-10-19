@@ -51,6 +51,9 @@ interface RecordsApi {
     /** The sessions (open or closed) of the branch whose business date is [date] (`yyyy-MM-dd`). */
     suspend fun sessionsOn(branch: String, date: String): List<SessionDto>
 
+    /** The sessions of the branch whose business date is from [from] to [to] (`yyyy-MM-dd`; the server takes at most 366 days), oldest first. */
+    suspend fun sessionsBetween(branch: String, from: String, to: String): List<SessionDto>
+
     suspend fun openSession(branch: String, request: OpenSessionRequest): OpenSessionResponse
 
     suspend fun dashboard(from: String, to: String, branch: String): DashboardDto

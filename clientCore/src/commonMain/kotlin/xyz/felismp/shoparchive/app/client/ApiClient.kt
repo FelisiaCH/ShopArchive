@@ -170,6 +170,9 @@ class ApiClient(
     override suspend fun sessionsOn(branch: String, date: String): List<SessionDto> =
         get("/api/v1/sessions/${branch.encodeURLPath()}?from=$date&to=$date")
 
+    override suspend fun sessionsBetween(branch: String, from: String, to: String): List<SessionDto> =
+        get("/api/v1/sessions/${branch.encodeURLPath()}?from=$from&to=$to")
+
     override suspend fun openSession(branch: String, request: OpenSessionRequest): OpenSessionResponse =
         post("/api/v1/sessions/${branch.encodeURLPath()}/open", request)
 
