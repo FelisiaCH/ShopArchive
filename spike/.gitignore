@@ -6,8 +6,5 @@ local.properties
 run/
 *.iml
 .idea/
-iosApp/*.xcodeproj/
-iosApp/**/xcuserdata/
 *.p12
 *.jks
-iosApp/SpikeApp/Info.plist
