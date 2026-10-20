@@ -4,8 +4,6 @@ kotlin = "2.4.20"
 agp = "9.4.1"
 compose-multiplatform = "1.12.1"
 shadow = "9.6.1"
-# Flow / suspend / sealed bridge from the client core to Swift (iOS app only); 0.10.15 supports Kotlin 2.4.20
-skie = "0.10.15"
 
 # Android (Android 8 = API 26 · targetSdk 37 = Android 17)
 android-minSdk = "26"
@@ -58,7 +56,6 @@ ktor-server-rate-limit = { module = "io.ktor:ktor-server-rate-limit", version.re
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
-ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
 
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
@@ -104,4 +101,3 @@ compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-m
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-kmp-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
-skie = { id = "co.touchlab.skie", version.ref = "skie" }
