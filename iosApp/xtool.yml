@@ -7,4 +7,6 @@ resources:
   - ShopArchive/en.lproj
   - ShopArchive/lo.lproj
   - ShopArchive/th.lproj
+  - ShopArchive/AppIcon60x60@2x.png
+  - ShopArchive/AppIcon60x60@3x.png
 skipLSP: true
