@@ -63,7 +63,8 @@ struct Banner: View {
             Image(systemName: tone.symbol)
                 .foregroundColor(tone.color)
                 .accessibilityHidden(true)
-            Text(text).frame(maxWidth: .infinity, alignment: .leading)
+            // The height is the text's own: a banner that shows up later in a card is not cut to the height the card had before.
+            Text(text).fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)
         }
         .font(.subheadline)
         .padding(12)
@@ -436,10 +437,17 @@ struct DateField: View {
     }
 
     var body: some View {
-        DatePicker(label, selection: day, displayedComponents: .date)
-            .datePickerStyle(.compact)
-            .environment(\.locale, Language.locale)
-            .environment(\.calendar, Calendar(identifier: .gregorian))
+        // The label is drawn here and the picker has its natural size, so the system does not shorten one date to `10/20/26` when its row is a little narrower than another's.
+        HStack {
+            Text(label)
+            Spacer(minLength: 8)
+            DatePicker(label, selection: day, displayedComponents: .date)
+                .labelsHidden()
+                .datePickerStyle(.compact)
+                .fixedSize()
+        }
+        .environment(\.locale, Language.locale)
+        .environment(\.calendar, Calendar(identifier: .gregorian))
     }
 }
 
