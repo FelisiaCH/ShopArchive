@@ -28,6 +28,7 @@ struct ServersView: View {
     let state: AppStateServers
     let flow: AppFlow
     @State private var address = ""
+    @State private var removingId: String?
 
     var body: some View {
         NavigationStack {
@@ -45,6 +46,10 @@ struct ServersView: View {
                             }
                         }
                         .disabled(state.busy)
+                        .swipeActions(edge: .trailing) {
+                            Button(text("remove_row"), role: .destructive) { removingId = row.serverId }
+                                .disabled(state.busy)
+                        }
                     }
                 }
 
@@ -80,6 +85,16 @@ struct ServersView: View {
                 StatusSection(busy: state.busy, problem: state.problem)
             }
             .navigationTitle(text("servers_title"))
+            .confirmationDialog(
+                text("remove_confirm_body"),
+                isPresented: Binding(get: { removingId != nil }, set: { if !$0 { removingId = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button(text("remove_confirm"), role: .destructive) {
+                    if let id = removingId { flow.removeSavedServer(serverId: id) }
+                    removingId = nil
+                }
+            }
         }
     }
 }

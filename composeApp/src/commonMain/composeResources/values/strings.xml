@@ -368,6 +368,7 @@
     <string name="servers_title">Servers</string>
     <string name="servers_none">No servers on this device yet.</string>
     <string name="servers_open">Open</string>
+    <string name="remove_row">Remove</string>
     <string name="servers_found">Found on this network</string>
     <string name="servers_refresh">Refresh</string>
     <string name="servers_searching">Looking…</string>

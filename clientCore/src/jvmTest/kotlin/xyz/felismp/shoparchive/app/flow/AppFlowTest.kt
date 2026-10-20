@@ -366,6 +366,42 @@ class AppFlowTest {
         assertNull(f.workspace)
     }
 
+    @Test fun removingASavedServerFromTheListRemovesOnlyThatOneAndItsSignIns() {
+        store.all = twoServers()
+        val f = flow()
+        f.openServer("sid-2"); f.showServers() // sid-2 was the last one opened
+        f.removeSavedServer("sid-2")
+        val s = assertIs<AppState.Servers>(f.state.value)
+        assertEquals(listOf("sid-1"), s.saved.map { it.serverId })
+        assertFalse(s.busy)
+        assertEquals(listOf(server("sid-1", "10.0.0.5:8443", "alice")), store.all?.servers)
+        assertNull(store.all?.lastServerId)
+    }
+
+    @Test fun removingTheLastSavedServerFromTheListClearsTheStore() {
+        store.all = StoredServers(listOf(server("sid-1", "10.0.0.5:8443", "alice")))
+        val f = flow()
+        f.showServers()
+        f.removeSavedServer("sid-1")
+        assertNull(store.all)
+        assertTrue(assertIs<AppState.Servers>(f.state.value).saved.isEmpty())
+    }
+
+    @Test fun removingASavedServerWhileOneIsBeingRemovedIsIgnored() {
+        store.all = StoredServers(listOf(server("sid-1", "10.0.0.5:8443", "alice"), server("sid-2", "10.0.0.6:8443", "bob"), server("sid-3", "10.0.0.7:8443", "carol")))
+        lateinit var f: AppFlow
+        val removing = object : CredentialStore by store {
+            override fun save(servers: StoredServers) { f.removeSavedServer("sid-2"); store.save(servers) } // a second tap while the first runs
+        }
+        f = AppFlow(
+            scope, removing, ThisDevice("Test PC", "windows"), connect = { _, _, _ -> api }, probe = { PIN_FP },
+            prefs = prefs, now = { clock }, io = Dispatchers.Unconfined, discovery = discovery,
+        )
+        f.removeSavedServer("sid-1")
+        assertEquals(listOf("sid-2", "sid-3"), assertIs<AppState.Servers>(f.state.value).saved.map { it.serverId })
+        assertEquals(listOf("sid-2", "sid-3"), store.all?.servers?.map { it.serverId })
+    }
+
     @Test fun theServerListFromTheLockScreenEndsTheSession() {
         store.stored = storedAlice()
         val f = flow()

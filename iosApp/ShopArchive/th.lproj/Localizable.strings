@@ -366,6 +366,7 @@
 "servers_title" = "เซิร์ฟเวอร์";
 "servers_none" = "ยังไม่มีเซิร์ฟเวอร์ในเครื่องนี้";
 "servers_open" = "เปิด";
+"remove_row" = "ลบ";
 "servers_found" = "พบในเครือข่ายนี้";
 "servers_refresh" = "รีเฟรช";
 "servers_searching" = "กำลังค้นหา…";
