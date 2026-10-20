@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -84,7 +85,7 @@ private fun TodayContent(ws: Workspace, data: TodayData, canWrite: Boolean, can:
         return
     }
     data.statsFailure?.let { ShopBanner(stringResource(Res.string.today_stats_failed) + " " + it.text(), Tone.Error) }
-    data.currencies?.filter { it.totals.count > 0 }?.let { shown -> CardGrid(shown) { CurrencyCard(it) } }
+    data.currencies?.filter { it.totals.count > 0 }?.let { shown -> CardGrid(shown) { CurrencyCard(it, Modifier.fillMaxHeight()) } }
     if (data.recent.isEmpty()) {
         if (data.statsFailure == null) ShopText(stringResource(Res.string.today_empty), muted = true)
     } else {
@@ -110,10 +111,10 @@ private fun TodayCounts(data: TodayData, can: Capabilities, openHistory: () -> U
 
 /** One currency of the day: the net total first and large, money in green and out in red, the cash and online figures quieter. */
 @Composable
-internal fun CurrencyCard(c: DashboardCurrency) {
+internal fun CurrencyCard(c: DashboardCurrency, modifier: Modifier = Modifier) {
     val code = c.currency
     fun money(amount: String) = groupThousands(amount) + " " + code
-    ShopCard {
+    ShopCard(modifier) {
         ShopText(code, TextRole.Title)
         AmountRow(stringResource(Res.string.today_in), money(c.totals.income), MoneyFlow.In)
         AmountRow(stringResource(Res.string.today_out), money(c.totals.expense), MoneyFlow.Out)

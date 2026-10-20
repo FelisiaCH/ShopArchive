@@ -2,6 +2,7 @@ package xyz.felismp.shoparchive.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -11,10 +12,15 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import xyz.felismp.shoparchive.app.theme.ShopTheme
 
@@ -52,6 +58,74 @@ internal fun AmountRow(label: String, amount: String, flow: MoneyFlow = MoneyFlo
         androidx.compose.foundation.layout.Box(Modifier.weight(1.5f), contentAlignment = Alignment.CenterEnd) {
             if (strong) ShopText(amount, TextRole.Display, color = flow.color())
             else ShopText(amount, TextRole.Amount, muted = muted, color = flow.color())
+        }
+    }
+}
+
+/** One row of a [ShopTable]: a name, then amounts; the first [colored] amounts take the color of [flow]. */
+internal class TableRow(val cells: List<String>, val flow: MoneyFlow = MoneyFlow.Neutral, val colored: Int = cells.size - 1)
+
+/**
+ * A table whose columns line up from row to row: every amount column is at least as wide as its widest cell and every amount stays on one line, the room left over is shared by the amount columns.
+ * A table wider than the space slides sideways instead of shrinking; with [wrapsName] the name may wrap onto several lines and the table never slides.
+ */
+@Composable
+internal fun ShopTable(header: List<String>, rows: List<TableRow>, wrapsName: Boolean = false) {
+    if (wrapsName) TableGrid(header, rows, true, Modifier.fillMaxWidth())
+    else BoxWithConstraints(Modifier.fillMaxWidth()) {
+        TableGrid(header, rows, false, Modifier.horizontalScroll(rememberScrollState()).widthIn(min = maxWidth))
+    }
+}
+
+/** The header, a hairline under it and the rows, laid out together so the columns agree; a row sits on the first baseline of its cells. */
+@Composable
+private fun TableGrid(header: List<String>, rows: List<TableRow>, wrapsName: Boolean, modifier: Modifier) {
+    val cols = header.size
+    Layout(
+        {
+            header.forEach { ShopText(it, TextRole.Caption, muted = true) }
+            ShopDivider()
+            rows.forEach { row ->
+                row.cells.forEachIndexed { i, cell ->
+                    if (i == 0) ShopText(cell) else ShopText(cell, TextRole.Amount, color = if (i <= row.colored) row.flow.color() else Color.Unspecified)
+                }
+            }
+        },
+        modifier,
+    ) { measurables, constraints ->
+        val gap = 8.dp.roundToPx()
+        val divider = measurables[cols]
+        val cells = measurables.filterIndexed { i, _ -> i != cols }
+        val widths = IntArray(cols) { c -> cells.filterIndexed { i, _ -> i % cols == c }.maxOf { it.maxIntrinsicWidth(Constraints.Infinity) } }
+        val amounts = (1 until cols).sumOf { widths[it] } + gap * (cols - 1)
+        val total = if (wrapsName) constraints.maxWidth else maxOf(widths[0] + amounts, constraints.minWidth)
+        widths[0] = minOf(widths[0], total - amounts).coerceAtLeast(0)
+        // The room left over goes to the amount columns, so on a wide page the figures spread out instead of running together at the right.
+        val extra = (total - widths[0] - amounts).coerceAtLeast(0)
+        for (c in 1 until cols) widths[c] += extra / (cols - 1) + if (c == cols - 1) extra % (cols - 1) else 0
+        val placeables = cells.mapIndexed { i, m -> m.measure(Constraints(maxWidth = if (wrapsName && i % cols == 0) widths[0] else Constraints.Infinity)) }
+        val lines = placeables.chunked(cols)
+        val above = lines.map { line -> line.maxOf { it[FirstBaseline].coerceAtLeast(0) } }
+        val dividerPlaceable = divider.measure(Constraints.fixedWidth(total))
+        var y = 0
+        var dividerY = 0
+        val tops = lines.mapIndexed { r, line ->
+            val top = y
+            y += above[r] + line.maxOf { it.height - it[FirstBaseline].coerceAtLeast(0) }
+            if (r == 0) { y += gap; dividerY = y; y += dividerPlaceable.height }
+            y += gap
+            top
+        }
+        layout(total, (y - gap).coerceAtLeast(0)) {
+            var x = 0
+            val starts = widths.map { w -> x.also { x += w + gap } }
+            lines.forEachIndexed { r, line ->
+                line.forEachIndexed { c, p ->
+                    val px = if (c == 0) starts[0] else starts[c] + widths[c] - p.width
+                    p.place(px, tops[r] + above[r] - p[FirstBaseline].coerceAtLeast(0))
+                }
+            }
+            dividerPlaceable.place(0, dividerY)
         }
     }
 }

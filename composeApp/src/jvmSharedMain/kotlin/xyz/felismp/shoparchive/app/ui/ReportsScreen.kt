@@ -110,39 +110,45 @@ private fun Overview(ws: Workspace) {
 @Composable
 private fun CurrencyReport(ws: Workspace, c: DashboardCurrency, exponent: Int) {
     val code = c.currency
-    fun money(amount: String) = groupThousands(amount) + " " + code
     fun delta(now: String, before: String): String =
         ws.reports.delta(code, now, before)?.let { signedAmount(it, exponent) } ?: "—"
+    val t = c.totals
+    val p = c.previous
+    fun total(label: String, now: String, before: String, flow: MoneyFlow = MoneyFlow.Neutral) =
+        TableRow(listOf(label, groupThousands(now), groupThousands(before), delta(now, before)), flow)
     ShopText(code, TextRole.Title)
     ShopCard {
-        TableLine(listOf("", stringResource(Res.string.reports_this), stringResource(Res.string.reports_before), stringResource(Res.string.reports_change)), header = true)
-        val t = c.totals
-        val p = c.previous
-        TableLine(listOf(stringResource(Res.string.today_in), money(t.income), money(p.income), delta(t.income, p.income)))
-        TableLine(listOf(stringResource(Res.string.today_out), money(t.expense), money(p.expense), delta(t.expense, p.expense)))
-        TableLine(listOf(stringResource(Res.string.today_net), money(t.net), money(p.net), delta(t.net, p.net)))
-        TableLine(listOf(stringResource(Res.string.today_cash), money(t.cashNet), money(p.cashNet), delta(t.cashNet, p.cashNet)))
-        TableLine(listOf(stringResource(Res.string.reports_entries), t.count.toString(), p.count.toString(), (t.count - p.count).let { (if (it > 0) "+" else "") + it }))
+        ShopTable(
+            listOf("", stringResource(Res.string.reports_this), stringResource(Res.string.reports_before), stringResource(Res.string.reports_change)),
+            listOf(
+                total(stringResource(Res.string.today_in), t.income, p.income, MoneyFlow.In),
+                total(stringResource(Res.string.today_out), t.expense, p.expense, MoneyFlow.Out),
+                total(stringResource(Res.string.today_net), t.net, p.net),
+                total(stringResource(Res.string.today_cash), t.cashNet, p.cashNet),
+                TableRow(listOf(stringResource(Res.string.reports_entries), t.count.toString(), p.count.toString(), (t.count - p.count).let { (if (it > 0) "+" else "") + it })),
+            ),
+        )
     }
     Section(Res.string.reports_daily, c.daily.isNotEmpty()) {
-        TableLine(listOf(stringResource(Res.string.reports_date), stringResource(Res.string.today_in), stringResource(Res.string.today_out), stringResource(Res.string.today_net)), header = true)
-        c.daily.forEach { TableLine(listOf(it.date, groupThousands(it.income), groupThousands(it.expense), groupThousands(it.net))) }
+        ShopTable(
+            listOf(stringResource(Res.string.reports_date), stringResource(Res.string.today_in), stringResource(Res.string.today_out), stringResource(Res.string.today_net)),
+            c.daily.map { TableRow(listOf(it.date, groupThousands(it.income), groupThousands(it.expense), groupThousands(it.net))) },
+        )
     }
     Section(Res.string.reports_by_category, c.byCategory.isNotEmpty()) { Breakdown(c.byCategory) { if (it == "none") stringResource(Res.string.reports_no_category) else ws.categoryName(it) ?: it } }
     Section(Res.string.reports_by_method, c.byMethod.isNotEmpty()) {
         Breakdown(c.byMethod) { stringResource(if (it == "online") Res.string.method_online else Res.string.method_cash) }
     }
     Section(Res.string.reports_candles, c.candles.isNotEmpty()) {
-        TableLine(
+        ShopTable(
             listOf(
                 stringResource(Res.string.reports_time), stringResource(Res.string.reports_open), stringResource(Res.string.reports_high),
                 stringResource(Res.string.reports_low), stringResource(Res.string.reports_close), stringResource(Res.string.reports_money_in),
             ),
-            header = true,
+            c.candles.map {
+                TableRow(listOf(it.start.replace('T', ' '), groupThousands(it.open), groupThousands(it.high), groupThousands(it.low), groupThousands(it.close), groupThousands(it.moneyIn)))
+            },
         )
-        c.candles.forEach {
-            TableLine(listOf(it.start.replace('T', ' '), groupThousands(it.open), groupThousands(it.high), groupThousands(it.low), groupThousands(it.close), groupThousands(it.moneyIn)))
-        }
     }
     Section(Res.string.reports_top_items, c.topItems.isNotEmpty()) { Items(c.topItems) }
     Section(Res.string.reports_expense_items, c.expenseItems.isNotEmpty()) { Items(c.expenseItems) }
@@ -155,19 +161,26 @@ private fun Section(title: org.jetbrains.compose.resources.StringResource, show:
     ShopCard(content = rows)
 }
 
+/** The sum of a row in the color of its type, with the sign as in History: green and + came in, red and - went out. */
 @Composable
 private fun Breakdown(rows: List<DashboardBreakdown>, name: @Composable (String) -> String) {
-    TableLine(listOf(stringResource(Res.string.category_label), stringResource(Res.string.reports_sum), stringResource(Res.string.reports_entries)), header = true)
-    rows.forEach {
-        val sign = if (it.type == EntryType.INCOME) "+" else "-"
-        TableLine(listOf(name(it.key) + " " + sign, groupThousands(it.sum), it.count.toString()))
-    }
+    ShopTable(
+        listOf(stringResource(Res.string.category_label), stringResource(Res.string.reports_sum), stringResource(Res.string.reports_entries)),
+        rows.map {
+            val income = it.type == EntryType.INCOME
+            TableRow(listOf(name(it.key), (if (income) "+" else "-") + groupThousands(it.sum), it.count.toString()), if (income) MoneyFlow.In else MoneyFlow.Out, colored = 1)
+        },
+        wrapsName = true,
+    )
 }
 
 @Composable
 private fun Items(rows: List<DashboardItem>) {
-    TableLine(listOf(stringResource(Res.string.item_label), stringResource(Res.string.reports_sum), stringResource(Res.string.reports_entries)), header = true)
-    rows.forEach { TableLine(listOf(it.item.ifBlank { "—" }, groupThousands(it.sum), it.count.toString())) }
+    ShopTable(
+        listOf(stringResource(Res.string.item_label), stringResource(Res.string.reports_sum), stringResource(Res.string.reports_entries)),
+        rows.map { TableRow(listOf(it.item.ifBlank { "—" }, groupThousands(it.sum), it.count.toString())) },
+        wrapsName = true,
+    )
 }
 
 // ---- export ----
