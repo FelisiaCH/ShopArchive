@@ -366,6 +366,7 @@
 "servers_title" = "ເຊີບເວີ";
 "servers_none" = "ຍັງບໍ່ມີເຊີບເວີໃນເຄື່ອງນີ້";
 "servers_open" = "ເປີດ";
+"remove_row" = "ລຶບ";
 "servers_found" = "ພົບໃນເຄືອຂ່າຍນີ້";
 "servers_refresh" = "ໂຫຼດໃໝ່";
 "servers_searching" = "ກຳລັງຊອກຫາ…";

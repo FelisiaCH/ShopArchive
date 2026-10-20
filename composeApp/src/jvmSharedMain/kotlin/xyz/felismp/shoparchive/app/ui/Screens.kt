@@ -74,13 +74,25 @@ private fun CertChangedScreen(s: AppState.CertChanged, flow: AppFlow) {
 @Composable
 private fun ServersScreen(s: AppState.Servers, flow: AppFlow) {
     var address by rememberSaveable { mutableStateOf("") }
+    var confirmRemove by remember { mutableStateOf<String?>(null) } // the saved server whose removal is being confirmed
     ScreenFrame(stringResource(Res.string.servers_title)) {
         if (s.saved.isEmpty()) ShopText(stringResource(Res.string.servers_none), muted = true)
         s.saved.forEach { row ->
             ShopCard(Modifier.fillMaxWidth()) {
                 ShopText(row.name, TextRole.Title)
                 ShopText(row.endpoint + " · " + pluralStringResource(Res.plurals.server_users, row.userCount, row.userCount), TextRole.Caption, muted = true)
-                ShopButton(stringResource(Res.string.servers_open), { flow.openServer(row.serverId) }, primary = false, enabled = !s.busy)
+                if (confirmRemove == row.serverId) {
+                    ShopBanner(stringResource(Res.string.remove_confirm_body), Tone.Error)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ShopButton(stringResource(Res.string.remove_confirm), { flow.removeSavedServer(row.serverId) }, enabled = !s.busy)
+                        ShopButton(stringResource(Res.string.cancel), { confirmRemove = null }, primary = false, enabled = !s.busy)
+                    }
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ShopButton(stringResource(Res.string.servers_open), { flow.openServer(row.serverId) }, primary = false, enabled = !s.busy)
+                        ShopButton(stringResource(Res.string.remove_row), { confirmRemove = row.serverId }, primary = false, enabled = !s.busy)
+                    }
+                }
             }
         }
 

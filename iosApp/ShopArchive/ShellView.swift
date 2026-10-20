@@ -54,8 +54,8 @@ struct ShellView: View {
                 case .notes: screen { NotesView(ws: ws) }
                 // As in Compose, Manage shop is there without a branch: it is where the first one is added.
                 case .admin: AdminView(ws: ws)
-                // As in Compose, the console is there without the config or a branch.
-                case .console: ConsoleView(ws: ws)
+                // As in Compose, the console is there without the config or a branch. Its title is inline, so the header can sit above its own scroll view.
+                case .console: ConsoleView(ws: ws).safeAreaInset(edge: .top, spacing: 0) { header.background(Color(.systemGroupedBackground)) }
                 default: MoreView(state: state, flow: flow, ws: ws, can: capabilities)
                 }
             }
@@ -71,16 +71,17 @@ struct ShellView: View {
 
     private func page<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         NavigationStack {
-            // The screen's own scroll view is the root of the stack, so the large title collapses as it scrolls; the banner and the branch choice sit above it as an inset.
+            // The screen's own scroll view is the root of the stack, so the large title collapses as it scrolls; each Page puts the header at the top of that scroll view.
             content()
-                .safeAreaInset(edge: .top, spacing: 0) {
-                    VStack(spacing: 0) {
-                        connectionBanner
-                        branchChoice
-                    }
-                    .background(Color(.systemGroupedBackground))
-                }
+                .environment(\.pageHeader, AnyView(header))
                 .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        }
+    }
+
+    private var header: some View {
+        VStack(spacing: 0) {
+            connectionBanner
+            branchChoice
         }
     }
 

@@ -1032,16 +1032,7 @@ class AppFlow(
             val gone = stored?.serverId
             val cleared = try {
                 guarded({
-                    withContext(io) {
-                        saveLock.withLock {
-                            val next = StoredServers(all.servers.filter { it.serverId != gone }, all.lastServerId.takeIf { it != gone })
-                            // The last server takes the file with it.
-                            if (next.servers.isEmpty()) store.clear() else store.save(next)
-                            all = next
-                            stored = null
-                            persisted = null
-                        }
-                    }
+                    withContext(io) { saveLock.withLock { forget(gone) } }
                 }) { p -> settings { it.copy(busy = false, problem = p) } }
             } finally {
                 removing = false
@@ -1054,6 +1045,35 @@ class AppFlow(
             stored = null
             showList()
         }
+    }
+
+    /**
+     * Forgets a server that is not open and cannot be signed in to (a reinstalled one whose key changed): the server list's delete, as in Minecraft's.
+     * Its saved sign-ins go with it, other servers stay.
+     */
+    fun removeSavedServer(serverId: String) {
+        val s = _state.value as? AppState.Servers ?: return
+        if (s.busy || removing) return
+        _state.value = s.copy(busy = true, problem = null)
+        removing = true
+        scope.launch {
+            val cleared = try {
+                guarded({ withContext(io) { saveLock.withLock { forget(serverId) } } }) { p -> servers { it.copy(busy = false, problem = p) } }
+            } finally {
+                removing = false
+            }
+            if (cleared != null) showList()
+        }
+    }
+
+    /** Takes [serverId] and its saved sign-ins off this device. Call under [saveLock]. */
+    private fun forget(serverId: String?) {
+        val next = StoredServers(all.servers.filter { it.serverId != serverId }, all.lastServerId.takeIf { it != serverId })
+        // The last server takes the file with it.
+        if (next.servers.isEmpty()) store.clear() else store.save(next)
+        all = next
+        stored = null
+        persisted = null
     }
 
     // ---- errors ----

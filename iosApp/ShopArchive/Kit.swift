@@ -185,14 +185,29 @@ extension View {
 /// A scrollable column for one screen inside the shell. The grouped background is the shell's.
 struct Page<Content: View>: View {
     @ViewBuilder let content: Content
+    @Environment(\.pageHeader) private var header
 
     var body: some View {
         ScrollView {
+            // The header scrolls with the screen, under the large title, so the title has its own place and collapses as the screen scrolls.
+            header
             VStack(alignment: .leading, spacing: 20) { content }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
         }
+    }
+}
+
+private struct PageHeaderKey: EnvironmentKey {
+    static let defaultValue: AnyView? = nil
+}
+
+extension EnvironmentValues {
+    /// What the shell shows at the top of every page: the connection banner and the branch choice.
+    var pageHeader: AnyView? {
+        get { self[PageHeaderKey.self] }
+        set { self[PageHeaderKey.self] = newValue }
     }
 }
 

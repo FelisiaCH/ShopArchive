@@ -366,6 +366,7 @@
 "servers_title" = "Servers";
 "servers_none" = "No servers on this device yet.";
 "servers_open" = "Open";
+"remove_row" = "Remove";
 "servers_found" = "Found on this network";
 "servers_refresh" = "Refresh";
 "servers_searching" = "Looking…";

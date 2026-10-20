@@ -26,6 +26,7 @@ struct CertChangedView: View {
                 .disabled(state.busy)
             }
             .navigationTitle(text("pinmm_title"))
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
@@ -44,6 +45,7 @@ struct ProtocolMismatchView: View {
                 }
             }
             .navigationTitle(text("proto_title"))
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
@@ -73,6 +75,7 @@ struct ReauthView: View {
                 .disabled(prompt.busy)
             }
             .navigationTitle(text("reauth_title"))
+            .navigationBarTitleDisplayMode(.inline)
             .onChange(of: prompt.needsPassword) { _ in secret = "" }
         }
     }

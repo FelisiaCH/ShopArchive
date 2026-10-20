@@ -28,6 +28,7 @@ struct ServersView: View {
     let state: AppStateServers
     let flow: AppFlow
     @State private var address = ""
+    @State private var removingId: String?
 
     var body: some View {
         NavigationStack {
@@ -37,14 +38,28 @@ struct ServersView: View {
                         Text(text("servers_none")).foregroundColor(.secondary)
                     }
                     ForEach(state.saved, id: \.serverId) { row in
-                        Button { flow.openServer(serverId: row.serverId) } label: {
-                            VStack(alignment: .leading) {
-                                Text(row.name)
-                                Text(row.endpoint + " · " + text("server_users", row.userCount))
-                                    .font(.caption).foregroundColor(.secondary)
+                        // Remove is a button in sight, as on Android and in Minecraft's list: a swipe alone is found by nobody who does not know it.
+                        HStack(spacing: 12) {
+                            Button { flow.openServer(serverId: row.serverId) } label: {
+                                VStack(alignment: .leading) {
+                                    Text(row.name).foregroundColor(.primary)
+                                    Text(row.endpoint + " · " + text("server_users", row.userCount))
+                                        .font(.caption).foregroundColor(.secondary)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.borderless)
+                            Button(text("remove_row"), role: .destructive) { removingId = row.serverId }
+                                .buttonStyle(.bordered)
+                                .tint(Theme.moneyOut)
                         }
                         .disabled(state.busy)
+                        .swipeActions(edge: .trailing) {
+                            Button(text("remove_row"), role: .destructive) { removingId = row.serverId }
+                                .tint(Theme.moneyOut)
+                                .disabled(state.busy)
+                        }
                     }
                 }
 
@@ -80,6 +95,16 @@ struct ServersView: View {
                 StatusSection(busy: state.busy, problem: state.problem)
             }
             .navigationTitle(text("servers_title"))
+            .confirmationDialog(
+                text("remove_confirm_body"),
+                isPresented: Binding(get: { removingId != nil }, set: { if !$0 { removingId = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button(text("remove_confirm"), role: .destructive) {
+                    if let id = removingId { flow.removeSavedServer(serverId: id) }
+                    removingId = nil
+                }
+            }
         }
     }
 }
