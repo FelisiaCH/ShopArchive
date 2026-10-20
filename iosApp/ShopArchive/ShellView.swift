@@ -71,12 +71,16 @@ struct ShellView: View {
 
     private func page<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                connectionBanner
-                branchChoice
-                content()
-            }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            // The screen's own scroll view is the root of the stack, so the large title collapses as it scrolls; the banner and the branch choice sit above it as an inset.
+            content()
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    VStack(spacing: 0) {
+                        connectionBanner
+                        branchChoice
+                    }
+                    .background(Color(.systemGroupedBackground))
+                }
+                .background(Color(.systemGroupedBackground).ignoresSafeArea())
         }
     }
 

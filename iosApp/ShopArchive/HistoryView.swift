@@ -383,7 +383,7 @@ private struct Actions: View {
     var body: some View {
         let busy = isWorking(ui.action)
         if !ui.entry.deleted && (ui.canEdit || ui.canDelete) {
-            HStack(spacing: 10) {
+            VStack(spacing: 10) {
                 if ui.canEdit {
                     Button(text("detail_edit")) { state.startEdit() }
                         .buttonStyle(.tonalFull)
@@ -409,7 +409,7 @@ private struct Actions: View {
         if ui.confirmDelete {
             Card {
                 Text(text("detail_delete_ask")).font(.headline)
-                Text(text("detail_delete_body")).foregroundColor(.secondary)
+                Text(text("detail_delete_body")).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
                     Button(text("detail_delete_yes"), role: .destructive) { state.confirmDelete() }
                         .buttonStyle(.filledFull)
