@@ -28,6 +28,8 @@ targets:
         INFOPLIST_FILE: AppInfo.plist
         GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1"
+        # The icon is in ShopArchive/Assets.xcassets; xtool cannot compile it, so CI does and fetch-clientcore.sh downloads Assets.car.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # The script phase below runs Gradle, which Xcode's sandbox would block.
         ENABLE_USER_SCRIPT_SANDBOXING: NO
         FRAMEWORK_SEARCH_PATHS: $(SRCROOT)/../clientCore/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)

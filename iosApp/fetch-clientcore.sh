@@ -1,5 +1,5 @@
 #!/bin/sh
-# Downloads the ClientCore XCFramework that CI built for this commit into Frameworks/, for xtool on Linux:
+# Downloads the ClientCore XCFramework and the compiled asset catalog (the app icon) that CI built for this commit into Frameworks/ and Assets/, for xtool on Linux:
 # Kotlin/Native links Apple binaries only on macOS. Push the commit and wait for CI first.
 set -eu
 cd "$(dirname "$0")"
@@ -11,6 +11,9 @@ if [ -z "$run" ]; then
 fi
 rm -rf Frameworks/ClientCore.xcframework
 gh run download "$run" --name ClientCore-xcframework --dir Frameworks
+# The app icon, compiled by CI (xtool cannot compile the asset catalog).
+rm -rf Assets
+gh run download "$run" --name ios-assets --dir Assets
 echo "ClientCore from CI run $run ($commit)"
 # SwiftPM's build folder goes to the cache: copying the framework into it fails on NTFS, where this repo may live.
 if [ ! -e .build ]; then

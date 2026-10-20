@@ -1,15 +1,27 @@
 #!/bin/sh
-# Renders the home-screen icon (AppIcon60x60@2x/@3x.png in ShopArchive/) from ../composeApp/icons/shoparchive.svg, the art every platform shares:
-# white background, no alpha, the receipt (not receipt and coin) centred and the art 62% of the width, as Android's adaptive icon. Needs rsvg-convert.
+# Renders the home-screen icon (ShopArchive/Assets.xcassets/AppIcon.appiconset) from ../composeApp/icons/shoparchive.svg, the art every platform shares:
+# the receipt (not receipt and coin) centred and the art 72% of the width, as Android's adaptive icon. Needs rsvg-convert.
+#   AppIcon.png         on opaque white, RGB without alpha (iOS rejects an alpha channel here)
+#   AppIcon-Dark.png    the same art on transparent: iOS adds the dark backdrop
+#   AppIcon-Tinted.png  light on transparent, the coin's rim and symbol black: iOS tints the grays
 set -eu
 cd "$(dirname "$0")"
+out=ShopArchive/Assets.xcassets/AppIcon.appiconset
 dir=$(mktemp -d)
-{
-    echo '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="white"/>'
-    echo '<g fill="none" transform="translate(214.4 197.04) scale(1.24)">'
-    sed -e '/^<?xml/d' -e '/<svg/d' -e '/<\/svg>/d' ../composeApp/icons/shoparchive.svg
-    echo '</g></svg>'
-} > "$dir/icon.svg"
-rsvg-convert -b white -w 120 -h 120 "$dir/icon.svg" -o ShopArchive/AppIcon60x60@2x.png
-rsvg-convert -b white -w 180 -h 180 "$dir/icon.svg" -o ShopArchive/AppIcon60x60@3x.png
+# art BACKGROUND SED-SCRIPT: writes $dir/icon.svg, the shared art through the sed script, on the background colour unless that is empty
+art() {
+    {
+        echo '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">'
+        [ -z "$1" ] || echo "<rect width=\"1024\" height=\"1024\" fill=\"$1\"/>"
+        echo '<g fill="none" transform="translate(166.4 146.24) scale(1.44)">'
+        sed -e '/^<?xml/d' -e '/<svg/d' -e '/<\/svg>/d' -e "$2" ../composeApp/icons/shoparchive.svg
+        echo '</g></svg>'
+    } > "$dir/icon.svg"
+}
+art white 's/^$//'
+rsvg-convert -b white "$dir/icon.svg" -o "$out/AppIcon.png"
+art "" 's/^$//'
+rsvg-convert "$dir/icon.svg" -o "$out/AppIcon-Dark.png"
+art "" 's/r="100" fill="white"/r="100" fill="#000"/;s/stroke="white"/stroke="#000"/;s/fill="white" stroke="#1E8C45"/fill="none" stroke="#1E8C45"/;s/#1E8C45/white/g'
+rsvg-convert "$dir/icon.svg" -o "$out/AppIcon-Tinted.png"
 rm -r "$dir"
