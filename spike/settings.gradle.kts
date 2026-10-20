@@ -16,7 +16,7 @@ dependencyResolutionManagement {
 }
 
 // The Android modules need an SDK even just to configure. Same lookup order AGP uses;
-// without an SDK the build is desktop + server only (iOS klibs need a Mac anyway).
+// without an SDK the build is desktop + server only.
 val sdkFromLocalProperties = file("local.properties").takeIf { it.isFile }
     ?.let { f -> java.util.Properties().also { p -> f.reader().use(p::load) }.getProperty("sdk.dir") }
 val androidSdk = listOfNotNull(sdkFromLocalProperties, System.getenv("ANDROID_HOME"), System.getenv("ANDROID_SDK_ROOT"))

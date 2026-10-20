@@ -14,12 +14,6 @@ kotlin {
     jvmToolchain(21)
 
     jvm("desktop")
-    listOf(iosArm64(), iosSimulatorArm64()).forEach {
-        it.binaries.framework {
-            baseName = "SpikeShared" // Swift: `import SpikeShared`
-            isStatic = true
-        }
-    }
     if (androidEnabled) {
         (this as ExtensionAware).extensions.configure<KotlinMultiplatformAndroidLibraryTarget>("android") {
             namespace = "xyz.felismp.shoparchive.spike.app"
@@ -53,9 +47,6 @@ kotlin {
             implementation(libs.ktor.server.netty)
             implementation(libs.ktor.server.websockets)
             implementation(libs.ktor.network.tls.certificates)
-        }
-        iosMain.dependencies {
-            implementation(libs.ktor.client.darwin)
         }
         if (androidEnabled) {
             getByName("androidMain") {
