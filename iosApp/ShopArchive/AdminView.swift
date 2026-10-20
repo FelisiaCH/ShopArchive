@@ -469,7 +469,7 @@ private struct CategoriesSection: View {
         Card {
             Text(categoryName(c.name)).font(.headline)
             FlowLayout {
-                Chip(text: appliesText(c.appliesTo), tone: .success)
+                Chip(text: appliesText(c.appliesTo), tone: appliesTone(c.appliesTo))
                 if c.archived { Chip(text: text("manage_archived"), tone: .info) }
             }
             if editing == c.key {
@@ -496,6 +496,15 @@ private func appliesText(_ appliesTo: AppliesTo) -> String {
     case .income: return text("type_income")
     case .expense: return text("type_expense")
     case .both: return text("manage_both")
+    }
+}
+
+/// Money in green, money out red, both neutral, as the amounts are.
+private func appliesTone(_ appliesTo: AppliesTo) -> Tone {
+    switch appliesTo {
+    case .income: return .success
+    case .expense: return .error
+    case .both: return .info
     }
 }
 
