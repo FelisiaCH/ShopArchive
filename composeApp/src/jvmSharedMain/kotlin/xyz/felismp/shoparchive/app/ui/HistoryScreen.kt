@@ -143,9 +143,11 @@ private fun EntryRow(ws: Workspace, e: EntryDto) {
             if (e.slips.isNotEmpty()) ShopText(stringResource(Res.string.history_slips, e.slips.size.toString()), TextRole.Caption, muted = true)
             if (e.deleted) ShopChip(stringResource(Res.string.history_deleted), Tone.Error)
         }
-        Column(Modifier.weight(1f)) {
+        // The amount in its color, how it was paid quiet under it: a long amount wraps alone instead of pushing the method to a line of its own.
+        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
             e.tenders.forEach { t ->
-                AmountText(sign + groupThousands(t.amount) + " " + t.currency + " · " + methodText(t.method), flow, Modifier.fillMaxWidth())
+                AmountText(sign + groupThousands(t.amount) + " " + t.currency, flow)
+                ShopText(methodText(t.method), TextRole.Caption, muted = true)
             }
         }
     }
@@ -194,7 +196,8 @@ private fun EntryFacts(ws: Workspace, e: EntryDto) {
         val sign = if (e.type == EntryType.INCOME) "+" else "-"
         val flow = if (e.type == EntryType.INCOME) MoneyFlow.In else MoneyFlow.Out
         e.tenders.forEach { t ->
-            ShopText(sign + groupThousands(t.amount) + " " + t.currency + " · " + methodText(t.method), TextRole.Display, color = flow.color())
+            ShopText(sign + groupThousands(t.amount) + " " + t.currency, TextRole.Display, color = flow.color())
+            ShopText(methodText(t.method), TextRole.Caption, muted = true)
         }
     }
 }
