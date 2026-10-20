@@ -8,6 +8,7 @@ import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
@@ -175,7 +177,7 @@ fun <T> FluentSelectorBar(
     icon: (T) -> ImageVector? = { null },
 ) {
     val c = FluentTheme.colors
-    Row(modifier.clip(FluentShapes.card).background(c.shop.surfaceSelected).border(1.dp, c.cardStroke, FluentShapes.card).padding(3.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(modifier.clip(FluentShapes.card).background(c.shop.surfaceSelected).border(1.dp, c.cardStroke, FluentShapes.card).horizontalScroll(rememberScrollState()).padding(3.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         for ((value, label) in options) {
             val isSelected = value == selected
             val source = remember { MutableInteractionSource() }
@@ -193,7 +195,7 @@ fun <T> FluentSelectorBar(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 icon(value)?.let { Image(rememberVectorPainter(it), contentDescription = null, Modifier.size(16.dp), colorFilter = ColorFilter.tint(content)) }
-                FluentText(label, style = if (isSelected) FluentTheme.typography.bodyStrong else FluentTheme.typography.body, color = content)
+                FluentText(label, style = if (isSelected) FluentTheme.typography.bodyStrong else FluentTheme.typography.body, color = content, maxLines = 1)
             }
         }
     }

@@ -262,7 +262,7 @@ private fun CategoriesSection(admin: AdminState, ui: AdminUi, off: Boolean) {
         ShopCard {
             ShopText(c.name.pick(), TextRole.Title)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ShopChip(appliesText(c.appliesTo), Tone.Success)
+                ShopChip(appliesText(c.appliesTo), when (c.appliesTo) { AppliesTo.INCOME -> Tone.Success; AppliesTo.EXPENSE -> Tone.Error; AppliesTo.BOTH -> Tone.Info })
                 if (c.archived) ShopChip(stringResource(Res.string.manage_archived), Tone.Info)
             }
             if (editing == c.key) {
