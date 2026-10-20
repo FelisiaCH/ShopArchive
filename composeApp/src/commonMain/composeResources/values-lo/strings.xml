@@ -368,6 +368,7 @@
     <string name="servers_title">ເຊີບເວີ</string>
     <string name="servers_none">ຍັງບໍ່ມີເຊີບເວີໃນເຄື່ອງນີ້</string>
     <string name="servers_open">ເປີດ</string>
+    <string name="remove_row">ລຶບ</string>
     <string name="servers_found">ພົບໃນເຄືອຂ່າຍນີ້</string>
     <string name="servers_refresh">ໂຫຼດໃໝ່</string>
     <string name="servers_searching">ກຳລັງຊອກຫາ…</string>
