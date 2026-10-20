@@ -301,6 +301,14 @@ abstract class IosResourcesTask : DefaultTask() {
 	<string>ShopArchive</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconName</key>
+			<string>AppIcon</string>
+		</dict>
+	</dict>
 	<key>CFBundleLocalizations</key>
 	<array>
 		<string>en</string>

@@ -16,7 +16,8 @@ let package = Package(
             dependencies: ["ClientCore"],
             path: "ShopArchive",
             // The text goes into the app itself (xtool.yml resources), where Xcode puts it too, not into a SwiftPM resource bundle.
-            exclude: ["en.lproj", "lo.lproj", "th.lproj"],
+            // The icon catalog needs actool, which Linux has not: CI compiles it to Assets.car (fetch-clientcore.sh, xtool.yml resources).
+            exclude: ["en.lproj", "lo.lproj", "th.lproj", "Assets.xcassets"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .binaryTarget(name: "ClientCore", path: "Frameworks/ClientCore.xcframework"),

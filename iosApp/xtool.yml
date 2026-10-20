@@ -7,4 +7,5 @@ resources:
   - ShopArchive/en.lproj
   - ShopArchive/lo.lproj
   - ShopArchive/th.lproj
+  - Assets/Assets.car
 skipLSP: true

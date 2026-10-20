@@ -74,6 +74,17 @@ jobs:
           name: ClientCore-xcframework
           path: clientCore/build/XCFrameworks/release/
           if-no-files-found: error
+      # xtool on Linux cannot compile the asset catalog (the app icon): compile it here, and fetch-clientcore.sh downloads Assets.car.
+      - run: |
+          mkdir -p build/assets
+          xcrun actool ShopArchive/Assets.xcassets --compile build/assets --platform iphoneos --minimum-deployment-target 16.0 --app-icon AppIcon --target-device iphone --output-partial-info-plist build/assets/partial.plist
+          cat build/assets/partial.plist
+        working-directory: iosApp
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ios-assets
+          path: iosApp/build/assets/Assets.car
+          if-no-files-found: error
 
   # Manual only: GitHub-hosted arm64 runners may be unavailable to private repos.
   linux-arm64:
