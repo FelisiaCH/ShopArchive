@@ -53,34 +53,61 @@ struct ReportsView: View {
 }
 
 /// One row of a table: the first cell is text, the others are amounts that line up on the right.
-private struct TableLine: View {
+private struct TableRow {
     let cells: [String]
-    var header = false
-    /// The color of the amounts (every cell but the first).
+    /// The color of the first `colored` amounts.
     var amounts: Color = .primary
+    var colored = 3
+}
+
+/// A table whose columns line up from row to row. Every cell stays on one line at one size; a table too wide for the screen slides sideways instead of shrinking.
+/// With `wrapsName` the first cell is a name that may be long, so it wraps and the table never slides.
+private struct ReportTable: View {
+    let header: [String]
+    var wrapsName = false
+    let rows: [TableRow]
 
     var body: some View {
-        HStack(spacing: 8) {
-            ForEach(Array(cells.enumerated()), id: \.offset) { i, cell in
-                Text(cell)
-                    .font(font(i))
-                    .foregroundColor(color(i))
-                    .lineLimit(i == 0 ? nil : 1)
-                    .minimumScaleFactor(0.6)
-                    .multilineTextAlignment(i == 0 ? .leading : .trailing)
-                    .frame(maxWidth: .infinity, alignment: i == 0 ? .leading : .trailing)
+        if wrapsName {
+            grid
+        } else {
+            ViewThatFits(in: .horizontal) {
+                grid
+                ScrollView(.horizontal, showsIndicators: false) { grid }
             }
         }
     }
 
-    private func color(_ i: Int) -> Color {
-        if header { return .secondary }
-        return i == 0 ? .primary : amounts
+    private var grid: some View {
+        Grid(alignment: Alignment(horizontal: .trailing, vertical: .firstTextBaseline), horizontalSpacing: 8, verticalSpacing: 10) {
+            GridRow {
+                ForEach(Array(header.enumerated()), id: \.offset) { i, cell in
+                    self.cell(cell, column: i, font: .caption, color: .secondary)
+                }
+            }
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                GridRow {
+                    ForEach(Array(row.cells.enumerated()), id: \.offset) { i, cell in
+                        self.cell(cell, column: i, font: i == 0 ? .subheadline : .footnote.monospacedDigit(), color: color(row, i))
+                    }
+                }
+            }
+        }
     }
 
-    private func font(_ i: Int) -> Font {
-        if header { return .caption }
-        return i == 0 ? .body : .body.monospacedDigit()
+    private func cell(_ shown: String, column: Int, font: Font, color: Color) -> some View {
+        let wraps = wrapsName && column == 0
+        return Text(verbatim: shown)
+            .font(font)
+            .foregroundColor(color)
+            .lineLimit(wraps ? nil : 1)
+            .fixedSize(horizontal: !wraps, vertical: wraps)
+            .frame(maxWidth: column == 0 ? nil : .infinity, alignment: .trailing)
+            .gridColumnAlignment(column == 0 ? .leading : .trailing)
+    }
+
+    private func color(_ row: TableRow, _ i: Int) -> Color {
+        i >= 1 && i <= row.colored ? row.amounts : .primary
     }
 }
 
@@ -193,32 +220,38 @@ private struct CurrencyReport: View {
     let c: DashboardCurrency
     let exponent: Int32
 
-    private func money(_ amount: String) -> String { groupThousands(amount) + " " + c.currency }
-
     private func delta(_ now: String, _ before: String) -> String {
         ws.reports.delta(currency: c.currency, now: now, before: before).map { signedAmount(minor: $0.int64Value, exponent: exponent) } ?? "—"
+    }
+
+    /// A row of the totals table: the amounts without the currency, which the title above the table already says.
+    private func total(_ label: String, _ now: String, _ before: String, color: Color = .primary) -> TableRow {
+        TableRow(cells: [label, groupThousands(now), groupThousands(before), delta(now, before)], amounts: color)
     }
 
     var body: some View {
         let t = c.totals
         let p = c.previous
         let change = t.count - p.count
+        let changeShown = (change > 0 ? "+" : "") + String(change)
+        let totals: [TableRow] = [
+            total(text("today_in"), t.income, p.income, color: Theme.moneyIn),
+            total(text("today_out"), t.expense, p.expense, color: Theme.moneyOut),
+            total(text("today_net"), t.net, p.net),
+            total(text("today_cash"), t.cashNet, p.cashNet),
+            TableRow(cells: [text("reports_entries"), String(t.count), String(p.count), changeShown]),
+        ]
         VStack(alignment: .leading, spacing: 12) {
             Text(c.currency).font(.title3.weight(.semibold))
             Card {
-                TableLine(cells: ["", text("reports_this"), text("reports_before"), text("reports_change")], header: true)
-                TableLine(cells: [text("today_in"), money(t.income), money(p.income), delta(t.income, p.income)], amounts: Theme.moneyIn)
-                TableLine(cells: [text("today_out"), money(t.expense), money(p.expense), delta(t.expense, p.expense)], amounts: Theme.moneyOut)
-                TableLine(cells: [text("today_net"), money(t.net), money(p.net), delta(t.net, p.net)])
-                TableLine(cells: [text("today_cash"), money(t.cashNet), money(p.cashNet), delta(t.cashNet, p.cashNet)])
-                TableLine(cells: [text("reports_entries"), String(t.count), String(p.count), (change > 0 ? "+" : "") + String(change)])
+                ReportTable(header: ["", text("reports_this"), text("reports_before"), text("reports_change")], rows: totals)
             }
             if !c.daily.isEmpty {
                 ReportSection(title: text("reports_daily")) {
-                    TableLine(cells: [text("reports_date"), text("today_in"), text("today_out"), text("today_net")], header: true)
-                    ForEach(Array(c.daily.enumerated()), id: \.offset) { _, d in
-                        TableLine(cells: [d.date, groupThousands(d.income), groupThousands(d.expense), groupThousands(d.net)])
-                    }
+                    ReportTable(
+                        header: [text("reports_date"), text("today_in"), text("today_out"), text("today_net")],
+                        rows: c.daily.map { TableRow(cells: [$0.date, groupThousands($0.income), groupThousands($0.expense), groupThousands($0.net)]) }
+                    )
                 }
             }
             if !c.byCategory.isEmpty {
@@ -233,19 +266,16 @@ private struct CurrencyReport: View {
             }
             if !c.candles.isEmpty {
                 ReportSection(title: text("reports_candles")) {
-                    TableLine(
-                        cells: [
+                    ReportTable(
+                        header: [
                             text("reports_time"), text("reports_open"), text("reports_high"),
                             text("reports_low"), text("reports_close"), text("reports_money_in"),
                         ],
-                        header: true
+                        rows: c.candles.map { k in
+                            let start = k.start.replacingOccurrences(of: "T", with: " ")
+                            return TableRow(cells: [start, groupThousands(k.open), groupThousands(k.high), groupThousands(k.low), groupThousands(k.close), groupThousands(k.moneyIn)])
+                        }
                     )
-                    ForEach(Array(c.candles.enumerated()), id: \.offset) { _, k in
-                        TableLine(cells: [
-                            k.start.replacingOccurrences(of: "T", with: " "),
-                            groupThousands(k.open), groupThousands(k.high), groupThousands(k.low), groupThousands(k.close), groupThousands(k.moneyIn),
-                        ])
-                    }
                 }
             }
             if !c.topItems.isEmpty {
@@ -257,20 +287,25 @@ private struct CurrencyReport: View {
         }
     }
 
-    @ViewBuilder
+    /// The sum of a row in the color of its type, with the sign as in History: green and + came in, red and - went out.
     private func breakdown(_ rows: [DashboardBreakdown], name: @escaping (String) -> String) -> some View {
-        TableLine(cells: [text("category_label"), text("reports_sum"), text("reports_entries")], header: true)
-        ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-            TableLine(cells: [name(row.key) + " " + (row.type == .income ? "+" : "-"), groupThousands(row.sum), String(row.count)])
-        }
+        ReportTable(
+            header: [text("category_label"), text("reports_sum"), text("reports_entries")],
+            wrapsName: true,
+            rows: rows.map { row in
+                let income = row.type == .income
+                let sum = (income ? "+" : "-") + groupThousands(row.sum)
+                return TableRow(cells: [name(row.key), sum, String(row.count)], amounts: Theme.color(of: row.type), colored: 1)
+            }
+        )
     }
 
-    @ViewBuilder
     private func items(_ rows: [DashboardItem]) -> some View {
-        TableLine(cells: [text("item_label"), text("reports_sum"), text("reports_entries")], header: true)
-        ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-            TableLine(cells: [isBlank(row.item) ? "—" : row.item, groupThousands(row.sum), String(row.count)])
-        }
+        ReportTable(
+            header: [text("item_label"), text("reports_sum"), text("reports_entries")],
+            wrapsName: true,
+            rows: rows.map { TableRow(cells: [isBlank($0.item) ? "—" : $0.item, groupThousands($0.sum), String($0.count)]) }
+        )
     }
 }
 
