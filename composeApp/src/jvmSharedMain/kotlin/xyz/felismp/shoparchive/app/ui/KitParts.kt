@@ -67,13 +67,12 @@ internal class TableRow(val cells: List<String>, val flow: MoneyFlow = MoneyFlow
 
 /**
  * A table whose columns line up from row to row: every amount column is at least as wide as its widest cell and every amount stays on one line, the room left over is shared by the amount columns.
- * A table wider than the space slides sideways instead of shrinking; with [wrapsName] the name may wrap onto several lines and the table never slides.
+ * A table wider than the space slides sideways instead of shrinking; with [wrapsName] the name may wrap onto several lines first, and the table slides only when even a narrow name does not fit.
  */
 @Composable
 internal fun ShopTable(header: List<String>, rows: List<TableRow>, wrapsName: Boolean = false) {
-    if (wrapsName) TableGrid(header, rows, true, Modifier.fillMaxWidth())
-    else BoxWithConstraints(Modifier.fillMaxWidth()) {
-        TableGrid(header, rows, false, Modifier.horizontalScroll(rememberScrollState()).widthIn(min = maxWidth))
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        TableGrid(header, rows, wrapsName, Modifier.horizontalScroll(rememberScrollState()).widthIn(min = maxWidth))
     }
 }
 
@@ -98,8 +97,9 @@ private fun TableGrid(header: List<String>, rows: List<TableRow>, wrapsName: Boo
         val cells = measurables.filterIndexed { i, _ -> i != cols }
         val widths = IntArray(cols) { c -> cells.filterIndexed { i, _ -> i % cols == c }.maxOf { it.maxIntrinsicWidth(Constraints.Infinity) } }
         val amounts = (1 until cols).sumOf { widths[it] } + gap * (cols - 1)
-        val total = if (wrapsName) constraints.maxWidth else maxOf(widths[0] + amounts, constraints.minWidth)
-        widths[0] = minOf(widths[0], total - amounts).coerceAtLeast(0)
+        // minWidth is the space the table has (the scroll leaves maxWidth open); a wrapping name keeps at least 96 dp of it.
+        if (wrapsName) widths[0] = minOf(widths[0], maxOf(constraints.minWidth - amounts, 96.dp.roundToPx()))
+        val total = maxOf(widths[0] + amounts, constraints.minWidth)
         // The room left over goes to the amount columns, so on a wide page the figures spread out instead of running together at the right.
         val extra = (total - widths[0] - amounts).coerceAtLeast(0)
         for (c in 1 until cols) widths[c] += extra / (cols - 1) + if (c == cols - 1) extra % (cols - 1) else 0
