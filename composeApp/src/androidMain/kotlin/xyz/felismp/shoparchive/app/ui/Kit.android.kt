@@ -34,6 +34,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -270,7 +271,8 @@ actual fun <T> ShopSegmented(options: List<Pair<T, String>>, selected: T, onSele
                 selected = value == selected,
                 onClick = { onSelect(value) },
                 shape = SegmentedButtonDefaults.itemShape(index, options.size),
-                label = { Text(label, maxLines = 1) },
+                // A label wider than its equal share ("This month" on a phone) shrinks instead of being cut off.
+                label = { Text(label, maxLines = 1, autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = LocalTextStyle.current.fontSize)) },
             )
         }
     }
