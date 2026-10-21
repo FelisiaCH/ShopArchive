@@ -104,7 +104,8 @@ val releaseFileName = "ShopArchive-${project.version}.msi"
 // The MSI that is handed out. jpackage packs the app image `createDistributable` made, with `packaging/windows` as its resource
 // directory: its main.wxs (jpackage's own from JDK 21, plus an uninstall that also removes the app's data) replaces jpackage's.
 // Compose's `packageMsi` cannot take one (it empties the resource directory it gives jpackage), so it is not used for releases.
-// The options match what `packageMsi` passes, so the UpgradeCode, and with it upgrading an installed copy, stays the same.
+// jpackage derives the UpgradeCode, and with it upgrading an installed copy, from the name and vendor only: keep both as they are.
+// No --win-dir-chooser: its page asks "already exists, install anyway?" on every update; the app goes where Windows apps go.
 val msiDir = layout.buildDirectory.dir("compose/binaries/main/msi-release")
 // The WiX that `packageMsi` uses too: WIX_PATH when it is set (Compose then downloads none), else the one Compose unzips.
 val wixPath: String? = System.getenv("WIX_PATH")
@@ -122,7 +123,7 @@ val msi = tasks.register<Exec>("msi") {
     args(
         "--type", "msi", "--app-image", appImage.get().asFile.path, "--name", "ShopArchive", "--app-version", msiVersion,
         "--icon", project.file("icons/shoparchive.ico").path, "--resource-dir", windowsPackaging.asFile.path,
-        "--win-dir-chooser", "--win-shortcut", "--win-shortcut-prompt", "--win-menu", "--win-menu-group", "ShopArchive", "--dest", msiDir.get().asFile.path,
+        "--win-shortcut", "--win-shortcut-prompt", "--win-menu", "--win-menu-group", "ShopArchive", "--dest", msiDir.get().asFile.path,
     )
     environment("PATH", wixDir.path + File.pathSeparator + System.getenv("PATH"))
     val uninstallIcon = project.file("icons/shoparchive-uninstall.ico")
