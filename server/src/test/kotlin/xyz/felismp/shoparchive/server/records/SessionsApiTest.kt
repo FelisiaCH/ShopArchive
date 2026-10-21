@@ -307,6 +307,24 @@ class SessionsApiTest {
         }
     }
 
+    @Test
+    fun theCountOfAClosedDayIsOnlyForWhoMayCloseTheDayOrSeeTheDashboard() = env().run {
+        val lead = login("lead", grant = closer)
+        val viewer = login("viewer", grant = listOf(DASHBOARD_VIEW_NODE))
+        val noy = login("noy")
+        api {
+            val day = openDay(lead)
+            closeDay(lead, day, mapOf("LAK" to "50000"))
+            suspend fun read(token: String) = getPath("/api/v1/sessions/main", token).parsed(ListSerializer(SessionDto.serializer())).single()
+
+            assertNotNull(read(lead).close)
+            assertNotNull(read(viewer).close)
+            val seen = read(noy)
+            assertEquals(SessionStatus.CLOSED, seen.status, "the day is still known to be closed")
+            assertNull(seen.close, "the drawer's count is not for a user without either node")
+        }
+    }
+
     private fun change(entry: EntryDto, item: String) =
         xyz.felismp.shoparchive.shared.UpdateEntryRequest(entry.type, entry.category, item, entry.note, entry.tenders)
 

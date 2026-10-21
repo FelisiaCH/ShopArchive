@@ -173,7 +173,9 @@ internal class DefaultSessionService(
         val end = to?.let(::date) ?: today.withDayOfMonth(today.lengthOfMonth())
         if (end.isBefore(start)) throw badRequest("'from' is after 'to'.", ErrorReasons.RANGE_ORDER)
         if (ChronoUnit.DAYS.between(start, end) >= 366) throw badRequest("Ask for at most 366 days at a time.", ErrorReasons.RANGE_TOO_LONG)
-        return sessions.inRange(branch, start, end).map { it.toDto() }
+        // The close holds the day's counted cash, expected, variance and handover: only who may close the day or see the dashboard reads it.
+        val seesClose = access.has(principal, DAY_CLOSE_NODE) || access.has(principal, DASHBOARD_VIEW_NODE)
+        return sessions.inRange(branch, start, end).map { it.toDto().let { dto -> if (seesClose) dto else dto.copy(close = null) } }
     }
 
     /**
