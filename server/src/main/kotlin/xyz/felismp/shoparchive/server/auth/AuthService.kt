@@ -72,7 +72,7 @@ internal class DefaultAuthService(
             val user = users.findFreshById(found.id)?.takeIf { it.first == username && it.second.enabled }?.second ?: throw unknown()
             // The device first: a device that is not accepted costs the account no wrong try, and the PIN is not tested against it.
             val existing = existingDevice(request, username, ip)
-            proveExisting(username, user, request, ip)
+            proveExisting(username, user, request, ip, known = existing != null && devices.ownerOf(existing.first, request.deviceCredential.orEmpty()) == user.id)
             // This tells whoever asks that the name exists and has no PIN; the app needs it to ask for a new PIN.
             if (!isUsableCredential(user.pin) && request.newPin == null) {
                 throw ApiError(401, ErrorCode.UNAUTHORIZED, "Set a PIN.", reason = ErrorReasons.PIN_NOT_SET, pinLength = config.auth.pinLength)
@@ -253,20 +253,20 @@ internal class DefaultAuthService(
             id to device
         }
 
-    /** The password and PIN the user already has, each against [request]; a wrong one counts against the account ([Backoff]) and is refused. */
-    private fun proveExisting(username: String, user: UserData, request: LoginRequest, ip: String) {
+    /** The password and PIN the user already has, each against [request]; a wrong one counts against the account ([Backoff]), or, if the device is not one of the account's, only against the anonymous tries on it, and is refused. */
+    private fun proveExisting(username: String, user: UserData, request: LoginRequest, ip: String, known: Boolean) {
         val hasPassword = isUsableCredential(user.password)
         val hasPin = isUsableCredential(user.pin)
         val proves = hasPassword || hasPin
-        if (proves) backoff.requireNotLocked(user, "login", username, request.deviceId, ip)
+        if (proves) backoff.requireNotLocked(user, "login", username, request.deviceId, ip, known)
         val passwordOk = !hasPassword || checkExisting(request.password, user.password, password = true)
         val pinOk = !hasPin || checkExisting(request.pin, user.pin, password = false)
         if (!passwordOk || !pinOk) {
-            backoff.failed(user.id, username, request.deviceId, ip)
+            backoff.failed(user.id, username, request.deviceId, ip, known)
             audit.record("login.fail", username, request.deviceId, ip, "wrong-secret")
             throw unauthorized("Login failed.")
         }
-        if (proves) backoff.succeeded(user)
+        if (proves) backoff.succeeded(user, known)
     }
 
     /** The hashes of the password (if the user needs one) and the PIN the user does not have yet, from [request]; null for what they have. */
