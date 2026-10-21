@@ -307,6 +307,31 @@ class SessionsApiTest {
         }
     }
 
+    @Test
+    fun expectedVarianceAndNoteOfAClosedDayAreOnlyForWhoMayCloseTheDayOrSeeTheDashboard() = env().run {
+        val lead = login("lead", grant = closer)
+        val viewer = login("viewer", grant = listOf(DASHBOARD_VIEW_NODE))
+        val noy = login("noy")
+        api {
+            val day = openDay(lead, float = mapOf("LAK" to "1000"))
+            closeDay(lead, day, mapOf("LAK" to "900"), note = "short")
+            suspend fun read(token: String) = getPath("/api/v1/sessions/main", token).parsed(ListSerializer(SessionDto.serializer())).single().close!!
+
+            val full = read(lead)
+            assertEquals("900", full.counted["LAK"])
+            assertEquals("1000", full.expected["LAK"])
+            assertEquals("-100", full.variance["LAK"])
+            assertEquals("short", full.note)
+            assertEquals(full, read(viewer))
+            val seen = read(noy)
+            assertEquals(full.counted, seen.counted, "the next opening starts from what was kept")
+            assertEquals(full.handover, seen.handover)
+            assertEquals(emptyMap(), seen.expected)
+            assertEquals(emptyMap(), seen.variance)
+            assertEquals("", seen.note)
+        }
+    }
+
     private fun change(entry: EntryDto, item: String) =
         xyz.felismp.shoparchive.shared.UpdateEntryRequest(entry.type, entry.category, item, entry.note, entry.tenders)
 
