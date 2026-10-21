@@ -1,31 +1,20 @@
 package xyz.felismp.shoparchive.server
 
+import xyz.felismp.shoparchive.server.records.FileOps
 import java.io.IOException
-import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 
 /**
  * The one way ShopArchive writes a whole file: `<name>.tmp` next to it, fsync, atomic rename over the
  * target, fsync of the directory. A crash leaves either the old file or the new one, never half of one.
+ * The rename is tried again on Windows when an antivirus scan or indexer holds the file for a moment
+ * (see [FileOps.rename]).
  */
-internal fun writeAtomically(path: Path, bytes: ByteArray) {
-    val tmp = path.resolveSibling(path.fileName.toString() + ".tmp")
-    // A .tmp left by a crash right after CREATE_NEW must not block this write. Deleting it first (rather
-    // than opening with REPLACE_EXISTING) keeps CREATE_NEW's guarantee that we never write over a file
-    // mid-write by some other process; TRUNCATE_EXISTING would silently accept that instead.
-    Files.deleteIfExists(tmp)
-    FileChannel.open(tmp, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE).use { channel ->
-        val buffer = ByteBuffer.wrap(bytes)
-        while (buffer.hasRemaining()) channel.write(buffer) // a single write() may not take the whole buffer
-        channel.force(true) // fsync: the content must survive a crash immediately after this write
-    }
-    Files.move(tmp, path, StandardCopyOption.ATOMIC_MOVE)
-    fsyncDirectory(path.parent)
-}
+internal fun writeAtomically(path: Path, bytes: ByteArray, files: FileOps = sharedFileOps) = files.writeAtomic(path, bytes)
+
+private val sharedFileOps = FileOps()
 
 /**
  * The file content is fsynced on write, but the rename is a separate directory-entry write that isn't
