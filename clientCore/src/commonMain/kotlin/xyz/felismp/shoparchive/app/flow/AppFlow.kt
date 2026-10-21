@@ -117,6 +117,8 @@ class AppFlow(
     private var lastActivity = 0L
     private var idleLimitMs = 0L
     private var watchJobs = emptyList<Job>()
+    // Saves with an unknown result, kept over a lock for the (server, user) that sent them; only in memory, and only that user's unlock gets one back.
+    private val pendingSaves = mutableMapOf<Pair<String, String>, PendingSave>()
     // Everything an unlocked user starts runs here; a lock cancels it all, so no late answer can land in the next user's session.
     private var sessionScope: CoroutineScope = newSessionScope()
     private var removing = false
@@ -770,6 +772,7 @@ class AppFlow(
             saveBranch = ::saveBranch, compressor = compressor, reader = reader,
             today = { Instant.fromEpochMilliseconds(now()).toLocalDateTime(TimeZone.currentSystemDefault()).date }, now = now,
             updatesFactory = updatesFactory, language = { language.value ?: systemLanguage() },
+            restored = pendingSaves.remove(opened.serverId to username),
         )
     }
 
@@ -817,6 +820,7 @@ class AppFlow(
      */
     internal fun checkIdle() {
         if (unlocked == null || now() - lastActivity < idleLimitMs) return
+        if (workspace?.record?.pending() != null) return // a save in flight or unresolved is not left to a lock nobody chose
         if (!unlocksWithoutPin(stored)) return lockNow()
         session?.api?.lock()
         lastActivity = now() // once per idle time
@@ -834,8 +838,11 @@ class AppFlow(
         if (creds == null) showList(problem) else _state.value = lockedFor(creds, username, needsPassword, problem)
     }
 
-    /** Everything that exists only while unlocked. */
-    private fun endSession() {
+    /** Everything that exists only while unlocked; a save with an unknown result is kept for its user unless [keepPending] is false. */
+    private fun endSession(keepPending: Boolean = true) {
+        val user = unlocked?.username
+        val serverId = session?.serverId
+        if (keepPending && user != null && serverId != null) workspace?.record?.pending()?.let { pendingSaves[serverId to user] = it }
         lastLiveSearchMs = null
         generation++
         sessionScope.cancel()
@@ -1038,7 +1045,7 @@ class AppFlow(
                 removing = false
             }
             if (cleared == null) return@launch
-            endSession()
+            endSession(keepPending = false)
             failReauth(ClientError.Locked())
             session?.api?.close()
             session = null
@@ -1071,6 +1078,7 @@ class AppFlow(
         val next = StoredServers(all.servers.filter { it.serverId != serverId }, all.lastServerId.takeIf { it != serverId })
         // The last server takes the file with it.
         if (next.servers.isEmpty()) store.clear() else store.save(next)
+        pendingSaves.keys.removeAll { it.first == serverId }
         all = next
         stored = null
         persisted = null

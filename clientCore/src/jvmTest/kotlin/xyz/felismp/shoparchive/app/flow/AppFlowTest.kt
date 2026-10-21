@@ -138,6 +138,8 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
     var onText: ((String) -> Unit)? = null
     /** What `GET /config` says about the person being an op. */
     var isOp = true
+    /** The currencies `GET /config` lists. */
+    var currencies = emptyList<xyz.felismp.shoparchive.shared.CurrencyInfo>()
 
     override val isUnlocked get() = token
     override var endpoints: List<String> = emptyList()
@@ -157,7 +159,7 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
         reach()
         failConfig?.let { throw it }
         return ConfigResponse(
-            AuthPolicy(6, false, sharedMinutes, personalMinutes, false, 5, unlockWithoutPin), announced, emptyList(),
+            AuthPolicy(6, false, sharedMinutes, personalMinutes, false, 5, unlockWithoutPin), announced, currencies,
             records.configBranches.map { xyz.felismp.shoparchive.shared.BranchDto(it, it, false) },
             permissions = permissions, admin = isOp,
         )
@@ -1620,6 +1622,100 @@ class AppFlowTest {
         val second = assertNotNull(f.workspace)
         assertTrue(first !== second)
         assertEquals("", second.record.ui.value.draft.note)
+    }
+
+    // ---- a save whose answer is unknown ----
+
+    /** [user] has saved an entry whose answer was lost: the request reached the server, the link dropped. */
+    private fun AppFlow.saveWithLostAnswer(): String {
+        api.records.storeThenFail = true
+        workspace!!.record.run {
+            setAmount(ui.value.draft.tenders.first().key, "1500")
+            save()
+            assertIs<SavePhase.Unknown>(ui.value.phase)
+            return ui.value.draft.id
+        }
+    }
+
+    private fun savedFlow(creds: StoredServer = storedAlice()): AppFlow {
+        api.records.configBranches = listOf("main")
+        api.records.current = api.records.session("s1")
+        api.currencies = listOf(LAK)
+        return lockedFlow(creds)
+    }
+
+    @Test fun anIdleAppDoesNotLockWhileASaveIsUnresolvedAndLocksOnceItIs() {
+        val f = savedFlow()
+        f.unlock("483926")
+        f.saveWithLostAnswer()
+        clock += 99 * minute; f.checkIdle()
+        assertIs<AppState.Unlocked>(f.state.value)
+        f.workspace!!.record.checkAgain()
+        assertIs<SavePhase.Saved>(f.workspace!!.record.ui.value.phase)
+        f.checkIdle()
+        assertIs<AppState.Locked>(f.state.value)
+    }
+
+    @Test fun anUnsentDraftDoesNotKeepTheAppFromLockingNorSurvivesTheLock() {
+        val f = savedFlow()
+        f.unlock("483926")
+        f.workspace!!.record.setNote("half written")
+        clock += 10 * minute; f.checkIdle()
+        assertIs<AppState.Locked>(f.state.value)
+        f.unlock("483926")
+        assertEquals("", f.workspace!!.record.ui.value.draft.note)
+        assertTrue(api.records.created.isEmpty())
+    }
+
+    @Test fun aLockWhileASaveIsUnknownSendsItAgainWithTheSameIdWhenTheSameUserUnlocks() {
+        val f = savedFlow()
+        f.unlock("483926")
+        val id = f.saveWithLostAnswer()
+        f.lockNow()
+        assertEquals(1, api.records.created.size)
+        f.unlock("483926")
+        val phase = assertIs<SavePhase.Saved>(f.workspace!!.record.ui.value.phase)
+        assertEquals(id, phase.entry.id)
+        assertEquals(listOf(id, id), api.records.created.map { it.first.id })
+        assertEquals(1, api.records.stored.size, "created once on the server")
+    }
+
+    @Test fun aSaveTheServerRefusesAfterTheLockComesBackAsFailedWithItsDraft() {
+        val f = savedFlow()
+        f.unlock("483926")
+        f.saveWithLostAnswer()
+        f.lockNow()
+        api.records.createFails = { if (it == 2) ClientError.Api(400, ErrorCode.INVALID_REQUEST, "no") else null }
+        f.unlock("483926")
+        val ui = f.workspace!!.record.ui.value
+        assertIs<SavePhase.Failed>(ui.phase)
+        assertEquals("1500", ui.draft.tenders.first().amount)
+    }
+
+    @Test fun aSaveWaitingOverALockIsNeverSentForAnotherUserAndWaitsForItsOwner() {
+        val f = savedFlow(storedShared())
+        f.selectUser("alice"); f.unlock("111111")
+        val id = f.saveWithLostAnswer()
+        f.lockNow()
+        f.selectUser("bob"); f.unlock("222222")
+        assertIs<SavePhase.Editing>(f.workspace!!.record.ui.value.phase)
+        assertEquals(1, api.records.created.size, "nothing sent for bob")
+        f.lockNow()
+        f.selectUser("alice"); f.unlock("111111")
+        assertEquals(id, assertIs<SavePhase.Saved>(f.workspace!!.record.ui.value.phase).entry.id)
+        assertEquals(2, api.records.created.size)
+        assertEquals(1, api.records.stored.size)
+    }
+
+    @Test fun removingTheServerDropsTheWaitingSave() {
+        val f = savedFlow()
+        f.unlock("483926")
+        f.saveWithLostAnswer()
+        f.openSettings(); f.removeServer()
+        f.addServer("10.0.0.5:8443") // the same server, added again
+        f.login("alice", "483926")
+        assertIs<SavePhase.Editing>(f.workspace!!.record.ui.value.phase)
+        assertEquals(1, api.records.created.size)
     }
 
     @Test fun theBranchChosenIsRememberedOnThisDeviceAndTheLanguageIsKept() {

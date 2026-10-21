@@ -113,12 +113,16 @@ class RecordUi(
     val canSave: Boolean get() = block == null && issues.isEmpty() && !frozen && !compressing && !scanning
 }
 
-/** Record: one entry at a time. The draft lives as long as the unlocked session. */
+/** A save sent whose answer is not known, with its draft: kept by the app across a lock and sent again, with the same id, when the same user unlocks. */
+class PendingSave internal constructor(internal val draft: Draft, internal val request: CreateEntryRequest, internal val slips: List<ByteArray>)
+
+/** Record: one entry at a time. The draft lives as long as the unlocked session; a [restored] save is sent again once the connection is up. */
 class RecordState(
     private val env: Env,
     private val today: TodayState,
     private val compressor: SlipCompressor,
     private val reader: SlipReader,
+    restored: PendingSave? = null,
 ) {
     private class Inner(
         val draft: Draft,
@@ -138,9 +142,12 @@ class RecordState(
 
     private class Sent(val request: CreateEntryRequest, val slips: List<ByteArray>)
 
-    private var keys = 0
+    // A restored draft keeps its row keys, so the next ones must not repeat them.
+    private var keys = restored?.draft?.let { d -> (d.tenders.map { it.key } + d.slips.map { it.key } + d.transfers.map { it.key }).maxOrNull() } ?: 0
     private var suggestionJob: Job? = null
-    private val inner = MutableStateFlow(Inner(freshDraft(EntryType.EXPENSE, "")))
+    private val inner = MutableStateFlow(
+        restored?.let { Inner(it.draft, SavePhase.Unknown(Failure.Unreachable), sent = Sent(it.request, it.slips)) } ?: Inner(freshDraft(EntryType.EXPENSE, "")),
+    )
 
     val ui: StateFlow<RecordUi> = combine(inner, env.config, env.canWrite, env.branch, today.ui) { s, config, canWrite, branch, day ->
         val ready = (config as? ConfigState.Ready)?.config
@@ -176,6 +183,8 @@ class RecordState(
     }.stateIn(env.scope, SharingStarted.Eagerly, initialUi())
 
     init {
+        // The answer to the save sent before the lock is not known: ask again with the same id as soon as the connection is up.
+        if (restored != null) env.scope.launch { env.canWrite.first { it }; checkAgain() }
         env.scope.launch {
             // The first currency is the default once the config is there.
             val ready = env.config.first { it is ConfigState.Ready } as ConfigState.Ready
@@ -481,6 +490,13 @@ class RecordState(
     /** After an unknown result: asks the server again with the same id; it answers with the entry if it already landed. */
     fun checkAgain() {
         if (inner.value.phase is SavePhase.Unknown) send()
+    }
+
+    /** The save sent whose answer is not known (or still awaited), for the app to keep over a lock; null for anything else, a plain draft included. */
+    fun pending(): PendingSave? {
+        val s = inner.value
+        val sent = s.sent ?: return null
+        return if (s.phase is SavePhase.Saving || s.phase is SavePhase.Unknown) PendingSave(s.draft, sent.request, sent.slips) else null
     }
 
     /** Gives up a draft whose result is unknown and starts an empty one. */
