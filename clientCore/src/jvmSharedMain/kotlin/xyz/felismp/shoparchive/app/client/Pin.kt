@@ -2,10 +2,15 @@ package xyz.felismp.shoparchive.app.client
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.network.sockets.ConnectTimeoutException
 import io.ktor.client.plugins.websocket.WebSockets
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
+import java.net.ConnectException
+import java.net.NoRouteToHostException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.security.cert.CertificateException
@@ -13,6 +18,7 @@ import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.X509TrustManager
 
@@ -48,7 +54,7 @@ private class PinTrust(pin: String) : X509TrustManager {
 }
 
 /** An OkHttp client that talks only to a server whose leaf key hashes to [pin], whatever address it is reached at. */
-internal fun pinnedOkHttp(pin: String, connectTimeoutMs: Long): OkHttpClient.Builder {
+internal fun pinnedOkHttp(pin: String, connectTimeoutMs: Long, ioTimeoutMs: Long): OkHttpClient.Builder {
     val trust = PinTrust(pin)
     val context = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), SecureRandom()) }
     // Server certificates are self-signed for LAN IPs and the address used may not be one of them: the pin decides, not the name.
@@ -63,20 +69,29 @@ internal fun pinnedOkHttp(pin: String, connectTimeoutMs: Long): OkHttpClient.Bui
         .sslSocketFactory(context.socketFactory, trust)
         .hostnameVerifier(verifier)
         .connectTimeout(connectTimeoutMs, TimeUnit.MILLISECONDS)
+        // The server runs a console command (backup) before it answers, which can take longer than OkHttp's 10 s default.
+        .readTimeout(ioTimeoutMs, TimeUnit.MILLISECONDS)
+        .writeTimeout(ioTimeoutMs, TimeUnit.MILLISECONDS)
 }
 
-internal fun pinnedHttpClient(pin: String, connectTimeoutMs: Long): HttpClient = HttpClient(OkHttp) {
+internal fun pinnedHttpClient(pin: String, connectTimeoutMs: Long, ioTimeoutMs: Long): HttpClient = HttpClient(OkHttp) {
     expectSuccess = false
     install(WebSockets) { pingIntervalMillis = 20_000 }
-    engine { preconfigured = pinnedOkHttp(pin, connectTimeoutMs).build() }
+    engine { preconfigured = pinnedOkHttp(pin, connectTimeoutMs, ioTimeoutMs).build() }
 }
 
 /** True when [e] or something it wraps is a failed pin check. */
 internal fun isPinFailure(e: Throwable): Boolean = generateSequence(e) { it.cause }.take(10).any { it is PinMismatchException || it is SSLPeerUnverifiedException }
 
+/** True when the request cannot have reached the server (no connection, or the handshake failed), so another address may be tried. */
+internal fun isConnectFailure(e: Throwable): Boolean = generateSequence(e) { it.cause }.take(10).any {
+    it is ConnectException || it is UnknownHostException || it is NoRouteToHostException || it is SSLHandshakeException ||
+        it is ConnectTimeoutException || (it is SocketTimeoutException && it.message.orEmpty().contains("connect", ignoreCase = true))
+}
+
 /** An [ApiClient] that talks only to a server whose key is [pin], through OkHttp. */
-fun ApiClient(serverId: String, pin: String, endpoints: List<String>, connectTimeoutMs: Long = 5_000): ApiClient =
-    ApiClient(serverId, endpoints, pinnedHttpClient(pin, connectTimeoutMs), ::isPinFailure)
+fun ApiClient(serverId: String, pin: String, endpoints: List<String>, connectTimeoutMs: Long = 5_000, ioTimeoutMs: Long = 120_000): ApiClient =
+    ApiClient(serverId, endpoints, pinnedHttpClient(pin, connectTimeoutMs, ioTimeoutMs), ::isPinFailure, ::isConnectFailure)
 
 private class TofuDone : CertificateException("fingerprint recorded; handshake aborted on purpose")
 
