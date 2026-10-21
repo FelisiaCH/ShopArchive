@@ -88,8 +88,8 @@ internal fun registerRecordNodes(nodes: PermissionNodeRegistry) {
     )
     node(
         EXPORT_NODE, "Export the entries you may see as a CSV or Excel file", false,
-        "ส่งออกรายการที่ตนดูได้เป็นไฟล์ CSV หรือ Excel (ต้องใส่ PIN หรือรหัสผ่านอีกครั้ง)",
-        "ສົ່ງອອກລາຍການທີ່ຕົນເບິ່ງໄດ້ເປັນໄຟລ໌ CSV ຫຼື Excel (ຕ້ອງໃສ່ PIN ຫຼື ລະຫັດຜ່ານອີກຄັ້ງ)",
+        "ส่งออกรายการที่ตนดูได้เป็นไฟล์ CSV หรือ Excel",
+        "ສົ່ງອອກລາຍການທີ່ຕົນເບິ່ງໄດ້ເປັນໄຟລ໌ CSV ຫຼື Excel",
     )
     node(
         DASHBOARD_VIEW_NODE, "See the dashboard: the totals of the branches you work in, whoever recorded them", false,
