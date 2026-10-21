@@ -18,7 +18,10 @@ import xyz.felismp.shoparchive.shared.NotificationState
 import java.nio.file.Path
 import java.time.Clock
 
-/** The notifier the core ships: it only logs one line, so a server without a channel plugin still shows what would have been sent. Always succeeds. */
+/**
+ * The notifier the core ships: it only logs one line, so a server without a channel plugin still shows what would have been sent.
+ * It is no channel: a message left by an earlier run is not given to it (the outbox only asks it to log) but kept for the channel plugin that took it before.
+ */
 internal class LogNotifier : Notifier {
     override fun deliver(notification: Notification): DeliveryResult {
         Log.info("Notification ${notification.id}: ${describe(notification)}")

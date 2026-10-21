@@ -29,6 +29,7 @@ import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** What records publish and what the core turns into outbox messages, through the real API on a temporary root. */
@@ -362,5 +363,31 @@ class NotifyEventsTest {
 
         assertEquals("entry.created", channel.got.single().event)
         assertNotNull(restarted.notify.outbox.items().single().sentAt)
+    }
+
+    @Test
+    fun aMessageLeftByAnEarlierRunIsHeldWhileOnlyTheCoreLogIsInUseAndSentWhenAChannelIsRegistered() = env().run {
+        val noy = login("noy")
+        api {
+            openDay(noy)
+            createEntry(noy, newEntry())
+        }
+        val restarted = AuthEnv(root, NO_BACKOFF, withNotify = true)
+        val outbox = restarted.notify!!.outbox
+
+        assertEquals(0, outbox.processDue())
+        outbox.processDue()
+        val held = outbox.items().single()
+        assertEquals(NotificationState.QUEUED, held.state)
+        assertEquals(0, held.attempts, "not counted as a try")
+        assertNull(held.nextAttempt)
+        assertNull(outbox.nextDue(), "nothing is due, so the worker does not spin")
+
+        val channel = ScriptedNotifier()
+        restarted.services.register(Notifier::class.java, channel, 5, "plugin:telegram")
+        assertEquals(1, outbox.processDue())
+
+        assertEquals("entry.created", channel.got.single().event)
+        assertEquals(NotificationState.SENT, outbox.items().single().state)
     }
 }
