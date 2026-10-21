@@ -104,9 +104,12 @@ val releaseFileName = "ShopArchive-${project.version}.msi"
 // The MSI that is handed out. jpackage packs the app image `createDistributable` made, with `packaging/windows` as its resource
 // directory: its main.wxs (jpackage's own from JDK 21, plus an uninstall that also removes the app's data) replaces jpackage's.
 // Compose's `packageMsi` cannot take one (it empties the resource directory it gives jpackage), so it is not used for releases.
-// jpackage derives the UpgradeCode, and with it upgrading an installed copy, from the name and vendor only: keep both as they are.
+// The UpgradeCode ties every version together, so a new MSI replaces the installed one. jpackage derived it from name and vendor up to
+// 0.2.0 (vendor unset, "Unknown" as Publisher in Settings > Apps); it is pinned to that value now, so the vendor can be set.
 // No --win-dir-chooser: its page asks "already exists, install anyway?" on every update; the app goes where Windows apps go.
 val msiDir = layout.buildDirectory.dir("compose/binaries/main/msi-release")
+val msiUpgradeCode = "000902E3-160E-3E82-86F0-26518BE8A1A2"
+val msiVendor = "ShopArchive"
 // The WiX that `packageMsi` uses too: WIX_PATH when it is set (Compose then downloads none), else the one Compose unzips.
 val wixPath: String? = System.getenv("WIX_PATH")
 val wixDir = wixPath?.let { File(it) } ?: rootProject.layout.buildDirectory.dir("wix311").get().asFile
@@ -123,7 +126,7 @@ val msi = tasks.register<Exec>("msi") {
     args(
         "--type", "msi", "--app-image", appImage.get().asFile.path, "--name", "ShopArchive", "--app-version", msiVersion,
         "--icon", project.file("icons/shoparchive.ico").path, "--resource-dir", windowsPackaging.asFile.path,
-        "--win-shortcut", "--win-shortcut-prompt", "--win-menu", "--win-menu-group", "ShopArchive", "--dest", msiDir.get().asFile.path,
+        "--vendor", msiVendor, "--win-upgrade-uuid", msiUpgradeCode, "--win-shortcut", "--win-shortcut-prompt", "--win-menu", "--win-menu-group", "ShopArchive", "--dest", msiDir.get().asFile.path,
     )
     environment("PATH", wixDir.path + File.pathSeparator + System.getenv("PATH"))
     val uninstallIcon = project.file("icons/shoparchive-uninstall.ico")
@@ -153,7 +156,9 @@ compose.desktop {
             targetFormats(TargetFormat.Msi)
             packageName = "ShopArchive"
             packageVersion = msiVersion
+            vendor = msiVendor
             windows {
+                upgradeUuid = msiUpgradeCode
                 iconFile.set(project.file("icons/shoparchive.ico"))
                 // Found where Windows apps are: on the desktop and in the Start menu, whose entry also offers Uninstall (as Settings > Apps does).
                 shortcut = true
