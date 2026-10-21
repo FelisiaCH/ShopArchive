@@ -190,6 +190,19 @@ class ApiClientTest {
         }
     }
 
+    @Test fun readTimeoutAfterTheRequestWasSentDoesNotRunItOnTheNextEndpoint() = runBlocking {
+        val slow = MockResponse.Builder().code(200).body("{}").headersDelay(3, java.util.concurrent.TimeUnit.SECONDS).build()
+        TlsServer { slow }.use { first ->
+            TlsServer { json("{}") }.use { second ->
+                val api = ApiClient("sid", first.pin, listOf(first.endpoint, second.endpoint), ioTimeoutMs = 500)
+                assertFailsWith<ClientError.Unreachable> { api.login(loginReq) }
+                assertEquals(1, first.requests.size)
+                assertEquals(0, second.requests.size)
+                api.close()
+            }
+        }
+    }
+
     @Test fun httpErrorDoesNotFallBack() = runBlocking {
         TlsServer { error(ErrorCode.INVALID_REQUEST, 400) }.use { first ->
             TlsServer { json("{}") }.use { second ->

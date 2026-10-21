@@ -88,7 +88,8 @@ internal val clientJson = Json { ignoreUnknownKeys = true; encodeDefaults = true
 /**
  * Talks to one server through [http], a client that only trusts the server's pinned certificate (see `pinnedHttpClient`);
  * [isPinFailure] tells whether a failure of a call is that certificate being refused. [endpoints] are `host:port`.
- * The access token lives only in this object's memory. On a connection failure (never on an HTTP error) the
+ * The access token lives only in this object's memory. On a connection failure (never on an HTTP error, and never
+ * once the request may have reached the server: [isConnectFailure] says the connection was not made) the
  * next endpoint is tried and the one that worked is kept first, so the token survives a change of address.
  */
 @OptIn(ExperimentalAtomicApi::class)
@@ -97,6 +98,7 @@ class ApiClient(
     endpoints: List<String>,
     private val http: HttpClient,
     private val isPinFailure: (Throwable) -> Boolean,
+    private val isConnectFailure: (Throwable) -> Boolean = { true },
 ) : ServerApi {
     private val endpointList = AtomicReference(orderEndpoints(endpoints))
 
@@ -438,7 +440,7 @@ class ApiClient(
                 when {
                     e is CancellationException || e is ClientError -> throw e
                     isPinFailure(e) -> throw ClientError.PinMismatch(e, endpoint)
-                    e is IOException -> last = e
+                    e is IOException -> if (isConnectFailure(e)) last = e else throw ClientError.Unreachable(e) // sent, answer unknown: do not run it twice
                     else -> throw e
                 }
             }
