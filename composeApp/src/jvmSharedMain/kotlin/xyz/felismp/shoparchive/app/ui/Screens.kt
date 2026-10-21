@@ -120,6 +120,7 @@ private fun LoginScreen(s: AppState.Login, flow: AppFlow) {
     var username by rememberSaveable { mutableStateOf("") }
     // Secrets use remember, never rememberSaveable, like the other forms.
     var pin by remember { mutableStateOf("") }
+    var setupCode by remember(s.needsNewPin) { mutableStateOf("") }
     var newPin by remember(s.needsNewPin) { mutableStateOf("") }
     var newPinRepeat by remember(s.needsNewPin) { mutableStateOf("") }
     // Back steps back as the visible buttons do (both are no-ops while busy): to the lock screen when adding a user, else to the servers.
@@ -130,6 +131,7 @@ private fun LoginScreen(s: AppState.Login, flow: AppFlow) {
         ShopTextField(username, { username = it }, stringResource(Res.string.username_label), enabled = !s.busy)
         if (s.needsNewPin) {
             ShopText(stringResource(Res.string.login_set_pin))
+            ShopTextField(setupCode, { setupCode = it }, stringResource(Res.string.setup_code_label), kind = FieldKind.Pin, enabled = !s.busy)
             // An old server does not say how many digits: then 4 to 12, and the server refuses a wrong length in words.
             ShopTextField(newPin, { newPin = it }, stringResource(Res.string.pin_new, s.pinLength?.toString() ?: "4–12"), kind = FieldKind.Pin, enabled = !s.busy)
             ShopTextField(newPinRepeat, { newPinRepeat = it }, stringResource(Res.string.pin_repeat), kind = FieldKind.Pin, enabled = !s.busy)
@@ -139,7 +141,7 @@ private fun LoginScreen(s: AppState.Login, flow: AppFlow) {
         Status(s.busy, s.problem)
         ShopButton(
             stringResource(Res.string.login_submit),
-            { flow.login(username, pin, newPin.takeIf { s.needsNewPin }, newPinRepeat.takeIf { s.needsNewPin }) },
+            { flow.login(username, pin, newPin.takeIf { s.needsNewPin }, newPinRepeat.takeIf { s.needsNewPin }, setupCode.takeIf { s.needsNewPin }) },
             Modifier.fillWidthOnPhone(), enabled = !s.busy,
         )
         if (s.adding) ShopButton(stringResource(Res.string.add_user_back), flow::cancelLogin, Modifier.fillWidthOnPhone(), primary = false, enabled = !s.busy)

@@ -126,7 +126,7 @@ class WebSocketTest {
         val hasPin = users.find(name)!!.pin != null
         val device = auth.login(
             LoginRequest(
-                name, "Phone of $name", "android", mode, pin = PIN.takeIf { hasPin }, newPin = PIN.takeUnless { hasPin },
+                name, "Phone of $name", "android", mode, pin = PIN.takeIf { hasPin }, newPin = PIN.takeUnless { hasPin }, setupCode = TEST_CODE.takeUnless { hasPin },
                 deviceId = onto?.deviceId, deviceCredential = onto?.credential,
             ),
             "127.0.0.1",

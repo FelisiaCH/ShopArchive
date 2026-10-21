@@ -95,3 +95,13 @@ internal open class Hasher(concurrency: Int, private val cost: Argon2Cost = Argo
         val PHC = Regex("\\\$argon2id\\\$v=19\\\$m=(\\d{1,9}),t=(\\d{1,9}),p=(\\d{1,9})\\\$([A-Za-z0-9+/]+)\\\$([A-Za-z0-9+/]+)")
     }
 }
+
+/** A user with no PIN claims the account with a code of this many digits, given once with the new PIN. */
+internal const val SETUP_CODE_LENGTH = 6
+private val setupCodeRandom = SecureRandom()
+
+/** A fresh setup code and its hash (what the user file keeps). */
+internal fun Hasher.newSetupCode(): Pair<String, String> {
+    val code = (1..SETUP_CODE_LENGTH).joinToString("") { setupCodeRandom.nextInt(10).toString() }
+    return code to hash(code)
+}

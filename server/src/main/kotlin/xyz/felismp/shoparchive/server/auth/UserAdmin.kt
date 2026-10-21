@@ -22,6 +22,7 @@ internal class DefaultUserAdminService(
     private val users: UserStore,
     private val accounts: AccountConsole,
     private val audit: AuditLog,
+    private val hasher: Hasher,
     /** The keys of the branches not archived (see [xyz.felismp.shoparchive.server.users.registerUserCommands]). */
     private val activeBranches: () -> List<String>,
     /** Whether the caller's session is still there: disabling an account or taking it off the device ends its sessions, so a request already in flight changes nothing. */
@@ -35,11 +36,17 @@ internal class DefaultUserAdminService(
         users.roleNames().map { AdminRoleDto(it, users.usersWithRole(it).size) }
     }
 
-    override fun add(principal: Principal, request: CreateUserRequest, ip: String): AdminUserDto = change(principal, "admin.user.add", request.name, ip) {
-        request.branches.forEach(::checkBranch)
-        val active = if (request.branches.isEmpty()) activeBranches() else emptyList()
-        users.addUser(request.name, request.role, joinedBranches(request.branches, active))
-        request.name
+    override fun add(principal: Principal, request: CreateUserRequest, ip: String): AdminUserDto {
+        var code: String? = null
+        // The code is in the answer once; the file keeps only its hash.
+        return change(principal, "admin.user.add", request.name, ip) {
+            request.branches.forEach(::checkBranch)
+            val active = if (request.branches.isEmpty()) activeBranches() else emptyList()
+            val (clear, hash) = hasher.newSetupCode()
+            users.addUser(request.name, request.role, joinedBranches(request.branches, active), hash)
+            code = clear
+            request.name
+        }.copy(setupCode = code)
     }
 
     override fun rename(principal: Principal, name: String, newName: String, ip: String): AdminUserDto = change(principal, "admin.user.rename", name, ip) {
@@ -80,13 +87,16 @@ internal class DefaultUserAdminService(
         name
     }
 
-    override fun reset(principal: Principal, name: String, ip: String): AdminUserDto = change(principal, "admin.user.reset", name, ip) {
-        // From the app the reset would end the very session it is asked from, and the op's own device with it.
-        if (users.user(name).id == principal.userId) {
-            throw ApiError(403, ErrorCode.FORBIDDEN, "Your own account can only be reset on the server console.", reason = ErrorReasons.USER_SELF_RESET)
-        }
-        accounts.resetAccount(name, ip)
-        name
+    override fun reset(principal: Principal, name: String, ip: String): AdminUserDto {
+        var code: String? = null
+        return change(principal, "admin.user.reset", name, ip) {
+            // From the app the reset would end the very session it is asked from, and the op's own device with it.
+            if (users.user(name).id == principal.userId) {
+                throw ApiError(403, ErrorCode.FORBIDDEN, "Your own account can only be reset on the server console.", reason = ErrorReasons.USER_SELF_RESET)
+            }
+            code = accounts.resetAccount(name, ip).second
+            name
+        }.copy(setupCode = code)
     }
 
     /** Runs [work] (which answers the name the account has afterwards), audits it, and answers the account. */

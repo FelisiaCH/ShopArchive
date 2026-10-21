@@ -22,7 +22,10 @@ class AuthConsoleTest {
     fun userAddCreatesTheUserAndTellsHowTheyLogIn() = env().run {
         val replies = console("user add noy")
 
-        assertEquals(listOf("User 'noy' created. They open the app, type the name 'noy' and set their own PIN."), replies)
+        assertEquals(
+            listOf("User 'noy' created. They open the app, type the name 'noy' and set their own PIN; give them the setup code ${replies.printedSetupCode()}, which they type once with their new PIN."),
+            replies,
+        )
         assertTrue(users.userNames().contains("noy"))
     }
 

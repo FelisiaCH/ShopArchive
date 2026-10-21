@@ -91,6 +91,18 @@ class AdminStateTest {
         assertTrue(s.admin.ui.value.canManageBranches && !s.admin.ui.value.canManageUsers && !s.admin.ui.value.canManageCategories)
     }
 
+    @Test fun theSetupCodeOfANewUserIsShownOnceAndNeverKeptInTheList() = runTest(UnconfinedTestDispatcher()) {
+        val s = setup()
+        s.admin.load()
+
+        s.admin.addUser("mali", "clerk", listOf("main"))
+
+        assertEquals("mali" to "246810", s.admin.ui.value.setupCode)
+        assertNull(s.admin.ui.value.users.first { it.name == "mali" }.setupCode)
+        s.admin.dismissSetupCode()
+        assertNull(s.admin.ui.value.setupCode)
+    }
+
     @Test fun eachUserActionCallsTheServerAndPutsTheAnswerInTheListByName() = runTest(UnconfinedTestDispatcher()) {
         val s = setup()
         s.admin.load()

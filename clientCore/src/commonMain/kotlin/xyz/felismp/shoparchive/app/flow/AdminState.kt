@@ -41,6 +41,8 @@ data class AdminUi(
     val canManageUsers: Boolean = false,
     val canManageBranches: Boolean = false,
     val canManageCategories: Boolean = false,
+    /** The name and the setup code the server just made for them (a new user, or a reset): shown once until [AdminState.dismissSetupCode]. */
+    val setupCode: Pair<String, String>? = null,
 )
 
 /**
@@ -57,6 +59,7 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
         val busy: Boolean = false,
         val failure: Failure? = null,
         val done: Int = 0,
+        val setupCode: Pair<String, String>? = null,
     )
 
     private val core = MutableStateFlow(Core())
@@ -66,7 +69,7 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
         val ready = (config as? ConfigState.Ready)?.config
         AdminUi(
             c.users, c.roles, ready?.branches.orEmpty(), ready?.categories.orEmpty(), c.loaded, c.loading, c.busy, c.failure, c.done, !canWrite,
-            can.manageUsers, can.manageBranches, can.manageCategories,
+            can.manageUsers, can.manageBranches, can.manageCategories, c.setupCode,
         )
     }.stateIn(env.scope, SharingStarted.Eagerly, AdminUi())
 
@@ -111,9 +114,16 @@ class AdminState(private val env: Env, private val reloadConfig: suspend () -> U
     /** Puts [user] into the list (replacing the account with its id, which a rename keeps), by name. */
     private fun keep(user: AdminUserDto) = change { it.copy(users = (it.users.filter { u -> u.id != user.id } + user).sortedBy { u -> u.name }) }
 
-    private fun userAction(call: suspend () -> AdminUserDto) = act(env.can.manageUsers) { keep(env.calls.run { call() }) }
+    private fun userAction(call: suspend () -> AdminUserDto) = act(env.can.manageUsers) {
+        val user = env.calls.run { call() }
+        // The code is for the screen to show once; the list keeps no secret.
+        keep(user.copy(setupCode = null))
+        user.setupCode?.let { code -> change { it.copy(setupCode = user.name to code) } }
+    }
 
-    /** [role] is a role name or `none`; [branches] empty means the only active branch, if there is exactly one. The new user has no PIN: they set it at their first login. */
+    fun dismissSetupCode() = change { it.copy(setupCode = null) }
+
+    /** [role] is a role name or `none`; [branches] empty means the only active branch, if there is exactly one. The new user has no PIN: they set it at their first login with the setup code the answer carries ([AdminUi.setupCode]). */
     fun addUser(name: String, role: String, branches: List<String>) = userAction { env.api.addUser(CreateUserRequest(name, role, branches)) }
 
     fun renameUser(name: String, to: String) = userAction { env.api.renameUser(name, to) }

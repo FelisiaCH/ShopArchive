@@ -637,11 +637,11 @@ class AppFlow(
     }
 
     /**
-     * Logs [username] in with [pin], or with [newPin] (typed twice, the second time [newPinRepeat]) once the server said the user has none.
+     * Logs [username] in with [pin], or with [newPin] (typed twice, the second time [newPinRepeat]) once the server said the user has none, with the [setupCode] the owner gave them.
      * The first login on this device makes it a shared one with this platform's name; when it already holds users, one of their device
      * credentials puts the new user on it. The device id and the user's credential are saved (never the PIN), and the PIN just typed unlocks.
      */
-    fun login(username: String, pin: String, newPin: String? = null, newPinRepeat: String? = null) {
+    fun login(username: String, pin: String, newPin: String? = null, newPinRepeat: String? = null, setupCode: String? = null) {
         val s = _state.value as? AppState.Login ?: return
         val opened = session ?: return
         val creds = stored ?: return
@@ -664,6 +664,7 @@ class AppFlow(
         val request = LoginRequest(
             name, device.label, device.platform, DeviceMode.SHARED,
             pin = secret.takeIf { !s.needsNewPin && it.isNotEmpty() }, newPin = secret.takeIf { s.needsNewPin },
+            setupCode = setupCode?.trim()?.takeIf { s.needsNewPin && it.isNotEmpty() },
         )
         scope.launch {
             val rejected = mutableListOf<String>()
@@ -1129,7 +1130,8 @@ internal fun Exception.toProblem(): Problem = when (this) {
         ErrorCode.DEVICE_NOT_RECOGNIZED -> Problem.DeviceRejected
         // A refusal that says why (e.g. this device is personal) is worded by its reason; one that does not is a wrong secret.
         ErrorCode.FORBIDDEN -> if (reason != null) Problem.Rejected(code, reason) else Problem.WrongCredentials
-        ErrorCode.UNAUTHORIZED, ErrorCode.REAUTH_REQUIRED -> Problem.WrongCredentials
+        ErrorCode.UNAUTHORIZED -> if (reason == ErrorReasons.SETUP_CODE) Problem.Rejected(code, reason) else Problem.WrongCredentials
+        ErrorCode.REAUTH_REQUIRED -> Problem.WrongCredentials
         ErrorCode.CREDENTIALS_CHANGED -> Problem.CredentialsChanged
         ErrorCode.INVALID_REQUEST -> if (reason == ErrorReasons.PIN_LENGTH && pinLength != null) Problem.PinExactly(pinLength) else Problem.Rejected(code, reason)
         else -> Problem.Rejected(code, reason)

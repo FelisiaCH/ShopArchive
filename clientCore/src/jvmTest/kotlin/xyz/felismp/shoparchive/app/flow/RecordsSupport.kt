@@ -393,7 +393,7 @@ class FakeRecordsApi : RecordsApi {
     override suspend fun addUser(request: CreateUserRequest): AdminUserDto {
         admin("addUser ${request.name} ${request.role} ${request.branches}")
         if (adminUserList.any { it.name == request.name }) throw ClientError.Api(409, ErrorCode.CONFLICT, "Exists.", reason = ErrorReasons.USER_EXISTS)
-        return AdminUserDto("id-${request.name}", request.name, true, role = request.role, branches = request.branches).also { adminUserList = adminUserList + it }
+        return AdminUserDto("id-${request.name}", request.name, true, role = request.role, branches = request.branches).also { adminUserList = adminUserList + it }.copy(setupCode = "246810")
     }
 
     override suspend fun renameUser(name: String, to: String): AdminUserDto {

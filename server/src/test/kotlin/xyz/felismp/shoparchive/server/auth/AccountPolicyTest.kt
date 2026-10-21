@@ -396,7 +396,10 @@ class AccountPolicyTest {
 
         val replies = env.console("user reset mali")
 
-        assertEquals(listOf("User 'mali' reset: off 2 devices, password and PIN cleared. They set a new PIN at their next login."), replies)
+        val code = replies.printedSetupCode()
+        assertEquals(
+            listOf("User 'mali' reset: off 2 devices, password and PIN cleared. Give them the setup code $code: they type it once with their new PIN at their next login."), replies,
+        )
         assertFalse("  mali:" in deviceFile(phone.deviceId))
         assertFalse("  mali:" in deviceFile(shared.deviceId))
         assertTrue("  kham:" in deviceFile(shared.deviceId))
@@ -411,7 +414,7 @@ class AccountPolicyTest {
         // The user chooses a new PIN at the next login, and the other user of the shared device is untouched.
         val pinNotSet = assertFailsWith<ApiError> { env.authService().login(LoginRequest("mali", "Phone", "android", DeviceMode.PERSONAL), "127.0.0.1") }
         assertEquals(ErrorReasons.PIN_NOT_SET, pinNotSet.reason)
-        env.unlock(env.authService().login(LoginRequest("mali", "Phone", "android", DeviceMode.PERSONAL, newPin = TEST_PIN), "127.0.0.1"), "mali")
+        env.unlock(env.authService().login(LoginRequest("mali", "Phone", "android", DeviceMode.PERSONAL, newPin = TEST_PIN, setupCode = code), "127.0.0.1"), "mali")
         env.unlock(kham, "kham")
         // An unknown user changes nothing.
         assertEquals(listOf("No user 'nobody'"), env.console("user reset nobody"))
@@ -425,10 +428,10 @@ class AccountPolicyTest {
         repeat(5) { env.wrongTry(device) }
         assertFalse(env.users.find("mali")!!.enabled)
 
-        env.console("user reset mali")
+        val code = env.console("user reset mali").printedSetupCode()
 
         assertTrue(env.users.find("mali")!!.enabled)
-        env.authService().login(LoginRequest("mali", "Phone", "android", DeviceMode.PERSONAL, newPin = TEST_PIN), "127.0.0.1")
+        env.authService().login(LoginRequest("mali", "Phone", "android", DeviceMode.PERSONAL, newPin = TEST_PIN, setupCode = code), "127.0.0.1")
     }
 
     @Test

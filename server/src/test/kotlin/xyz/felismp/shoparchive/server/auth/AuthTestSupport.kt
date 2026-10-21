@@ -184,8 +184,8 @@ internal class AuthEnv(
             commands, settings, mapOf("devices" to auth.devices::load) + (if (records != null) mapOf("data" to records::loadData) else emptyMap()),
             alsoOnReload = setOf("devices"),
         )
-        val accounts = AccountConsole(users, auth.devices, auth.sessions, auth.audit, barrier)
-        registerUserCommands(commands, users, accounts::reset, accounts::disable) { records?.branches?.activeKeys().orEmpty() }
+        val accounts = AccountConsole(users, auth.devices, auth.sessions, auth.audit, auth.hasher, barrier)
+        registerUserCommands(commands, users, accounts::reset, accounts::disable, { auth.hasher.newSetupCode() }) { records?.branches?.activeKeys().orEmpty() }
         accounts.register(commands)
         registerSayCommand(commands, services)
         if (records != null) registerRecordCommands(commands, records)
@@ -207,7 +207,7 @@ internal class AuthEnv(
 
     /** A user, optionally an op, made through the console. */
     fun addUser(name: String, op: Boolean = false) {
-        users.addUser(name, "none", emptyList())
+        users.addUser(name, "none", emptyList(), auth.hasher.hash(TEST_CODE))
         if (op) users.setOp(name, true)
     }
 
@@ -289,6 +289,12 @@ internal suspend fun ApplicationTestBuilder.getPath(path: String, token: String?
 // --- people through the services, for tests of policy (the HTTP side of login is LoginTest's and AuthApiTest's) ---
 
 internal const val TEST_PIN = "482915"
+
+/** The setup code [AuthEnv.addUser] gives a new user, which a test sends with the new PIN. */
+internal const val TEST_CODE = "246810"
+
+/** The setup code in what `user add` or `user reset` said. */
+internal fun List<String>.printedSetupCode(): String = Regex("setup code (\\d{6})").find(joinToString("\n"))!!.groupValues[1]
 internal const val TEST_PASSWORD = "Correct-Horse-Battery-9"
 
 internal fun AuthEnv.authService() = services.get(AuthService::class.java)!!
@@ -305,7 +311,7 @@ internal fun AuthEnv.signIn(name: String, mode: DeviceMode = DeviceMode.PERSONAL
     return authService().login(
         LoginRequest(
             name, "Phone of $name", "android", mode,
-            pin = TEST_PIN.takeIf { hasPin }, newPin = TEST_PIN.takeUnless { hasPin },
+            pin = TEST_PIN.takeIf { hasPin }, newPin = TEST_PIN.takeUnless { hasPin }, setupCode = TEST_CODE.takeUnless { hasPin },
             // A new password is only read when the policy asks for one.
             password = TEST_PASSWORD.takeIf { hasPassword }, newPassword = TEST_PASSWORD.takeUnless { hasPassword },
             deviceId = onto?.deviceId, deviceCredential = onto?.credential,

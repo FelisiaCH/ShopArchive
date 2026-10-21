@@ -98,7 +98,7 @@ class UsersTest {
         val lines = content("user/noy.yml")
         assertEquals(
             listOf("file-version: 1", "id:", "display-name: \"noy\"", "enabled: true", "op: false", "role: cashier",
-                "branches: [market]", "locale: lo", "password: null", "pin: null", "failed-logins: 0", "locked-until: null", "disabled-reason: null", "permissions:", "test.edit: true", "test.view: true"),
+                "branches: [market]", "locale: lo", "password: null", "pin: null", "setup-code: null", "failed-logins: 0", "locked-until: null", "disabled-reason: null", "permissions:", "test.edit: true", "test.view: true"),
             lines.map { it.trim().let { l -> if (l.startsWith("id:")) "id:" else l } },
         )
         assertTrue(Regex("id: [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}").matches(lines[1]), lines[1])

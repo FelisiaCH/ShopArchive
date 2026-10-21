@@ -11,6 +11,7 @@ import xyz.felismp.shoparchive.api.ShopEventTypes
 import xyz.felismp.shoparchive.api.ShopEvents
 import xyz.felismp.shoparchive.server.auth.AuthEnv
 import xyz.felismp.shoparchive.server.auth.NO_BACKOFF
+import xyz.felismp.shoparchive.server.auth.TEST_CODE
 import xyz.felismp.shoparchive.server.auth.TEST_PIN
 import xyz.felismp.shoparchive.server.auth.api
 import xyz.felismp.shoparchive.server.auth.parsed
@@ -34,12 +35,12 @@ class NewDeviceNotifyTest {
 
     private fun env(notify: String = ""): AuthEnv = AuthEnv(root, NO_BACKOFF + notify, withNotify = true).also { e ->
         e.records!!.branches.add("main", "Main Shop")
-        e.users.addUser("mali", "none", listOf("main"))
-        e.users.addUser("dana", "none", emptyList())
+        e.users.addUser("mali", "none", listOf("main"), e.auth.hasher.hash(TEST_CODE))
+        e.users.addUser("dana", "none", emptyList(), e.auth.hasher.hash(TEST_CODE))
     }
 
     private fun loginRequest(name: String, pin: String? = null, newPin: String? = null, mode: DeviceMode = DeviceMode.PERSONAL, onto: LoginResponse? = null) =
-        LoginRequest(name, "Phone of $name", "android", mode, pin = pin, newPin = newPin, deviceId = onto?.deviceId, deviceCredential = onto?.credential)
+        LoginRequest(name, "Phone of $name", "android", mode, pin = pin, newPin = newPin, deviceId = onto?.deviceId, deviceCredential = onto?.credential, setupCode = TEST_CODE.takeIf { newPin != null })
 
     private suspend fun ApplicationTestBuilder.loggedIn(request: LoginRequest): LoginResponse {
         val response = postJson("/api/v1/login", LoginRequest.serializer(), request)

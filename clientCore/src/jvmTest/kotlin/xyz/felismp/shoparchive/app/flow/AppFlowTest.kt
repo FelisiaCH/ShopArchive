@@ -589,6 +589,23 @@ class AppFlowTest {
         assertIs<AppState.Unlocked>(f.state.value)
     }
 
+    @Test fun theSetupCodeIsSentOnlyWithTheNewPinAndARefusedOneKeepsTheForm() {
+        api.noPinYet += "alice"
+        val f = loginFlow()
+        f.login("alice", "", setupCode = "246810")
+        assertNull(api.logins.single().setupCode, "no new PIN yet: nothing to claim")
+        api.failLogin = ClientError.Api(401, ErrorCode.UNAUTHORIZED, "Ask the owner for a setup code.", reason = ErrorReasons.SETUP_CODE)
+        f.login("alice", "", newPin = "4839", newPinRepeat = "4839", setupCode = " 135790 ")
+        assertEquals(LoginRequest("alice", "Test PC", "windows", DeviceMode.SHARED, newPin = "4839", setupCode = "135790"), api.logins.last())
+        val s = assertIs<AppState.Login>(f.state.value)
+        assertEquals(Problem.Rejected(ErrorCode.UNAUTHORIZED, ErrorReasons.SETUP_CODE), s.problem)
+        assertTrue(s.needsNewPin)
+        api.failLogin = null
+        f.login("alice", "", newPin = "4839", newPinRepeat = "4839", setupCode = "246810")
+        assertEquals("246810", api.logins.last().setupCode)
+        assertIs<AppState.Unlocked>(f.state.value)
+    }
+
     @Test fun aNewPinIsCheckedBeforeItIsSent() {
         api.noPinYet += "alice"
         val f = loginFlow()
