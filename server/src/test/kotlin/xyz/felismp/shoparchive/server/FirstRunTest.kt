@@ -148,6 +148,8 @@ class FirstRunTest {
         }
 
         val (_, pin) = assertNotNull(start().ownerLogin())
+        // A wrong PIN from a caller with no device is held in memory; a real restart empties it. This test restarts nothing, so the delay runs out.
+        clock.advance(java.time.Duration.ofSeconds(31))
 
         assertEquals(0, users.user("owner").failedLogins)
         assertNull(users.user("owner").lockedUntil)
