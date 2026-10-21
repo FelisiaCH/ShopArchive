@@ -11,12 +11,13 @@ import org.slf4j.helpers.NOPMDCAdapter
 import org.slf4j.spi.MDCAdapter
 import org.slf4j.spi.SLF4JServiceProvider
 import xyz.felismp.shoparchive.server.Log
+import java.io.IOException
 import javax.net.ssl.SSLException
 
 /**
  * Ktor and Netty log through SLF4J. Without a provider SLF4J prints a three-line warning at boot and drops everything,
  * including their warnings and errors; this one hands warnings and errors to [Log] (the console and latest.log).
- * Anything below warning is library chatter and is dropped, and so is a failed TLS handshake. Found by SLF4J through META-INF/services.
+ * Anything below warning is library chatter and is dropped, and so are a failed TLS handshake and a client hanging up. Found by SLF4J through META-INF/services.
  */
 class Slf4jToLog : SLF4JServiceProvider {
     private val markers = BasicMarkerFactory()
@@ -43,6 +44,9 @@ private class LogForwarder(private val name: String) : LegacyAbstractLogger() {
     override fun handleNormalizedLoggingCall(level: Level, marker: Marker?, messagePattern: String?, arguments: Array<out Any?>?, throwable: Throwable?) {
         // A client that is not TLS, or does not trust the certificate, fails the handshake. On a port open to the internet that is routine, not a warning.
         if (generateSequence(throwable) { it.cause }.any { it is SSLException }) return
+        // An I/O error that reaches the end of Netty's pipeline is the client going away mid-connection (an iPhone app sent to the background,
+        // a phone off Wi-Fi): "Connection reset", "Broken pipe". Nothing for the owner to do, so no 20-line trace in the console.
+        if (name == "io.netty.channel.DefaultChannelPipeline" && generateSequence(throwable) { it.cause }.any { it is IOException }) return
         val text = "${name.substringAfterLast('.')}: ${MessageFormatter.arrayFormat(messagePattern, arguments).message}"
         if (level == Level.ERROR) Log.error(text, throwable) else Log.warn(text, throwable)
     }
