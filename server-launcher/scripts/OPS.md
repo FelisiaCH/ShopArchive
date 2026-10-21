@@ -16,7 +16,7 @@ Staff: the owner adds them with `user add <name>` (in the app's Console or the s
 
 ## Memory, flags and settings
 
-Memory is 1 GB (`SHOPARCHIVE_MEMORY=2G ./start.sh` to change;  `set SHOPARCHIVE_MEMORY=2G` first on Windows). Command-line flags after the script name override `server.properties` for that run only: `--port`, `--bind-address`, `--log-level`, `--no-plugins` (start without any plugin).
+Memory is 1 GB (`SHOPARCHIVE_MEMORY=2G ./start.sh` to change;  `set SHOPARCHIVE_MEMORY=2G` first on Windows). Command-line flags after the script name override `server.properties` for that run only: `--port`, `--bind-address`, `--log-level`, `--no-plugins` (start without any plugin). Messages queued before such a restart wait in the outbox for the channel; messages made while the server runs without it are only written to the log.
 
 Settings live in `server.properties` (name, `port` default 25655, `bind-address`, `lan-discovery`, `log-level`; applied at restart) and `config/shoparchive.yml` (time zone, locale, backup, notifications, plugins ...). Every key is explained in the comment above it, and a value that is not allowed is replaced by the nearest allowed one with a warning in the console. `reload` reads the config files again.
 

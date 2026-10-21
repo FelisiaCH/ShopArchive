@@ -139,6 +139,7 @@ internal class OutboxStore(root: Path, private val config: ConfigService, privat
                 Log.error("data/outbox/$name: ${e.message}; left alone and not used")
             }
         }
+        loadedIds = items.keys.toSet()
         Log.info("data/outbox/: ${items.size} messages loaded, ${items.values.count { it.state == NotificationState.QUEUED || it.state == NotificationState.UNKNOWN }} still to send")
     }
 
@@ -164,6 +165,12 @@ internal class OutboxStore(root: Path, private val config: ConfigService, privat
 
     private fun writeSince(file: Path): Instant =
         clock.instant().truncatedTo(ChronoUnit.SECONDS).also { barrier.mutate { writeAtomically(file, it.toString().toByteArray(Charsets.UTF_8)) } }
+
+    /** The ids read from disk by [load]: the messages of earlier runs. */
+    @Volatile
+    private var loadedIds: Set<String> = emptySet()
+
+    fun wasLoaded(id: String): Boolean = id in loadedIds
 
     fun find(id: String): OutboxItem? = items[id]
 
@@ -286,14 +293,26 @@ internal class Outbox(
         val now = clock.instant()
         // An item whose last outcome is not on disk is not offered again until it is: a crash now would replay the old file.
         val due = store.all().filter { !store.isUnsaved(it.id) && (it.state == NotificationState.QUEUED || it.state == NotificationState.UNKNOWN) && (it.nextAttempt?.let { at -> !at.isAfter(now) } ?: true) }
+        val log = notifier() as? LogNotifier
         var tried = 0
         for (item in due) {
             if (stopping) break
+            if (log != null && store.wasLoaded(item.id)) {
+                // Left by an earlier run, probably for a channel that is not loaded now: the log shows it once and the file stays as it is until a channel is registered.
+                if (logged.add(item.id)) log.deliver(item.notification)
+                continue
+            }
             tryOnce(item)
             tried++
         }
         return tried
     }
+
+    /** Held messages already shown in the log, so a round does not repeat them. */
+    private val logged = ConcurrentHashMap.newKeySet<String>()
+
+    /** Whether [item] is held for a channel: it is from an earlier run and only the core's [LogNotifier] is in use. */
+    private fun held(item: OutboxItem) = notifier() is LogNotifier && store.wasLoaded(item.id)
 
     private fun tryOnce(item: OutboxItem) {
         val settings = config.notify
@@ -345,7 +364,8 @@ internal class Outbox(
     /** The earliest time a message is due again, or null when nothing waits (messages that are due now give the present). */
     fun nextDue(): Instant? {
         val now = clock.instant()
-        val delivery = store.all().filter { !store.isUnsaved(it.id) && (it.state == NotificationState.QUEUED || it.state == NotificationState.UNKNOWN) }.minOfOrNull { it.nextAttempt ?: now }
+        // A held message is not due: the worker looks again at its longest sleep, which is how a channel registered later gets it.
+        val delivery = store.all().filter { !store.isUnsaved(it.id) && !held(it) && (it.state == NotificationState.QUEUED || it.state == NotificationState.UNKNOWN) }.minOfOrNull { it.nextAttempt ?: now }
         return listOfNotNull(delivery, store.nextSaveAt()).minOrNull()
     }
 
