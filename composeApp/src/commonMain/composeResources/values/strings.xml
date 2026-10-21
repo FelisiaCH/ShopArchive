@@ -265,6 +265,7 @@
     <string name="reason_pin_length">The PIN must be only digits, and exactly the number of digits the server asks for.</string>
     <string name="reason_pin_repeated">The PIN must not be one digit repeated, like 111111.</string>
     <string name="reason_pin_not_set">This account has no PIN yet. Choose one.</string>
+    <string name="reason_setup_code">The setup code is missing or wrong. Ask the owner for a setup code.</string>
     <string name="reason_pin_sequence">The PIN must not be a straight run of digits, like 123456.</string>
     <string name="reason_password_required">Enter a password.</string>
     <string name="reason_password_short">The password is too short.</string>
@@ -381,6 +382,9 @@
     <string name="err_other_server">Another server answers at this address now. Check the address, or add it as a new server.</string>
     <string name="login_title">Log in</string>
     <string name="login_submit">Log in</string>
+    <string name="setup_code_label">Setup code (from the owner)</string>
+    <string name="manage_code_give">Give %1$s this code. They type it once with their new PIN.</string>
+    <string name="manage_code_done">Done</string>
     <string name="login_set_pin">This account has no PIN yet. Choose one for it.</string>
     <string name="err_pin_digits">The PIN is 4 to 12 digits.</string>
     <string name="err_pin_exact">The PIN is exactly %1$d digits.</string>
@@ -427,7 +431,7 @@
     <string name="manage_add">Add</string>
     <string name="manage_rename">Rename</string>
     <string name="manage_staff_add">Add staff</string>
-    <string name="manage_staff_hint">The new person sets their own PIN the first time they log in.</string>
+    <string name="manage_staff_hint">The new person gets a setup code to type once with their own new PIN at their first login.</string>
     <string name="manage_role">Role</string>
     <string name="manage_role_none">No role</string>
     <string name="manage_admin">Admin</string>
@@ -438,7 +442,7 @@
     <string name="manage_unlock">Unlock</string>
     <string name="manage_reset">Reset PIN</string>
     <string name="manage_reset_ask">Reset the PIN of %1$s?</string>
-    <string name="manage_reset_body">%1$s is signed out of every device and sets a new PIN at the next login.</string>
+    <string name="manage_reset_body">%1$s is signed out of every device and gets a new setup code to set a new PIN at the next login.</string>
     <string name="manage_reset_yes">Yes, reset</string>
     <string name="manage_branch_add">Add branch</string>
     <string name="manage_branch_name">Branch name</string>

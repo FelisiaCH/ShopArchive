@@ -34,8 +34,8 @@ class LoginTest {
 
     private fun loginRequest(
         name: String, pin: String? = null, newPin: String? = null, mode: DeviceMode = DeviceMode.PERSONAL, onto: LoginResponse? = null,
-        deviceCredential: String? = onto?.credential,
-    ) = LoginRequest(name, "Phone of $name", "android", mode, pin = pin, newPin = newPin, deviceId = onto?.deviceId, deviceCredential = deviceCredential)
+        deviceCredential: String? = onto?.credential, setupCode: String? = TEST_CODE.takeIf { newPin != null },
+    ) = LoginRequest(name, "Phone of $name", "android", mode, pin = pin, newPin = newPin, deviceId = onto?.deviceId, deviceCredential = deviceCredential, setupCode = setupCode)
 
     private suspend fun ApplicationTestBuilder.login(request: LoginRequest) = postJson("/api/v1/login", LoginRequest.serializer(), request)
 
@@ -94,13 +94,13 @@ class LoginTest {
 
     @Test
     fun aUserMadeWithUserAddLogsInWithTheNameAndSetsTheirOwnPin() = AuthEnv(root).run {
-        console("user add staff1")
+        val code = console("user add staff1").printedSetupCode()
         api {
             val notSet = login(loginRequest("staff1"))
             assertEquals(HttpStatusCode.Unauthorized, notSet.status)
             assertEquals(ErrorReasons.PIN_NOT_SET, notSet.errorReason())
 
-            val device = loggedIn(loginRequest("staff1", newPin = TEST_PIN))
+            val device = loggedIn(loginRequest("staff1", newPin = TEST_PIN, setupCode = code))
             assertEquals(HttpStatusCode.OK, unlock(device, "staff1", TEST_PIN).status)
         }
     }
@@ -111,13 +111,13 @@ class LoginTest {
         api {
             val old = loggedIn(loginRequest("staff1", newPin = TEST_PIN))
 
-            console("user reset staff1")
+            val code = console("user reset staff1").printedSetupCode()
 
             assertEquals(HttpStatusCode.Unauthorized, unlock(old, "staff1", TEST_PIN).status)
             val notSet = login(loginRequest("staff1"))
             assertEquals(HttpStatusCode.Unauthorized, notSet.status)
             assertEquals(ErrorReasons.PIN_NOT_SET, notSet.errorReason())
-            val device = loggedIn(loginRequest("staff1", newPin = OTHER_PIN))
+            val device = loggedIn(loginRequest("staff1", newPin = OTHER_PIN, setupCode = code))
             assertEquals(HttpStatusCode.OK, unlock(device, "staff1", OTHER_PIN).status)
         }
     }

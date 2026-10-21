@@ -72,7 +72,7 @@ internal class Auth(
     private val policy = Policy(config, users)
     private val backoff = Backoff(config, users, sessions, audit, clock)
 
-    val accounts = AccountConsole(users, devices, sessions, audit, barrier)
+    val accounts = AccountConsole(users, devices, sessions, audit, hasher, barrier)
 
     init {
         // The device files are keyed by name for the admin to read; the account behind a block is its user-id, and the name follows a rename.
@@ -82,7 +82,7 @@ internal class Auth(
         services.register(EventService::class.java, events, CORE_SERVICE_PRIORITY, "core")
         // The record services write their own lines (a branch added) through the registry, as they reach the login services.
         services.register(AuditLog::class.java, audit, CORE_SERVICE_PRIORITY, "core")
-        services.register(UserAdminService::class.java, DefaultUserAdminService(users, accounts, audit, activeBranches, sessions::isLive), CORE_SERVICE_PRIORITY, "core")
+        services.register(UserAdminService::class.java, DefaultUserAdminService(users, accounts, audit, hasher, activeBranches, sessions::isLive), CORE_SERVICE_PRIORITY, "core")
         services.register(DeviceService::class.java, DefaultDeviceService(config, users, devices, sessions, audit), CORE_SERVICE_PRIORITY, "core")
         services.register(ClientConfigService::class.java, DefaultClientConfigService(config, users, policy, endpoints, records), CORE_SERVICE_PRIORITY, "core")
         services.register(AuthService::class.java, DefaultAuthService(config, users, policy, hasher, sessions, devices, audit, services, backoff, clock, barrier), CORE_SERVICE_PRIORITY, "core")

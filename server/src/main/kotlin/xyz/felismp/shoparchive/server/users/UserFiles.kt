@@ -48,6 +48,8 @@ internal data class UserData(
     val failedLogins: Int = 0,
     val lockedUntil: Instant? = null,
     val disabledReason: String? = null,
+    /** Argon2 hash of the 6-digit code an account with no PIN needs to claim it (first login); cleared when the PIN is set. Null on an old file. */
+    val setupCode: String? = null,
 )
 
 internal data class RoleData(val displayName: String, val permissions: Map<String, Boolean>, val newNodes: Set<String> = emptySet())
@@ -67,7 +69,7 @@ internal class UserFile(
     override val path = "user/$name.yml"
     override val title = "ShopArchive user '$name'. Change it with the console, or edit by hand and run 'reload users'."
 
-    private val known = setOf("id", "display-name", "enabled", "op", "role", "branches", "locale", "password", "pin", "permissions", "failed-logins", "locked-until", "disabled-reason")
+    private val known = setOf("id", "display-name", "enabled", "op", "role", "branches", "locale", "password", "pin", "setup-code", "permissions", "failed-logins", "locked-until", "disabled-reason")
 
     // A '# ใหม่' the template wrote earlier is a comment, which the YAML parse drops, so it is read from the text.
     override fun parse(text: String, warn: Warn): UserData {
@@ -109,6 +111,7 @@ internal class UserFile(
             locale = locale,
             password = readCredential(content, "password", warn),
             pin = readCredential(content, "pin", warn),
+            setupCode = readCredential(content, "setup-code", warn),
             permissions = permissions,
             newNodes = newNodes,
             failedLogins = (content["failed-logins"] as? String)?.trim()?.toIntOrNull()?.coerceAtLeast(0) ?: 0,
@@ -127,6 +130,7 @@ internal class UserFile(
         append("locale: ").append(value.locale).append('\n')
         append("password: ").append(value.password?.let(::quoted) ?: "null").append('\n')
         append("pin: ").append(value.pin?.let(::quoted) ?: "null").append('\n')
+        append("setup-code: ").append(value.setupCode?.let(::quoted) ?: "null").append('\n')
         append("failed-logins: ").append(value.failedLogins).append('\n')
         append("locked-until: ").append(value.lockedUntil ?: "null").append('\n')
         append("disabled-reason: ").append(value.disabledReason ?: "null").append('\n')

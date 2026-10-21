@@ -49,7 +49,7 @@ class AccountLockTest {
     fun tearDown() = Log.close()
 
     private fun login(name: String, pin: String? = null, newPin: String? = null) =
-        LoginRequest(name, "Phone", "android", DeviceMode.PERSONAL, pin = pin, newPin = newPin)
+        LoginRequest(name, "Phone", "android", DeviceMode.PERSONAL, pin = pin, newPin = newPin, setupCode = TEST_CODE.takeIf { newPin != null })
 
     @Test
     fun aLoginInsideTheLockWhileUserResetRunsLeavesNoUsableDevice() {

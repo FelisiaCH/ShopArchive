@@ -38,7 +38,7 @@ class AuthApiTest {
     private fun loginRequest(
         name: String, mode: DeviceMode = DeviceMode.PERSONAL, password: String? = null, newPassword: String? = null, pin: String? = null, newPin: String? = null,
         deviceId: String? = null, deviceCredential: String? = null,
-    ) = LoginRequest(name, "Test phone", "android", mode, pin, newPin, password, newPassword, deviceId, deviceCredential)
+    ) = LoginRequest(name, "Test phone", "android", mode, pin, newPin, password, newPassword, deviceId, deviceCredential, TEST_CODE.takeIf { newPin != null })
 
     private suspend fun ApplicationTestBuilder.login(request: LoginRequest) = postJson("/api/v1/login", LoginRequest.serializer(), request)
 

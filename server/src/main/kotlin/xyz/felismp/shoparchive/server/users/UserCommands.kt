@@ -39,11 +39,13 @@ internal fun registerUserCommands(
     users: UserStore,
     reset: ResetUser? = null,
     disable: ResetUser? = null,
+    /** A new setup code and its hash for `user add`; without it a new user has no code and is closed until `user reset`. */
+    setupCode: (() -> Pair<String, String>)? = null,
     activeBranches: () -> List<String> = { emptyList() },
 ) {
     val bools = listOf("true", "false")
 
-    commands.register(UserCommand("user", "Manage users: add, list, info, enable, disable, unlock, reset, rename, role, branch", { sender, args -> userCommand(users, sender, args, reset, disable, activeBranches) }) { args ->
+    commands.register(UserCommand("user", "Manage users: add, list, info, enable, disable, unlock, reset, rename, role, branch", { sender, args -> userCommand(users, sender, args, reset, disable, setupCode, activeBranches) }) { args ->
         val sub = args.first()
         when {
             args.size == 1 -> listOf("add", "list", "info", "enable", "disable", "unlock", "reset", "rename", "role", "branch")
@@ -96,7 +98,7 @@ private fun addCompletion(users: UserStore, args: List<String>): List<String> {
     }
 }
 
-private fun userCommand(users: UserStore, sender: CommandSender, args: List<String>, reset: ResetUser?, disable: ResetUser?, activeBranches: () -> List<String>) {
+private fun userCommand(users: UserStore, sender: CommandSender, args: List<String>, reset: ResetUser?, disable: ResetUser?, setupCode: (() -> Pair<String, String>)?, activeBranches: () -> List<String>) {
     val rest = args.drop(1)
     when (args.firstOrNull()) {
         "add" -> {
@@ -104,10 +106,12 @@ private fun userCommand(users: UserStore, sender: CommandSender, args: List<Stri
             val (role, given) = parseAddFlags(rest.drop(1))
             val active = if (given.isEmpty()) activeBranches() else emptyList()
             val branches = joinedBranches(given, active)
-            users.addUser(rest[0], role, branches)
+            val code = setupCode?.invoke()
+            users.addUser(rest[0], role, branches, code?.second)
             sender.sendMessage(
                 "User '${rest[0]}' created" + (if (role != NO_ROLE) ", role $role" else "") + (if (branches.isNotEmpty()) ", branches ${branches.joinToString()}" else "") +
-                    ". They open the app, type the name '${rest[0]}' and set their own PIN.",
+                    ". They open the app, type the name '${rest[0]}' and set their own PIN" +
+                    (if (code != null) "; give them the setup code ${code.first}, which they type once with their new PIN." else "."),
             )
             if (given.isEmpty() && active.size > 1) sender.sendMessage("No branch yet: user branch ${rest[0]} add <branch>")
         }

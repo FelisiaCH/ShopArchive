@@ -4,6 +4,7 @@ import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.builtins.ListSerializer
 import org.junit.jupiter.api.io.TempDir
 import xyz.felismp.shoparchive.server.auth.AuthEnv
+import xyz.felismp.shoparchive.server.auth.printedSetupCode
 import xyz.felismp.shoparchive.server.auth.api
 import xyz.felismp.shoparchive.server.auth.errorCode
 import xyz.felismp.shoparchive.server.auth.getPath
@@ -62,7 +63,8 @@ class BranchesCategoriesTest {
         console("branch add market Market")
         console("branch archive market")
 
-        assertEquals("User 'a1x' created, branches main. They open the app, type the name 'a1x' and set their own PIN.", console("user add a1x").single())
+        val reply = console("user add a1x").single()
+        assertEquals("User 'a1x' created, branches main. They open the app, type the name 'a1x' and set their own PIN; give them the setup code ${listOf(reply).printedSetupCode()}, which they type once with their new PIN.", reply)
 
         console("branch unarchive market")
         assertEquals(listOf("main", "market"), records!!.branches.activeKeys())

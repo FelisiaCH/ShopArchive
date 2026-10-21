@@ -138,10 +138,11 @@ internal class UserStore(
         return values[node] ?: nodes.all().firstOrNull { it.node == node }?.default ?: false
     }
 
-    fun addUser(name: String, role: String, branches: List<String>) = barrier.mutate { addUserInLock(name, role, branches) }
+    /** [setupCodeHash] is the hash of the code the user gives with the new PIN at the first login; null leaves the account closed until `user reset`. */
+    fun addUser(name: String, role: String, branches: List<String>, setupCodeHash: String? = null) = barrier.mutate { addUserInLock(name, role, branches, setupCodeHash) }
 
     @Synchronized
-    private fun addUserInLock(name: String, role: String, branches: List<String>) {
+    private fun addUserInLock(name: String, role: String, branches: List<String>, setupCodeHash: String?) {
         checkUserName(name)
         if (name in users || Files.exists(userPath(name))) throw UserException("User '$name' already exists", ErrorReasons.USER_EXISTS, 409)
         val roleData = if (role == NO_ROLE) null else role(role)
@@ -155,6 +156,7 @@ internal class UserStore(
             locale = config.locale.toLanguageTag(),
             password = null,
             pin = null,
+            setupCode = setupCodeHash,
             permissions = roleData?.permissions ?: defaults(),
             newNodes = roleData?.newNodes ?: emptySet(),
         )
@@ -218,15 +220,15 @@ internal class UserStore(
         return enable
     }
 
-    /** `user reset`: no password and no PIN, so the next login sets new ones; the wrong tries are forgotten too. Access tokens end. */
-    fun resetCredentials(name: String) = barrier.mutate { resetCredentialsInLock(name) }
+    /** `user reset`: no password and no PIN, so the next login sets new ones with the code [setupCodeHash] stands for; the wrong tries are forgotten too. Access tokens end. */
+    fun resetCredentials(name: String, setupCodeHash: String?) = barrier.mutate { resetCredentialsInLock(name, setupCodeHash) }
 
     @Synchronized
-    private fun resetCredentialsInLock(name: String) {
+    private fun resetCredentialsInLock(name: String, setupCodeHash: String?) {
         val changed = editUser(name) {
             val enable = !it.enabled && it.disabledReason == DISABLED_BY_BACKOFF
             it.copy(
-                password = null, pin = null, failedLogins = 0, lockedUntil = null,
+                password = null, pin = null, setupCode = setupCodeHash, failedLogins = 0, lockedUntil = null,
                 enabled = it.enabled || enable, disabledReason = if (enable) null else it.disabledReason,
             )
         }
@@ -250,7 +252,8 @@ internal class UserStore(
         val name = findById(id)?.first ?: throw UserException("No user with id '$id'")
         val current = freshUser(name)
         if ((passwordHash != null && isUsableCredential(current.password)) || (pinHash != null && isUsableCredential(current.pin))) return false
-        editUser(name) { it.copy(password = passwordHash ?: it.password, pin = pinHash ?: it.pin) }
+        // The setup code is spent with the PIN it let in.
+        editUser(name) { it.copy(password = passwordHash ?: it.password, pin = pinHash ?: it.pin, setupCode = if (pinHash != null) null else it.setupCode) }
         return true
     }
 

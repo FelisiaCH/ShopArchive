@@ -62,6 +62,8 @@ object ErrorReasons {
     const val PIN_SEQUENCE = "pin.sequence"
     /** `/login` for a user who has no PIN yet: send it again with `newPin`. */
     const val PIN_NOT_SET = "pin.not-set"
+    /** `/login` with `newPin` for a user who has no PIN: the setup code from the owner was missing or wrong (or the user has none until `user reset`). */
+    const val SETUP_CODE = "setup.code"
     const val PASSWORD_REQUIRED = "password.required"
     const val PASSWORD_SHORT = "password.short"
     const val PASSWORD_LONG = "password.long"
@@ -131,7 +133,7 @@ object ErrorReasons {
 
     /** Every key above, for a client that must have words for each. */
     val all: List<String> = listOf(
-        PIN_REQUIRED, PIN_LENGTH, PIN_REPEATED, PIN_SEQUENCE, PIN_NOT_SET,
+        PIN_REQUIRED, PIN_LENGTH, PIN_REPEATED, PIN_SEQUENCE, PIN_NOT_SET, SETUP_CODE,
         PASSWORD_REQUIRED, PASSWORD_SHORT, PASSWORD_LONG, PASSWORD_COMMON, PASSWORD_HAS_USERNAME, PASSWORD_HAS_SERVER_NAME,
         PERMISSION_MISSING, BRANCH_NOT_ALLOWED, BRANCH_UNKNOWN, BRANCH_ARCHIVED, DEVICE_PERSONAL, DEVICE_HAS_OTHER_USERS, COMMAND_CONSOLE_ONLY,
         SESSION_NO_OPEN_DAY, SESSION_CLOSED,
@@ -191,6 +193,8 @@ data class LoginRequest(
     val newPassword: String? = null,
     val deviceId: String? = null,
     val deviceCredential: String? = null,
+    /** What the owner gave the user with a new account (or after a reset): needed with [newPin] while the account has no PIN. */
+    val setupCode: String? = null,
 )
 
 /** The device credential is shown once: the device must keep it. */

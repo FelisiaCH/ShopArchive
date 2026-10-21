@@ -27,9 +27,11 @@ import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.CreateBranchRequest
 import xyz.felismp.shoparchive.shared.CreateCategoryRequest
 import xyz.felismp.shoparchive.shared.CreateUserRequest
+import xyz.felismp.shoparchive.shared.DeviceMode
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.LocalizedName
+import xyz.felismp.shoparchive.shared.LoginRequest
 import xyz.felismp.shoparchive.shared.ROLE_NONE
 import xyz.felismp.shoparchive.shared.ReauthRequest
 import xyz.felismp.shoparchive.shared.RenameUserRequest
@@ -46,6 +48,8 @@ import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** `/api/v1/admin/...`, and the reauth, audit and live message that `/branches` and `/categories` got: what the console does for an op, in the app. */
@@ -151,11 +155,17 @@ class AdminApiTest {
             val byConsole = users.user("viaconsole")
             val byApi = users.user("viaapi")
             // Same account but for the id and the name it started with: role, the branch the only active branch gives, the permission copy, no credentials.
-            assertEquals(byConsole.copy(id = byApi.id, displayName = "viaapi"), byApi)
+            assertEquals(byConsole.copy(id = byApi.id, displayName = "viaapi", setupCode = null), byApi.copy(setupCode = null))
             assertEquals(listOf("main"), dto.branches)
             assertEquals("clerk", dto.role)
             assertTrue(!dto.hasPin && !dto.hasPassword && dto.enabled)
             assertFalse("argon2" in created.bodyAsText())
+            // The code is in the answer, once, and works; the list and the file keep only its hash.
+            val code = assertNotNull(dto.setupCode)
+            assertTrue(Regex("\\d{6}").matches(code))
+            assertTrue(Hasher(1, TEST_COST).verify(code, byApi.setupCode))
+            assertNull(getPath(admin, boss).parsed(userList).first { it.name == "viaapi" }.setupCode)
+            authService().login(LoginRequest("viaapi", "Phone", "android", DeviceMode.PERSONAL, newPin = TEST_PIN, setupCode = code), "127.0.0.1")
         }
     }
 
@@ -270,7 +280,9 @@ class AdminApiTest {
             val reset = postRaw("$admin/noy/reset", "", boss).parsed(AdminUserDto.serializer())
 
             assertTrue(!reset.hasPin && !reset.hasPassword)
-            assertEquals(users.user("kham").copy(id = noyId, displayName = "noy"), users.user("noy"))
+            assertEquals(users.user("kham").copy(id = noyId, displayName = "noy", setupCode = null), users.user("noy").copy(setupCode = null))
+            val code = assertNotNull(reset.setupCode)
+            assertTrue(Hasher(1, TEST_COST).verify(code, users.user("noy").setupCode))
             assertTrue(auth.devices.devicesOf(noyId).isEmpty())
             assertEquals(HttpStatusCode.Unauthorized, getPath("/api/v1/config", noy).status)
             assertTrue(audit().lines().any { "account.reset user=noy" in it && "ip=localhost" in it }, audit())
@@ -333,7 +345,7 @@ class AdminApiTest {
     fun theLastEnabledOpCannotBeDisabledOrGivenAnotherRole() = env().run {
         console("role create clerk")
         addUser("boss", op = true)
-        val service = DefaultUserAdminService(users, auth.accounts, auth.audit, { emptyList() }) { true }
+        val service = DefaultUserAdminService(users, auth.accounts, auth.audit, auth.hasher, { emptyList() }) { true }
         // The guard on the target alone: the session is taken as live here (a real disable ends it, see the next test).
         addUser("ghost", op = true)
         users.setEnabled("ghost", false)
@@ -359,7 +371,7 @@ class AdminApiTest {
     fun aRequestWhoseSessionEndedOnTheWayChangesNothing() = env().run {
         addUser("boss", op = true)
         addUser("boss2", op = true)
-        val service = DefaultUserAdminService(users, auth.accounts, auth.audit, { emptyList() }, auth.sessions::isLive)
+        val service = DefaultUserAdminService(users, auth.accounts, auth.audit, auth.hasher, { emptyList() }, auth.sessions::isLive)
         // An op disabled while their request was still on its way: the disable ended the session the request was let in with.
         val gone = Principal(users.user("boss").id, "boss", "device", "ended-session")
 
@@ -376,7 +388,7 @@ class AdminApiTest {
     fun twoOpsDisablingEachOtherAtTheSameMomentNeverLeaveNoEnabledOp() = env().run {
         addUser("opa", op = true)
         addUser("opb", op = true)
-        val service = DefaultUserAdminService(users, auth.accounts, auth.audit, { emptyList() }) { true }
+        val service = DefaultUserAdminService(users, auth.accounts, auth.audit, auth.hasher, { emptyList() }) { true }
         fun caller(name: String) = Principal(users.user(name).id, name, "device", "session")
         val callers = mapOf("opa" to caller("opa"), "opb" to caller("opb"))
 

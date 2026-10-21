@@ -16,6 +16,7 @@ import xyz.felismp.shoparchive.server.config.ConfigService
 import xyz.felismp.shoparchive.server.config.OverrideException
 import xyz.felismp.shoparchive.server.config.Overrides
 import xyz.felismp.shoparchive.server.auth.Auth
+import xyz.felismp.shoparchive.server.auth.newSetupCode
 import xyz.felismp.shoparchive.server.auth.registerAuthNodes
 import xyz.felismp.shoparchive.server.net.HttpStartException
 import xyz.felismp.shoparchive.server.net.Network
@@ -144,7 +145,7 @@ fun main(args: Array<String>) {
         registerRecordCommands(commands, records)
         registerNotifyCommand(commands, notify.outbox)
         registerBackupCommand(commands, backup, root)
-        registerUserCommands(commands, users, auth.accounts::reset, auth.accounts::disable, records.branches::activeKeys)
+        registerUserCommands(commands, users, auth.accounts::reset, auth.accounts::disable, { auth.hasher.newSetupCode() }, records.branches::activeKeys)
         auth.accounts.register(commands)
         registerIpBanCommands(commands, network.bans)
         registerSayCommand(commands, services)

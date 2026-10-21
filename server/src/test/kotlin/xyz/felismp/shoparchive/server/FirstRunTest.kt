@@ -6,6 +6,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.testing.ApplicationTestBuilder
 import org.junit.jupiter.api.io.TempDir
 import xyz.felismp.shoparchive.server.auth.AuthEnv
+import xyz.felismp.shoparchive.server.auth.TEST_CODE
 import xyz.felismp.shoparchive.server.auth.api
 import xyz.felismp.shoparchive.server.auth.postJson
 import xyz.felismp.shoparchive.server.users.isUsableCredential
@@ -47,7 +48,7 @@ class FirstRunTest {
     }
 
     private suspend fun ApplicationTestBuilder.login(name: String, pin: String? = null, newPin: String? = null): HttpResponse =
-        postJson("/api/v1/login", LoginRequest.serializer(), LoginRequest(name, "Phone of $name", "android", DeviceMode.PERSONAL, pin = pin, newPin = newPin))
+        postJson("/api/v1/login", LoginRequest.serializer(), LoginRequest(name, "Phone of $name", "android", DeviceMode.PERSONAL, pin = pin, newPin = newPin, setupCode = TEST_CODE.takeIf { newPin != null }))
 
     @Test
     fun theFirstStartMakesTheBranchAndTheOpOwnerAndPrintsAPinThatLogsIn() = env().run {

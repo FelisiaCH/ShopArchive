@@ -27,6 +27,6 @@ Contents of the release zip:
 2. Install the app, pick this server in the list (or "Add server" with `IP:port`), and log in as `owner` with the PIN printed in the console.
 3. Other branches, or outside the shop's network: give the machine a fixed LAN address and forward the TCP port (default 25655) on the router. In the app at the other branch, "Add server" with `domain:port` (or `public-IP:port`). Details: `OPS.md`.
 
-- Staff: `user add <name>` in the app's Console or the server console; they type their name in the app and set their own PIN.
+- Staff: `user add <name>` in the app's Console or the server console; they type their name in the app and set their own PIN with the 6-digit setup code `user add` prints (typed once).
 - `stop` stops the server.
 - Everything else: `OPS.md`.

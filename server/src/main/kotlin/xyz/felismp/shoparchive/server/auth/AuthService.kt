@@ -72,10 +72,15 @@ internal class DefaultAuthService(
             val user = users.findFreshById(found.id)?.takeIf { it.first == username && it.second.enabled }?.second ?: throw unknown()
             // The device first: a device that is not accepted costs the account no wrong try, and the PIN is not tested against it.
             val existing = existingDevice(request, username, ip)
-            proveExisting(username, user, request, ip, known = existing != null && devices.ownerOf(existing.first, request.deviceCredential.orEmpty()) == user.id)
+            val known = existing != null && devices.ownerOf(existing.first, request.deviceCredential.orEmpty()) == user.id
+            proveExisting(username, user, request, ip, known)
             // This tells whoever asks that the name exists and has no PIN; the app needs it to ask for a new PIN.
             if (!isUsableCredential(user.pin) && request.newPin == null) {
                 throw ApiError(401, ErrorCode.UNAUTHORIZED, "Set a PIN.", reason = ErrorReasons.PIN_NOT_SET, pinLength = config.auth.pinLength)
+            }
+            // An account that proves nothing yet is claimed with the code the owner gave: before any PIN is hashed or set.
+            if (request.newPin != null && !isUsableCredential(user.pin) && !isUsableCredential(user.password)) {
+                checkSetupCode(username, user, request, ip, known)
             }
             // Already on the device (logging in again there): nothing new for the owner to hear about.
             val wasOn = existing?.second?.users?.get(username)?.userId == user.id
@@ -267,6 +272,19 @@ internal class DefaultAuthService(
             throw unauthorized("Login failed.")
         }
         if (proves) backoff.succeeded(user, known)
+    }
+
+    /** The setup code of an account that has no PIN or password, against the hash on file. A wrong or missing one (or none on file) is a wrong try, like in [proveExisting]. */
+    private fun checkSetupCode(username: String, user: UserData, request: LoginRequest, ip: String, known: Boolean) {
+        backoff.requireNotLocked(user, "login", username, request.deviceId, ip, known)
+        // One hash whatever was sent or stored (verify against null costs the same).
+        val given = request.setupCode?.takeIf { it.length == SETUP_CODE_LENGTH } ?: "-"
+        if (!hasher.verify(given, user.setupCode?.takeIf(::isUsableCredential))) {
+            backoff.failed(user.id, username, request.deviceId, ip, known)
+            audit.record("login.fail", username, request.deviceId, ip, "wrong-setup-code")
+            throw ApiError(401, ErrorCode.UNAUTHORIZED, "Ask the owner for a setup code.", reason = ErrorReasons.SETUP_CODE)
+        }
+        backoff.succeeded(user, known)
     }
 
     /** The hashes of the password (if the user needs one) and the PIN the user does not have yet, from [request]; null for what they have. */

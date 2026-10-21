@@ -26,6 +26,8 @@ data class AdminUserDto(
     val lockedUntil: String? = null,
     val hasPin: Boolean = false,
     val hasPassword: Boolean = false,
+    /** Only in the answer to adding a user or resetting one, once: the code they type with their new PIN. */
+    val setupCode: String? = null,
 )
 
 /** A role and how many users have it. */

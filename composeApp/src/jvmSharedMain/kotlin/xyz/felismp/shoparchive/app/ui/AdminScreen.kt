@@ -67,9 +67,10 @@ private fun StaffSection(admin: AdminState, ui: AdminUi, off: Boolean) {
     var editing by remember { mutableStateOf<String?>(null) }
     var confirmReset by remember { mutableStateOf<String?>(null) }
     // The innermost open thing closes first; while a call is running Back does nothing, like the disabled buttons.
-    OnBackPress(adding || editing != null || confirmReset != null) {
+    OnBackPress(ui.setupCode != null || adding || editing != null || confirmReset != null) {
         if (!ui.busy) {
             when {
+                ui.setupCode != null -> admin.dismissSetupCode()
                 confirmReset != null -> confirmReset = null
                 adding -> adding = false
                 else -> editing = null
@@ -79,6 +80,14 @@ private fun StaffSection(admin: AdminState, ui: AdminUi, off: Boolean) {
     }
     LaunchedEffect(ui.done) { adding = false; confirmReset = null }
 
+    ui.setupCode?.let { (name, code) ->
+        ShopCard {
+            ShopText(stringResource(Res.string.manage_code_give, name), TextRole.Title)
+            ShopText(code, TextRole.Display)
+            ShopButton(stringResource(Res.string.manage_code_done), admin::dismissSetupCode, Modifier.fillWidthOnPhone())
+        }
+        return
+    }
     if (!ui.loaded) {
         if (!ui.loading) ShopButton(stringResource(Res.string.retry), admin::load, Modifier.fillWidthOnPhone())
         return

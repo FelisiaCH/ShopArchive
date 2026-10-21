@@ -12,7 +12,7 @@ The app opens on a list of servers: the ones it finds on the same network (mDNS)
 
 In the console, `help` lists the commands and `stop` stops the server (always stop this way or with Ctrl+C / SIGTERM, not by killing the process). The app has the same commands in its Console screen (Settings), for a user who holds the permission `shoparchive.command.<name>` of a command (an op holds them all); `user`, `perm`, `role`, `devices`, `op` and `deop` are for ops only. `status` shows the address, uptime and the last backup; `user list`, `devices <name>`, `category add ...` and `perm search <keyword>` manage the rest.
 
-Staff: the owner adds them with `user add <name>` (in the app's Console or the server console); they type their name in the app and set their own PIN. `user reset <name>` clears a user's PIN and devices, so they set a new PIN at the next login.
+Staff: the owner adds them with `user add <name>` (in the app's Console or the server console); they type their name in the app and set their own PIN with the 6-digit setup code `user add` prints (give it to them; it works once). `user reset <name>` clears a user's PIN and devices and prints a new setup code, so they set a new PIN at the next login.
 
 ## Memory, flags and settings
 

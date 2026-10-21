@@ -31,7 +31,7 @@ class AuthIdentityTest {
 
     private fun AuthEnv.login(name: String, pin: String, mode: DeviceMode = DeviceMode.PERSONAL): Login {
         if (name !in users.userNames()) addUser(name)
-        val device = authService().login(LoginRequest(name, "Phone of $name", "android", mode, newPin = pin), "127.0.0.1")
+        val device = authService().login(LoginRequest(name, "Phone of $name", "android", mode, newPin = pin, setupCode = TEST_CODE), "127.0.0.1")
         return Login(device, authService().unlock(UnlockRequest(device.deviceId, name, device.credential, pin = pin), "127.0.0.1").accessToken)
     }
 

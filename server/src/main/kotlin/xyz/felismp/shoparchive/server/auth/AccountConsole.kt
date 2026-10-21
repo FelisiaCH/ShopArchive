@@ -13,6 +13,7 @@ internal class AccountConsole(
     private val devices: DeviceStore,
     private val sessions: Sessions,
     private val audit: AuditLog,
+    private val hasher: Hasher,
     private val barrier: DataBarrier = DataBarrier(),
 ) {
     /**
@@ -26,24 +27,28 @@ internal class AccountConsole(
             sender.sendMessage("Your own account can only be reset on the server console.")
             return
         }
-        val removed = resetAccount(name, "console")
-        sender.sendMessage("User '$name' reset: off $removed ${if (removed == 1) "device" else "devices"}, password and PIN cleared. They set a new PIN at their next login.")
+        val (removed, code) = resetAccount(name, "console")
+        sender.sendMessage(
+            "User '$name' reset: off $removed ${if (removed == 1) "device" else "devices"}, password and PIN cleared. " +
+                "Give them the setup code $code: they type it once with their new PIN at their next login.",
+        )
     }
 
-    /** What `user reset` does, for the console and the app: the number of devices the account is off now. [ip] goes to the audit log. */
-    fun resetAccount(name: String, ip: String): Int {
+    /** What `user reset` does, for the console and the app: the number of devices the account is off now and the setup code it needs to claim a PIN. [ip] goes to the audit log. */
+    fun resetAccount(name: String, ip: String): Pair<Int, String> {
         val user = users.user(name)
+        val (code, codeHash) = hasher.newSetupCode()
         // The device files and the user file are one change for a backup: it must not hold the devices off and the user still with a PIN.
         val removed = barrier.mutate {
             sessions.withAccount(user.id) {
                 val removed = devices.removeAccount(user.id)
-                users.resetCredentials(name)
+                users.resetCredentials(name, codeHash)
                 sessions.revokeAccess(user.id, null)
                 removed
             }
         }
         audit.record("account.reset", name, null, ip, "ok,devices=$removed")
-        return removed
+        return removed to code
     }
 
     /** `user disable`, under the account lock: a login in flight finishes first, and none starts until the account is disabled. */

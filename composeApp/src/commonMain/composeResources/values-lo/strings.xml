@@ -265,6 +265,7 @@
     <string name="reason_pin_length">PIN ຕ້ອງເປັນຕົວເລກລ້ວນ ແລະ ມີຈຳນວນຫຼັກຕາມທີ່ເຊີບເວີກຳນົດ</string>
     <string name="reason_pin_repeated">PIN ຕ້ອງບໍ່ແມ່ນເລກໂຕດຽວຊ້ຳກັນ ເຊັ່ນ 111111</string>
     <string name="reason_pin_not_set">ບັນຊີນີ້ຍັງບໍ່ມີ PIN. ໃຫ້ຕັ້ງ PIN ໃໝ່.</string>
+    <string name="reason_setup_code">ລະຫັດຕັ້ງຄ່າບໍ່ຖືກຕ້ອງ ຫຼື ຍັງບໍ່ໄດ້ປ້ອນ. ຂໍລະຫັດຕັ້ງຄ່າຈາກເຈົ້າຂອງຮ້ານ.</string>
     <string name="reason_pin_sequence">PIN ຕ້ອງບໍ່ແມ່ນເລກລຽງກັນ ເຊັ່ນ 123456</string>
     <string name="reason_password_required">ກະລຸນາໃສ່ລະຫັດຜ່ານ</string>
     <string name="reason_password_short">ລະຫັດຜ່ານສັ້ນເກີນໄປ</string>
@@ -381,6 +382,9 @@
     <string name="err_other_server">ຕອນນີ້ມີເຊີບເວີອື່ນຕອບຢູ່ທີ່ຢູ່ນີ້. ກວດເບິ່ງທີ່ຢູ່, ຫຼື ເພີ່ມເປັນເຊີບເວີໃໝ່.</string>
     <string name="login_title">ເຂົ້າສູ່ລະບົບ</string>
     <string name="login_submit">ເຂົ້າສູ່ລະບົບ</string>
+    <string name="setup_code_label">ລະຫັດຕັ້ງຄ່າ (ຈາກເຈົ້າຂອງຮ້ານ)</string>
+    <string name="manage_code_give">ໃຫ້ລະຫັດນີ້ແກ່ %1$s. ພິມເທື່ອດຽວພ້ອມກັບ PIN ໃໝ່.</string>
+    <string name="manage_code_done">ສຳເລັດ</string>
     <string name="login_set_pin">ບັນຊີນີ້ຍັງບໍ່ມີ PIN. ໃຫ້ຕັ້ງ PIN ໃໝ່.</string>
     <string name="err_pin_digits">PIN ຕ້ອງເປັນຕົວເລກ 4 ຫາ 12 ຫຼັກ.</string>
     <string name="err_pin_exact">PIN ຕ້ອງເປັນຕົວເລກ %1$d ຫຼັກພໍດີ</string>
@@ -425,7 +429,7 @@
     <string name="manage_add">ເພີ່ມ</string>
     <string name="manage_rename">ປ່ຽນຊື່</string>
     <string name="manage_staff_add">ເພີ່ມພະນັກງານ</string>
-    <string name="manage_staff_hint">ຄົນໃໝ່ຕັ້ງ PIN ຂອງຕົນເອງເມື່ອເຂົ້າສູ່ລະບົບເທື່ອທຳອິດ</string>
+    <string name="manage_staff_hint">ຄົນໃໝ່ໄດ້ຮັບລະຫັດຕັ້ງຄ່າ ພິມເທື່ອດຽວພ້ອມຕັ້ງ PIN ຂອງຕົນເມື່ອເຂົ້າສູ່ລະບົບເທື່ອທຳອິດ</string>
     <string name="manage_role">ບົດບາດ</string>
     <string name="manage_role_none">ບໍ່ມີບົດບາດ</string>
     <string name="manage_admin">ຜູ້ດູແລ</string>
@@ -436,7 +440,7 @@
     <string name="manage_unlock">ປົດລັອກ</string>
     <string name="manage_reset">ຣີເຊັດ PIN</string>
     <string name="manage_reset_ask">ຣີເຊັດ PIN ຂອງ %1$s ບໍ</string>
-    <string name="manage_reset_body">%1$s ຈະຖືກອອກຈາກລະບົບທຸກອຸປະກອນ ແລະ ຕັ້ງ PIN ໃໝ່ເມື່ອເຂົ້າສູ່ລະບົບຄັ້ງຕໍ່ໄປ</string>
+    <string name="manage_reset_body">%1$s ຈະຖືກອອກຈາກລະບົບທຸກອຸປະກອນ ແລະ ໄດ້ລະຫັດຕັ້ງຄ່າໃໝ່ເພື່ອຕັ້ງ PIN ໃໝ່ເມື່ອເຂົ້າສູ່ລະບົບຄັ້ງຕໍ່ໄປ</string>
     <string name="manage_reset_yes">ແມ່ນ, ຣີເຊັດເລີຍ</string>
     <string name="manage_branch_add">ເພີ່ມສາຂາ</string>
     <string name="manage_branch_name">ຊື່ສາຂາ</string>
