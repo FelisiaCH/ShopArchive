@@ -308,20 +308,27 @@ class SessionsApiTest {
     }
 
     @Test
-    fun theCountOfAClosedDayIsOnlyForWhoMayCloseTheDayOrSeeTheDashboard() = env().run {
+    fun expectedVarianceAndNoteOfAClosedDayAreOnlyForWhoMayCloseTheDayOrSeeTheDashboard() = env().run {
         val lead = login("lead", grant = closer)
         val viewer = login("viewer", grant = listOf(DASHBOARD_VIEW_NODE))
         val noy = login("noy")
         api {
-            val day = openDay(lead)
-            closeDay(lead, day, mapOf("LAK" to "50000"))
-            suspend fun read(token: String) = getPath("/api/v1/sessions/main", token).parsed(ListSerializer(SessionDto.serializer())).single()
+            val day = openDay(lead, float = mapOf("LAK" to "1000"))
+            closeDay(lead, day, mapOf("LAK" to "900"), note = "short")
+            suspend fun read(token: String) = getPath("/api/v1/sessions/main", token).parsed(ListSerializer(SessionDto.serializer())).single().close!!
 
-            assertNotNull(read(lead).close)
-            assertNotNull(read(viewer).close)
+            val full = read(lead)
+            assertEquals("900", full.counted["LAK"])
+            assertEquals("1000", full.expected["LAK"])
+            assertEquals("-100", full.variance["LAK"])
+            assertEquals("short", full.note)
+            assertEquals(full, read(viewer))
             val seen = read(noy)
-            assertEquals(SessionStatus.CLOSED, seen.status, "the day is still known to be closed")
-            assertNull(seen.close, "the drawer's count is not for a user without either node")
+            assertEquals(full.counted, seen.counted, "the next opening starts from what was kept")
+            assertEquals(full.handover, seen.handover)
+            assertEquals(emptyMap(), seen.expected)
+            assertEquals(emptyMap(), seen.variance)
+            assertEquals("", seen.note)
         }
     }
 
