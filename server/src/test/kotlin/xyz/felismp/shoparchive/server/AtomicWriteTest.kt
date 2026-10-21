@@ -1,8 +1,12 @@
 package xyz.felismp.shoparchive.server
 
 import org.junit.jupiter.api.io.TempDir
+import xyz.felismp.shoparchive.server.records.FileOps
+import xyz.felismp.shoparchive.server.records.RetryPolicy
+import java.nio.file.AccessDeniedException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -39,6 +43,22 @@ class AtomicWriteTest {
         writeAtomically(dir.resolve("a.txt"), "ok".toByteArray())
 
         assertEquals("ok", Files.readString(dir.resolve("a.txt")))
+        assertFalse(Files.exists(dir.resolve("a.txt.tmp")))
+    }
+
+    @Test
+    fun aRenameTheSystemRefusesForAMomentIsTriedAgain() {
+        val file = dir.resolve("a.txt")
+        var calls = 0
+        val files = FileOps(RetryPolicy(enabled = true, sleep = {}), move = { from, to ->
+            if (++calls <= 3) throw AccessDeniedException(to.toString())
+            Files.move(from, to, StandardCopyOption.ATOMIC_MOVE)
+        })
+
+        writeAtomically(file, "ok".toByteArray(), files)
+
+        assertEquals(4, calls)
+        assertEquals("ok", Files.readString(file))
         assertFalse(Files.exists(dir.resolve("a.txt.tmp")))
     }
 }

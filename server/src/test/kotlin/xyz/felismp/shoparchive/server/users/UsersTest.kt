@@ -27,6 +27,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -666,5 +667,36 @@ class UsersTest {
         assertEquals("rwx------", mode("user"))
         assertEquals("rwx------", mode("user/role"))
         for (file in listOf("user/noy.yml", "user/role/cashier.yml", "user/permissions.txt")) assertEquals("rw-------", mode(file), file)
+    }
+
+    /** Makes writing [relative] fail on every OS: the temp name the atomic write needs is taken by a folder that is not empty. */
+    private fun blockWrites(relative: String) {
+        Files.createDirectories(root.resolve("$relative.tmp"))
+        Files.writeString(root.resolve("$relative.tmp/x"), "x")
+    }
+
+    @Test
+    fun aFailedWriteLeavesTheUserAndRoleInMemoryAsTheyWere() {
+        store.addRole("cashier")
+        store.addUser("noy", "none", emptyList())
+        val id = store.user("noy").id
+        val before = store.user("noy")
+        val roleBefore = store.role("cashier")
+
+        blockWrites("user/noy.yml")
+        assertFailsWith<Exception> { store.replacePin(id, "new-pin-hash") }
+        assertEquals(before, store.user("noy"))
+
+        blockWrites("user/bob.yml")
+        assertFailsWith<Exception> { store.addUser("bob", "none", emptyList()) }
+        assertEquals(null, store.find("bob"))
+
+        blockWrites("user/role/cashier.yml")
+        assertFailsWith<Exception> { store.setRolePermission("cashier", "test.edit", true) }
+        assertEquals(roleBefore, store.role("cashier"))
+
+        blockWrites("user/role/clerk.yml")
+        assertFailsWith<Exception> { store.addRole("clerk") }
+        assertFailsWith<UserException> { store.role("clerk") }
     }
 }

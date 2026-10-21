@@ -158,8 +158,8 @@ internal class UserStore(
             permissions = roleData?.permissions ?: defaults(),
             newNodes = roleData?.newNodes ?: emptySet(),
         )
-        users[name] = data
         writeUser(name, data)
+        users[name] = data
     }
 
     fun addRole(name: String) = barrier.mutate { addRoleInLock(name) }
@@ -169,8 +169,8 @@ internal class UserStore(
         checkRoleName(name)
         if (name in roles || Files.exists(rolePath(name))) throw UserException("Role '$name' already exists")
         val data = RoleData(name, defaults())
-        roles[name] = data
         writeRole(name, data)
+        roles[name] = data
     }
 
     /** Enabling forgets the wrong tries; disabling by hand records that the admin did it, so `user unlock` leaves it alone. */
@@ -301,8 +301,8 @@ internal class UserStore(
         checkNode(node)
         val role = freshRole(roleName)
         val changed = role.copy(permissions = role.permissions + (node to value), newNodes = role.newNodes - node)
-        roles[roleName] = changed
         writeRole(roleName, changed)
+        roles[roleName] = changed
         return usersWithRole(roleName).also { members -> members.forEach { member -> editUser(member) { it } } }
     }
 
@@ -443,8 +443,8 @@ internal class UserStore(
         val changed = change(current).let { data ->
             roles[data.role]?.let { data.copy(permissions = it.permissions, newNodes = it.newNodes) } ?: data
         }
-        users[name] = changed
         writeUser(name, changed)
+        users[name] = changed
         return changed
     }
 
