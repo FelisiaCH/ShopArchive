@@ -3,8 +3,8 @@ package xyz.felismp.shoparchive.app.flow
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
-import com.google.zxing.NotFoundException
 import com.google.zxing.RGBLuminanceSource
+import com.google.zxing.ReaderException
 import com.google.zxing.common.HybridBinarizer
 import com.google.zxing.qrcode.QRCodeReader
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +31,7 @@ private fun readQr(jpeg: ByteArray): String? {
     val hints = mapOf(DecodeHintType.TRY_HARDER to true, DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE))
     return try {
         QRCodeReader().decode(bitmap, hints).text.trim().takeIf { it.isNotEmpty() }
-    } catch (_: NotFoundException) {
+    } catch (_: ReaderException) { // not found, or found but unreadable: the OCR text is still worth keeping
         null
     }
 }
@@ -79,7 +79,7 @@ private fun readTextWithWindowsOcr(jpeg: ByteArray): String? {
         process.outputStream.close()
         val out = CompletableFuture.supplyAsync { process.inputStream.readBytes() } // drained while we wait, so a full pipe cannot stall the process
         if (!process.waitFor(20, TimeUnit.SECONDS)) {
-            process.destroyForcibly()
+            process.destroyForcibly().waitFor(5, TimeUnit.SECONDS) // let it release the image before finally deletes it
             return null
         }
         if (process.exitValue() != 0) return null
