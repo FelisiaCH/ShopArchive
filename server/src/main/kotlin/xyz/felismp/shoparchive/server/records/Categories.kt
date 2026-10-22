@@ -89,6 +89,8 @@ internal class CategoryStore(private val files: DataFileStore<List<Category>>) {
         if (!isSlug(key)) throw badRequest("A category key is 1 to 32 characters from a-z, 0-9 and -.", ErrorReasons.KEY_INVALID)
         val category = Category(key, cleanName(name), appliesTo, archived = false)
         files.update { list ->
+            // The same add again (its answer was lost, so the app sends it once more) gets the category it made, not a conflict.
+            if (category in list) return@update list
             if (list.any { it.key == key }) throw conflict("A category '$key' exists already.", ErrorReasons.KEY_EXISTS)
             list + category
         }

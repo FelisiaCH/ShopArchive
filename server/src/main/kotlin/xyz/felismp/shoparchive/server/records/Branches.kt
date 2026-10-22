@@ -80,6 +80,8 @@ internal class BranchStore(private val files: DataFileStore<List<Branch>>) {
         if (name.isEmpty()) throw badRequest("A branch needs a display name.", ErrorReasons.NAME_REQUIRED)
         val branch = Branch(key, name, archived = false)
         files.update { list ->
+            // The same add again (its answer was lost, so the app sends it once more) gets the branch it made, not a conflict.
+            if (branch in list) return@update list
             if (list.any { it.key == key }) throw conflict("A branch '$key' exists already.", ErrorReasons.KEY_EXISTS)
             list + branch
         }
