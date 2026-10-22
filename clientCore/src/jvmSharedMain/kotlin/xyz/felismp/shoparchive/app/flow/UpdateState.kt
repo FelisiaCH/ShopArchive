@@ -85,12 +85,15 @@ class UpdateState(
         if (!busy()) _ui.value = UpdateUi.Idle
     }
 
-    /** Downloads the offered file (a file already here that matches is not fetched again), checks it and starts the installer. */
+    /**
+     * Downloads the offered file (a file already here that matches is not fetched again), checks it and starts the installer.
+     * After a damaged download it asks the server again instead: the file may have been replaced since it was listed, and the old size and hash would never match.
+     */
     override fun install() {
         val file = when (val now = _ui.value) {
             is UpdateUi.Available -> now.file
             is UpdateUi.NeedsPermission -> now.file
-            is UpdateUi.Failed -> now.file
+            is UpdateUi.Failed -> if (now.problem == UpdateProblem.Damaged) return check(manual = true) else now.file
             else -> null
         } ?: return
         install(file)
