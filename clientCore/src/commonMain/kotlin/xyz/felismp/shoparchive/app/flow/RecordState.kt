@@ -533,7 +533,8 @@ class RecordState(
             } catch (e: Exception) {
                 // A refusal means nothing was recorded. A lost connection (or anything else unexpected) after sending may mean it was.
                 val unknown = e !is ClientError.Api && (e is ClientError.Unreachable || e !is ClientError)
-                if (!unknown) onPending(null)
+                // A session that ended (the app locks) keeps it too: nothing was recorded, and the same user's unlock sends it again.
+                if (!unknown && e !is ClientError.Locked) onPending(null)
                 inner.update { it.copy(phase = if (unknown) SavePhase.Unknown(e.toFailure()) else SavePhase.Failed(e.toFailure()), sent = if (unknown) sent else null) }
                 // A bank answer that came while saving could not change the draft then.
                 if (!unknown) {

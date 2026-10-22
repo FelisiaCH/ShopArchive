@@ -1843,6 +1843,22 @@ class AppFlowTest {
         assertEquals(listOf(id, id), api.records.created.map { it.first.id })
     }
 
+    @Test fun aSaveRefusedBecauseTheSessionEndedIsSentAgainAfterTheUnlock() {
+        val f = savedFlow()
+        f.unlock("483926")
+        api.records.createFails = { ClientError.Locked() } // the token was gone: nothing was recorded, and the app locks
+        val id = f.workspace!!.record.run {
+            setAmount(ui.value.draft.tenders.first().key, "1500")
+            save()
+            ui.value.draft.id
+        }
+        assertIs<AppState.Locked>(f.state.value)
+        api.records.createFails = { null }
+        f.unlock("483926")
+        assertEquals(id, assertIs<SavePhase.Saved>(f.workspace!!.record.ui.value.phase).entry.id)
+        assertNull(outbox.read("sid-1", "alice\ncred"))
+    }
+
     @Test fun aDiscardedSaveDoesNotComeBackFromAFileThatCouldNotBeRemoved() {
         val sticky = object : xyz.felismp.shoparchive.app.client.OutboxStore {
             override fun read(serverId: String, user: String) = outbox.read(serverId, user)
