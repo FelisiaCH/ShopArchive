@@ -95,6 +95,8 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
     var wsFails = false
     /** Makes the next socket find the session gone (the server restarted and forgot the token). */
     var wsLocked = false
+    /** Thrown by the next sockets, e.g. a key that is not the trusted one. */
+    var wsFailure: Exception? = null
     /** Like [wsLocked], for the next socket only; the token is forgotten as the real client does. */
     var wsLockedOnce = false
     /** Set to make the next open socket end when this completes (once). */
@@ -183,6 +185,7 @@ private class FakeApi(val records: FakeRecordsApi = FakeRecordsApi()) : ServerAp
     override suspend fun webSocketSession(onOpen: () -> Unit, onText: (String) -> Unit) {
         if (wsFails) throw ClientError.Unreachable()
         if (wsLocked) throw ClientError.Locked()
+        wsFailure?.let { throw it }
         if (wsLockedOnce) { wsLockedOnce = false; token = false; throw ClientError.Locked() }
         reach()
         this.onOpen = onOpen; this.onText = onText; onOpen()
@@ -1843,6 +1846,16 @@ class AppFlowTest {
         drop.complete(Unit)
         awaitTrue("the lock screen") { f.state.value is AppState.Locked } // the live loop waits a second before trying again
         assertEquals(Problem.SessionEnded, assertIs<AppState.Locked>(f.state.value).problem)
+        assertFalse(f.canWrite.value)
+    }
+
+    @Test fun aSocketThatMeetsAnotherKeyShowsTheCertificateChangedScreen() {
+        val f = lockedFlow()
+        f.unlock("483926")
+        val drop = CompletableDeferred<Unit>().also { api.dropSocket = it }
+        api.wsFailure = ClientError.PinMismatch(null, "192.168.1.2:8443") // the reconnect meets a key this device does not trust
+        drop.complete(Unit)
+        awaitTrue("the certificate screen") { f.state.value is AppState.CertChanged }
         assertFalse(f.canWrite.value)
     }
 
