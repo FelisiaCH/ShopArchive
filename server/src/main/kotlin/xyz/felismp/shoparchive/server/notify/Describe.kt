@@ -76,7 +76,9 @@ private fun dayFields(event: DayClosedEvent, locale: Locale): Map<String, String
     val close = event.session.close
     // A currency that stayed at 0 all day says nothing; when every one did, the first still shows the day's 0.
     val shown = event.currencies.filterNot { it.allZero() }.ifEmpty { event.currencies.take(1) }
-    fun each(value: (CurrencyDay) -> String) = shown.joinToString("; ") { "${it.currency} ${groupThousands(value(it), locale)}" }
+    // Each figure also leaves out the currencies at 0 in it, so a phone shows a short line; when all are 0, the first says 0.
+    fun each(value: (CurrencyDay) -> String) = shown.filter { BigDecimal(value(it)).signum() != 0 }.ifEmpty { shown.take(1) }
+        .joinToString("; ") { "${it.currency} ${groupThousands(value(it), locale)}" }
     val fields = linkedMapOf(
         "type" to ShopEventTypes.DAY_CLOSED,
         "category" to "",
