@@ -1833,9 +1833,38 @@ class AppFlowTest {
         f.unlock("483926")
         val id = f.saveWithLostAnswer()
         f.lockNow()
+        api.wsFails = true // unlocked again, but locked once more before the resend could go
+        f.unlock("483926")
+        assertIs<SavePhase.Unknown>(f.workspace!!.record.ui.value.phase)
+        f.lockNow()
+        api.wsFails = false
         f.unlock("483926")
         assertEquals(id, assertIs<SavePhase.Saved>(f.workspace!!.record.ui.value.phase).entry.id)
         assertEquals(listOf(id, id), api.records.created.map { it.first.id })
+    }
+
+    @Test fun aDiscardedSaveDoesNotComeBackFromAFileThatCouldNotBeRemoved() {
+        val sticky = object : xyz.felismp.shoparchive.app.client.OutboxStore {
+            override fun read(serverId: String, user: String) = outbox.read(serverId, user)
+            override fun write(serverId: String, user: String, text: String?) = if (text == null) error("cannot remove") else outbox.write(serverId, user, text)
+            override fun removeServer(serverId: String) = outbox.removeServer(serverId)
+        }
+        store.stored = storedAlice()
+        api.records.configBranches = listOf("main")
+        api.records.current = api.records.session("s1")
+        api.currencies = listOf(LAK)
+        val f = AppFlow(
+            scope, store, ThisDevice("Test PC", "windows"),
+            connect = { _, _, eps -> api.also { it.endpoints = eps } }, probe = { PIN_FP },
+            prefs = prefs, now = { clock }, io = Dispatchers.Unconfined, discovery = discovery, outbox = sticky,
+        )
+        f.unlock("483926")
+        f.saveWithLostAnswer()
+        f.workspace!!.record.discardDraft()
+        f.lockNow()
+        f.unlock("483926")
+        assertIs<SavePhase.Editing>(f.workspace!!.record.ui.value.phase)
+        assertEquals(1, api.records.created.size)
     }
 
     @Test fun theBranchChosenIsRememberedOnThisDeviceAndTheLanguageIsKept() {

@@ -107,8 +107,9 @@ class AppFlow(
     /** Where a save with no answer yet is kept on disk; the default keeps it only while the app runs. */
     private val outbox: OutboxStore = MemoryOutboxStore(),
 ) {
-    // A mirror of the outbox, so a disk that cannot be written still keeps a save over a lock; keyed like the outbox.
-    private val pendingSaves = mutableMapOf<Pair<String, String>, PendingSave>()
+    // A mirror of the outbox, keyed like it, kept until the answer is known: a disk that cannot be written still keeps a save over any number of locks,
+    // and a key set to null (the answer came, or the draft was dropped) wins over a file that could not be removed.
+    private val pendingSaves = mutableMapOf<Pair<String, String>, PendingSave?>()
 
     private val _state = MutableStateFlow<AppState>(AppState.Starting)
     val state: StateFlow<AppState> = _state.asStateFlow()
@@ -780,9 +781,10 @@ class AppFlow(
             saveBranch = ::saveBranch, compressor = compressor, reader = reader,
             today = { Instant.fromEpochMilliseconds(now()).toLocalDateTime(TimeZone.currentSystemDefault()).date }, now = now,
             updatesFactory = updatesFactory, language = { language.value ?: systemLanguage() },
-            restored = pendingSaves.remove(opened.serverId to owner) ?: try { pendingSaveFrom(outbox.read(opened.serverId, owner)) } catch (_: Exception) { null },
+            restored = if ((opened.serverId to owner) in pendingSaves) pendingSaves[opened.serverId to owner]
+            else try { pendingSaveFrom(outbox.read(opened.serverId, owner)) } catch (_: Exception) { null },
             onPending = { p ->
-                if (p == null) pendingSaves.remove(opened.serverId to owner) else pendingSaves[opened.serverId to owner] = p
+                pendingSaves[opened.serverId to owner] = p
                 // A failed write must not stop the save: the memory copy still holds it over a lock.
                 try { outbox.write(opened.serverId, owner, p?.toText()) } catch (_: Exception) { }
             },
