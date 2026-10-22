@@ -33,6 +33,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /** The console in the app: `POST /api/v1/command` and `/command/complete`. */
 class CommandServiceTest {
@@ -200,13 +201,19 @@ class CommandServiceTest {
     }
 
     @Test
-    fun theCommandsThatManageAccountsNeedAnOpWhateverNodeTheUserHolds() = env().run {
+    fun theCommandsThatManageAccountsAndPluginsNeedAnOpWhateverNodeTheUserHolds() = env().run {
         val owner = login("owner", op = true)
-        val noy = login("noy", grant = listOf("user", "perm", "role", "devices").map { "shoparchive.command.$it" })
+        val noy = login("noy", grant = listOf("user", "perm", "role", "devices", "plugins").map { "shoparchive.command.$it" })
         addUser("mali")
+        commands.register(object : Command { // the real one needs the plugin manager; the name is what the check looks at
+            override val name = "plugins"
+            override val description = "Stands in for the plugins command"
+            override val permission = "shoparchive.command.plugins"
+            override fun execute(sender: CommandSender, args: List<String>) = fail("a non-op ran plugins")
+        }, "test")
         api {
             val before = filesUnder("data").filterKeys { "audit" !in it }
-            for (line in listOf("user reset owner", "user disable owner", "perm noy shoparchive.command.stop true", "role list", "devices list owner")) {
+            for (line in listOf("user reset owner", "user disable owner", "perm noy shoparchive.command.stop true", "role list", "devices list owner", "plugins approve Telegram")) {
                 val refused = runLine(line, noy)
                 assertEquals(HttpStatusCode.Forbidden, refused.status, line)
                 assertEquals(ErrorReasons.PERMISSION_MISSING, refused.errorReason(), line)
