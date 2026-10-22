@@ -116,6 +116,21 @@ class UpdateStateTest {
     }
 
     @Test
+    fun aRetryAfterADamagedDownloadAsksTheServerAgainSoAReplacedFileInstalls() {
+        val api = FakeApi(listOf(file("ShopArchive-1.2.0.apk", "1.2.0"))).apply { send = { "rebuilt".toByteArray() } } // replaced after it was listed
+        val updater = FakeUpdater()
+        val s = state(api, updater, checkNow = true)
+        s.install()
+        assertEquals(UpdateProblem.Damaged, assertIs<UpdateUi.Failed>(s.ui.value).problem)
+
+        api.listed = listOf(file("ShopArchive-1.2.0.apk", "1.2.0", content = "rebuilt".toByteArray()))
+        s.install()
+        assertIs<UpdateUi.Available>(s.ui.value)
+        s.install()
+        assertEquals("rebuilt", Files.readString(updater.installed.single()))
+    }
+
+    @Test
     fun aRefusedPermissionKeepsTheDownloadAndTheNextInstallDoesNotFetchAgain() {
         val api = FakeApi(listOf(file("ShopArchive-1.2.0.apk", "1.2.0")))
         val updater = FakeUpdater(answer = Install.NeedsPermission)
