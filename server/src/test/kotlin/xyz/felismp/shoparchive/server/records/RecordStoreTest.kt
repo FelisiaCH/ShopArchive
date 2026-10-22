@@ -138,6 +138,22 @@ class RecordStoreTest {
     }
 
     @Test
+    fun aMoveWhoseFolderFsyncFailsAfterTheRenameKeepsTheNewDate() {
+        var failSync = false
+        val files = FileOps(RetryPolicy(enabled = false), syncDirectory = { if (failSync) throw java.io.IOException("fsync") })
+        val store = store(files)
+        val e = create(store)
+        val moved = e.copy(date = LocalDate.of(2026, 10, 1))
+        failSync = true
+
+        assertFailsWith<java.io.IOException> { store.move(e, moved, history("move")) }
+
+        assertTrue(Files.exists(dir(moved).resolve("entry.yml")))
+        assertEquals(moved, store.find(e.id), "memory follows the folder, so a retry does not look for it on the old date")
+        assertEquals(moved, store().also { it.load() }.find(e.id))
+    }
+
+    @Test
     fun theNextSlipNumberSkipsSlipsThatWereTakenOffTheEntryButStayOnDisk() {
         val store = store()
         val jpg = jpeg()

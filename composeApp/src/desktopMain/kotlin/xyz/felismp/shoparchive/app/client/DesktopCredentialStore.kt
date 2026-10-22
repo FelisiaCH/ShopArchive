@@ -1,9 +1,11 @@
 package xyz.felismp.shoparchive.app.client
 
 import com.sun.jna.platform.win32.Crypt32Util
+import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.PosixFilePermissions
 
 actual abstract class PlatformContext
@@ -65,6 +67,7 @@ class DesktopCredentialStore(private val dir: Path, private val protector: Prote
             Files.createFile(tmp) // not POSIX (Windows): DPAPI protects the content instead
         }
         Files.write(tmp, protector.protect(servers.encode()))
+        FileChannel.open(tmp, StandardOpenOption.WRITE).use { it.force(true) }
         Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     }
 

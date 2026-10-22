@@ -163,15 +163,16 @@ internal class RecordStore(
         try {
             files.createDirectories(to.parent, upTo = root)
             files.rename(from, to)
-            files.fsync(from.parent)
-            files.fsync(to.parent)
         } catch (e: Exception) {
             // The file says the new date but the folder is still on the old one; put the old file back so the two agree.
             runCatching { files.writeAtomic(from.resolve("entry.yml"), oldFile) }.onFailure { log.error("entry ${old.id}: could not undo a move to ${updated.date}: ${it.message}; the entry is broken until its folder and date agree") }
             throw e
         }
+        // The folder is on the new date now: memory follows it before the fsyncs, which can still throw.
         writeSnapshot(updated.id, entryBytes)
         hold(updated)
+        files.fsync(from.parent)
+        files.fsync(to.parent)
         updated
     }
 
