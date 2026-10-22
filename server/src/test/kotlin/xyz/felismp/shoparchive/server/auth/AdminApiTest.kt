@@ -542,7 +542,8 @@ class AdminApiTest {
             assertEquals(ErrorReasons.KEY_INVALID, category("Bad Key", name))
             assertEquals(ErrorReasons.NAME_REQUIRED, category("supplies", name.copy(th = "")))
             assertEquals(HttpStatusCode.Created, postJson("/api/v1/categories", CreateCategoryRequest.serializer(), CreateCategoryRequest("supplies", name, AppliesTo.BOTH), manager).status)
-            assertEquals(ErrorReasons.KEY_EXISTS, category("supplies", name))
+            assertEquals(HttpStatusCode.Created, postJson("/api/v1/categories", CreateCategoryRequest.serializer(), CreateCategoryRequest("supplies", name, AppliesTo.BOTH), manager).status, "the same add again, as after a lost answer")
+            assertEquals(ErrorReasons.KEY_EXISTS, category("supplies", name.copy(en = "Other")))
             assertEquals(ErrorReasons.ENTRY_CATEGORY_UNKNOWN, reason(putJson("/api/v1/categories/ghost", UpdateCategoryRequest.serializer(), UpdateCategoryRequest(archived = true), manager)))
         }
     }

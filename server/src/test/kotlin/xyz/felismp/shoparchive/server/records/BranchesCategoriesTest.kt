@@ -77,6 +77,7 @@ class BranchesCategoriesTest {
         console("branch add main Main")
 
         assertEquals(listOf("A branch 'main' exists already."), console("branch add main Again"))
+        assertEquals(listOf("Branch 'main' added: Main"), console("branch add main Main"), "the same add again, as after a lost answer, is the branch it made")
         assertEquals(listOf("A branch key is 1 to 32 characters from a-z, 0-9 and -."), console("branch add Bad_Key Name"))
         assertEquals(listOf("No branch 'ghost'."), console("branch archive ghost"))
         assertTrue(console("branch add").single().startsWith("Usage: branch add"))
