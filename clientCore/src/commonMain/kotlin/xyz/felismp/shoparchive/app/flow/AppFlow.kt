@@ -107,6 +107,9 @@ class AppFlow(
     /** Where a save with no answer yet is kept on disk; the default keeps it only while the app runs. */
     private val outbox: OutboxStore = MemoryOutboxStore(),
 ) {
+    // A mirror of the outbox, so a disk that cannot be written still keeps a save over a lock; keyed like the outbox.
+    private val pendingSaves = mutableMapOf<Pair<String, String>, PendingSave>()
+
     private val _state = MutableStateFlow<AppState>(AppState.Starting)
     val state: StateFlow<AppState> = _state.asStateFlow()
 
@@ -768,6 +771,8 @@ class AppFlow(
                 savePolicy(policy)
             },
         )
+        // Who the save belongs to: a new account with a reused name has another credential and must not send it.
+        val owner = username + "\n" + (stored?.users?.firstOrNull { it.username == username }?.credential ?: "")
         workspace = Workspace(
             sessionScope, opened.api, calls, canWrite, connection.refetch, connection.messages,
             onConfig = { saveEndpoints(opened.api, it.endpoints); savePolicy(it.auth) },
@@ -775,9 +780,12 @@ class AppFlow(
             saveBranch = ::saveBranch, compressor = compressor, reader = reader,
             today = { Instant.fromEpochMilliseconds(now()).toLocalDateTime(TimeZone.currentSystemDefault()).date }, now = now,
             updatesFactory = updatesFactory, language = { language.value ?: systemLanguage() },
-            restored = try { pendingSaveFrom(outbox.read(opened.serverId, username)) } catch (_: Exception) { null },
-            // A failed write must not stop the save: the entry is then no worse off than before the outbox existed.
-            onPending = { p -> try { outbox.write(opened.serverId, username, p?.toText()) } catch (_: Exception) { } },
+            restored = pendingSaves.remove(opened.serverId to owner) ?: try { pendingSaveFrom(outbox.read(opened.serverId, owner)) } catch (_: Exception) { null },
+            onPending = { p ->
+                if (p == null) pendingSaves.remove(opened.serverId to owner) else pendingSaves[opened.serverId to owner] = p
+                // A failed write must not stop the save: the memory copy still holds it over a lock.
+                try { outbox.write(opened.serverId, owner, p?.toText()) } catch (_: Exception) { }
+            },
         )
     }
 
@@ -1084,6 +1092,7 @@ class AppFlow(
         val next = StoredServers(all.servers.filter { it.serverId != serverId }, all.lastServerId.takeIf { it != serverId })
         // The last server takes the file with it.
         if (next.servers.isEmpty()) store.clear() else store.save(next)
+        pendingSaves.keys.removeAll { it.first == serverId }
         if (serverId != null) try { outbox.removeServer(serverId) } catch (_: Exception) { }
         all = next
         stored = null
