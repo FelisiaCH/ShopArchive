@@ -27,10 +27,10 @@ private val APP_COMMANDS = listOf(
 internal val CONSOLE_ONLY_COMMANDS = emptySet<String>()
 
 /**
- * What manages accounts, roles, devices and who is an admin is not for anyone but an op, whatever node they hold: with `user reset`,
- * `perm` or `op` a user would become the op. Like every command from the app, these need the PIN or password entered recently.
+ * What manages accounts, roles, devices, plugins and who is an admin is not for anyone but an op, whatever node they hold: with `user reset`,
+ * `perm`, `op` or `plugins approve` (a plugin runs as the server) a user would become the op. Like every command from the app, these need the PIN or password entered recently.
  */
-internal val OP_ONLY_COMMANDS = setOf("user", "perm", "role", "devices", "op", "deop")
+internal val OP_ONLY_COMMANDS = setOf("user", "perm", "role", "devices", "op", "deop", "plugins")
 
 /** At most this many characters of a line go into the audit log. */
 private const val AUDITED_CHARS = 200
