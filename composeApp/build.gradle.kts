@@ -87,6 +87,7 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.swing)
                 implementation(libs.jna.platform)
                 implementation(libs.jmdns)
+                implementation(libs.zxing.core)
             }
         }
     }
