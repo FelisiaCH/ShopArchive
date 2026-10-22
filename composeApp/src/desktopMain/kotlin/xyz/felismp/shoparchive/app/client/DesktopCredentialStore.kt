@@ -27,6 +27,8 @@ actual fun createCredentialStore(context: PlatformContext): CredentialStore =
 
 actual fun createPreferencesStore(context: PlatformContext): PreferencesStore = FilePreferencesStore(appDir().resolve("preferences.json").toFile())
 
+actual fun createOutboxStore(context: PlatformContext): OutboxStore = FileOutboxStore(appDir().resolve("outbox").toFile())
+
 /** Turns the credentials into the bytes that go to disk and back. */
 interface Protector {
     fun protect(data: ByteArray): ByteArray

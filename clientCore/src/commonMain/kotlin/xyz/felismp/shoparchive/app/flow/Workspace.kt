@@ -46,6 +46,8 @@ class Workspace(
     language: () -> String = { "en" },
     /** A save with an unknown result from before the last lock of this user; it is sent again. */
     restored: PendingSave? = null,
+    /** See [RecordState]. */
+    onPending: (PendingSave?) -> Unit = {},
 ) {
     private val _config = MutableStateFlow<ConfigState>(ConfigState.Loading)
     val config: StateFlow<ConfigState> = _config.asStateFlow()
@@ -65,7 +67,7 @@ class Workspace(
     private val env = Env(scope, api, calls, canWrite, config, branch, refetch, messages, today, now, language)
     val today = TodayState(env)
     val openDay = OpenDayState(env, this.today)
-    val record = RecordState(env, this.today, compressor, reader, restored)
+    val record = RecordState(env, this.today, compressor, reader, restored, onPending)
     val history = HistoryState(env, compressor, reader)
     val closeDay = CloseDayState(env, this.today)
     val reports = ReportsState(env)

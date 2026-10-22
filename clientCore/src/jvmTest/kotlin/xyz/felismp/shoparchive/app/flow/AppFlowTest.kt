@@ -17,6 +17,7 @@ import xyz.felismp.shoparchive.app.client.ServerApi
 import xyz.felismp.shoparchive.app.client.Preferences
 import xyz.felismp.shoparchive.app.client.PreferencesStore
 import xyz.felismp.shoparchive.app.client.FoundServer
+import xyz.felismp.shoparchive.app.client.MemoryOutboxStore
 import xyz.felismp.shoparchive.app.client.StoredServer
 import xyz.felismp.shoparchive.app.client.StoredServers
 import xyz.felismp.shoparchive.app.client.StoredUser
@@ -205,6 +206,7 @@ class AppFlowTest {
     private var probeResult: () -> String = { PIN_FP }
     private var connected = mutableListOf<Triple<String, String, List<String>>>()
     private val prefs = FakePrefs()
+    private val outbox = MemoryOutboxStore()
     private var clock = 0L
     private val discovery = FakeDiscovery()
     /** What a connection to exactly one candidate address reaches (discovery's probes); any other connect gets [api]. */
@@ -220,6 +222,7 @@ class AppFlowTest {
         io = Dispatchers.Unconfined,
         discovery = discovery,
         updatesFactory = updater?.let { u -> { s, a, c -> UpdateState(s, a, c, u, own) } },
+        outbox = outbox,
     )
 
     // ---- start ----
@@ -1736,6 +1739,68 @@ class AppFlowTest {
         f.login("alice", "483926")
         assertIs<SavePhase.Editing>(f.workspace!!.record.ui.value.phase)
         assertEquals(1, api.records.created.size)
+    }
+
+    // ---- the outbox: a save with no answer yet survives the app being killed ----
+
+    @Test fun aSaveInFlightWhenTheAppIsKilledIsSentAgainWithTheSameIdAfterTheSameUserUnlocks() {
+        val f = savedFlow()
+        f.unlock("483926")
+        api.records.createGate = CompletableDeferred() // the answer never comes: the app dies here
+        f.workspace!!.record.run {
+            setAmount(ui.value.draft.tenders.first().key, "1500")
+            save()
+        }
+        val id = f.workspace!!.record.ui.value.draft.id
+        assertNotNull(outbox.read("sid-1", "alice"), "on the store before the request is answered")
+        api.records.createGate = null
+        val again = flow() // a new process, same store, no lock happened
+        again.unlock("483926")
+        assertEquals(id, assertIs<SavePhase.Saved>(again.workspace!!.record.ui.value.phase).entry.id)
+        assertEquals(listOf(id, id), api.records.created.map { it.first.id })
+        assertEquals(1, api.records.stored.size)
+        assertNull(outbox.read("sid-1", "alice"))
+    }
+
+    @Test fun aSaveThatSucceedsOrIsRefusedForGoodLeavesTheOutboxEmpty() {
+        val f = savedFlow()
+        f.unlock("483926")
+        f.workspace!!.record.run {
+            setAmount(ui.value.draft.tenders.first().key, "1500")
+            save()
+            assertIs<SavePhase.Saved>(ui.value.phase)
+        }
+        assertNull(outbox.read("sid-1", "alice"))
+        api.records.createFails = { ClientError.Api(400, ErrorCode.INVALID_REQUEST, "no") }
+        f.workspace!!.record.run {
+            setAmount(ui.value.draft.tenders.first().key, "700")
+            save()
+            assertIs<SavePhase.Failed>(ui.value.phase)
+        }
+        assertNull(outbox.read("sid-1", "alice"))
+    }
+
+    @Test fun anUnknownSaveStaysInTheOutboxUntilItIsDiscarded() {
+        val f = savedFlow()
+        f.unlock("483926")
+        f.saveWithLostAnswer()
+        assertNotNull(outbox.read("sid-1", "alice"))
+        f.workspace!!.record.discardDraft()
+        assertNull(outbox.read("sid-1", "alice"))
+    }
+
+    @Test fun anotherUserDoesNotGetTheStoredSaveAndRemovingTheServerRemovesIt() {
+        val f = savedFlow(storedShared())
+        f.selectUser("alice"); f.unlock("111111")
+        f.saveWithLostAnswer()
+        f.lockNow()
+        val killed = flow()
+        killed.selectUser("bob"); killed.unlock("222222")
+        assertIs<SavePhase.Editing>(killed.workspace!!.record.ui.value.phase)
+        assertEquals(1, api.records.created.size)
+        assertNotNull(outbox.read("sid-1", "alice"))
+        killed.openSettings(); killed.removeServer()
+        assertNull(outbox.read("sid-1", "alice"))
     }
 
     @Test fun theBranchChosenIsRememberedOnThisDeviceAndTheLanguageIsKept() {
