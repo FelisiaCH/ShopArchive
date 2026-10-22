@@ -27,15 +27,15 @@ class NotifyConfigTest {
 
         assertEquals(listOf("day.closed", "device.new", "entry.created", "note.created"), notify.events)
         assertEquals(30, notify.timeoutSeconds)
-        assertEquals(10, notify.maxAttempts)
+        assertEquals(60, notify.maxAttempts)
         assertEquals(30, notify.backoffBaseSeconds)
         assertEquals(3600, notify.backoffMaxSeconds)
         assertEquals(2, notify.reconcileDays)
         val text = root.text("config/shoparchive.yml")
         val tail = text.substring(text.indexOf("\nnotify:\n"))
         for (line in listOf(
-            "notify:\n", "  events: [day.closed, device.new, entry.created, note.created]\n", "  timeout-seconds: 30\n", "  max-attempts: 10\n", "  backoff:\n",
-            "    base-seconds: 30\n", "    max-seconds: 3600\n", "  reconcile-days: 2\n", "# Allowed: integer from 0 to 31. Default: 2", "# Allowed: integer from 1 to 600. Default: 30", "# Allowed: integer from 1 to 1000. Default: 10",
+            "notify:\n", "  events: [day.closed, device.new, entry.created, note.created]\n", "  timeout-seconds: 30\n", "  max-attempts: 60\n", "  backoff:\n",
+            "    base-seconds: 30\n", "    max-seconds: 3600\n", "  reconcile-days: 2\n", "# Allowed: integer from 0 to 31. Default: 2", "# Allowed: integer from 1 to 600. Default: 30", "# Allowed: integer from 1 to 1000. Default: 60",
             "# The events that put a message into the outbox for the channel plugin: entry.created, day.closed, device.new, note.created.",
         )) assertTrue(line in tail, "missing ${line.trim()} in:\n$tail")
         assertEquals(emptyList(), log.warnings)
@@ -64,7 +64,7 @@ class NotifyConfigTest {
         val notify = loaded("  timeout-seconds: soon\n  max-attempts: lots\n")
 
         assertEquals(30, notify.timeoutSeconds)
-        assertEquals(10, notify.maxAttempts)
+        assertEquals(60, notify.maxAttempts)
         assertEquals(2, log.warningsWith("invalid value").size, log.warnings.toString())
     }
 
@@ -78,7 +78,7 @@ class NotifyConfigTest {
         assertEquals(7, notify.maxAttempts)
         val text = root.text("config/shoparchive.yml")
         assertTrue("config-version: 2" in text && "  events: [day.closed, entry.created, note.created]\n" in text && "  max-attempts: 7\n" in text, text)
-        assertTrue("# Allowed: integer from 1 to 1000. Default: 10" in text, "the comments come back from the template")
+        assertTrue("# Allowed: integer from 1 to 1000. Default: 60" in text, "the comments come back from the template")
         assertEquals(1, root.backups().size)
         assertEquals(emptyList(), log.warnings)
     }
