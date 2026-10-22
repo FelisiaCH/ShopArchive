@@ -1859,6 +1859,16 @@ class AppFlowTest {
         assertNull(outbox.read("sid-1", "alice\ncred"))
     }
 
+    @Test fun aRetryThatMeetsAnotherServerKeyKeepsTheSaveForAfterTheKeyIsTrusted() {
+        val f = savedFlow()
+        f.unlock("483926")
+        f.saveWithLostAnswer()
+        api.records.createFails = { ClientError.PinMismatch(null) }
+        f.workspace!!.record.checkAgain()
+        assertIs<AppState.CertChanged>(f.state.value)
+        assertNotNull(outbox.read("sid-1", "alice\ncred"), "the first try's result is still not known")
+    }
+
     @Test fun aDiscardedSaveDoesNotComeBackFromAFileThatCouldNotBeRemoved() {
         val sticky = object : xyz.felismp.shoparchive.app.client.OutboxStore {
             override fun read(serverId: String, user: String) = outbox.read(serverId, user)

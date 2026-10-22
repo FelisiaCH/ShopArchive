@@ -533,8 +533,9 @@ class RecordState(
             } catch (e: Exception) {
                 // A refusal means nothing was recorded. A lost connection (or anything else unexpected) after sending may mean it was.
                 val unknown = e !is ClientError.Api && (e is ClientError.Unreachable || e !is ClientError)
-                // A session that ended (the app locks) keeps it too: nothing was recorded, and the same user's unlock sends it again.
-                if (!unknown && e !is ClientError.Locked) onPending(null)
+                // Off the disk only when the server refused it or the person cancelled the PIN prompt; an error that ends the session
+                // (locked, another key, another protocol) keeps it for the same user's next unlock, which sends it again.
+                if (e is ClientError.Api || e is ClientError.ReauthCancelled) onPending(null)
                 inner.update { it.copy(phase = if (unknown) SavePhase.Unknown(e.toFailure()) else SavePhase.Failed(e.toFailure()), sent = if (unknown) sent else null) }
                 // A bank answer that came while saving could not change the draft then.
                 if (!unknown) {
