@@ -51,7 +51,7 @@ class AndroidCredentialStore(private val file: File) : CredentialStore {
     override fun save(servers: StoredServers) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, key()) }
         val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeBytes(cipher.iv + cipher.doFinal(servers.encode()))
+        java.io.FileOutputStream(tmp).use { it.write(cipher.iv + cipher.doFinal(servers.encode())); it.fd.sync() }
         check(tmp.renameTo(file)) { "could not replace ${file.name}" }
     }
 
