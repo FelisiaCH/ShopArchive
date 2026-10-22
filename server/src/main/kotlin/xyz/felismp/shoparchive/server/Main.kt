@@ -105,7 +105,7 @@ fun main(args: Array<String>) {
         plugins.loadAll()
     } catch (e: RegistryConflictException) {
         Log.error("Startup failed: ${e.message}")
-        exitProcess(1)
+        failStartup()
     }
     registerAuthNodes(permissions)
     registerRecordNodes(permissions)
@@ -120,7 +120,7 @@ fun main(args: Array<String>) {
         records.loadWithoutHint()
     } catch (e: ConfigFileException) {
         Log.error(e.message ?: "a data file cannot be read")
-        exitProcess(1)
+        failStartup()
     }
     // Registered before the network starts, so it stops after it: a request still being served can finish its write.
     Shutdown.register("records") { records.close() }
@@ -136,6 +136,9 @@ fun main(args: Array<String>) {
     val auth = Auth(root, config, users, services, network::deviceEndpoints, records = records, barrier = barrier, activeBranches = records.branches::activeKeys)
     services.register(CommandService::class.java, DefaultCommandService(commands, auth.audit, services, users), CORE_SERVICE_PRIORITY, "core")
 
+    // Registered after the records and before the network starts, so on a stop the plugins end after the network
+    // has stopped taking requests and before the records are closed; before enableAll, so a failure in it disables those already enabled.
+    Shutdown.register("plugins") { plugins.disableAll() }
     try {
         registerCoreCommands(
             commands, config, mapOf("users" to users::load, "devices" to auth.devices::load, "data" to records::loadData),
@@ -153,13 +156,10 @@ fun main(args: Array<String>) {
         plugins.enableAll()
     } catch (e: RegistryConflictException) {
         Log.error("Startup failed: ${e.message}")
-        exitProcess(1)
+        failStartup()
     }
     // Only now: the channel plugins have replaced the core's log notifier, so nothing is sent before they can.
     notify.outbox.start()
-    // Registered after the records and before the network starts, so on a stop the plugins end after the network
-    // has stopped taking requests and before the records are closed.
-    Shutdown.register("plugins") { plugins.disableAll() }
     // After the plugins, so on a stop the worker ends before any of them is disabled: a channel plugin's notifier is still the one
     // that sends until then, and a message being sent is left unknown. The records close after both.
     Shutdown.register("notifications") { notify.close() }
@@ -173,10 +173,10 @@ fun main(args: Array<String>) {
         network.start()
     } catch (e: CertificateException) {
         Log.error(e.message ?: "the certificate cannot be loaded")
-        exitProcess(1)
+        failStartup()
     } catch (e: HttpStartException) {
         Log.error("Startup failed: ${e.message}. Is another program (or another ShopArchive) using this port? Change it with port in server.properties or --port.")
-        exitProcess(1)
+        failStartup()
     }
 
     // Registered after the records' hook, so on a stop it runs before it: a backup in progress ends before the writer closes.
@@ -203,6 +203,12 @@ fun main(args: Array<String>) {
     printFirstRun(firstRunLogin)
 
     Console(commands).run()
+}
+
+/** A startup failure once shutdown hooks are registered: they run (plugins disabled, records closed, the log flushed) before the exit. */
+private fun failStartup(): Nothing {
+    Shutdown.stop(1)
+    exitProcess(1) // not reached: stop exits
 }
 
 /** Hands the settings that other parts of the core read at a fixed point to them. Call again after a reload. */
