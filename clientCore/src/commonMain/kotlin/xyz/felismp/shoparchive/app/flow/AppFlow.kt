@@ -779,7 +779,8 @@ class AppFlow(
 
     /**
      * One live socket; when no address answers, a search for the server (at most once per [LIVE_SEARCH_COOLDOWN_MS]), then straight another try.
-     * A socket the server refuses because the session is gone (it restarted) locks like any other call that finds the token gone.
+     * A socket the server refuses because the session is gone (it restarted) locks like any other call that finds the token gone,
+     * and one that meets a key this device does not trust shows the certificate screen like any other call.
      */
     private suspend fun liveSession(opened: Session, onOpen: () -> Unit, onText: (String) -> Unit) {
         try {
@@ -796,6 +797,9 @@ class AppFlow(
             }
         } catch (e: ClientError.Locked) {
             lockNow(Problem.SessionEnded) // stops this loop too; the throw below only ends this attempt
+            throw e
+        } catch (e: ClientError.PinMismatch) {
+            blockOr(e) {} // the same screen as a call that meets another key; it stops this loop too
             throw e
         }
     }
