@@ -199,8 +199,8 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 2, listOf(
         min = 1, max = 600,
     )
     val notifyMaxAttempts = IntKey(
-        "notify.max-attempts", 10,
-        "Tries that may fail for a message (retry and failed answers, and errors; unknown tries do not count) before it is given up as failed. A failed message can be sent again by hand.",
+        "notify.max-attempts", 60,
+        "Tries that may fail for a message (retry and failed answers, and errors; unknown tries do not count) before it is given up as failed. A failed message can be sent again by hand. With the default backoff, 60 tries span about two days, so a long internet outage at the shop does not lose a message.",
         min = 1, max = 1000,
     )
     val notifyBackoffBaseSeconds = IntKey(
