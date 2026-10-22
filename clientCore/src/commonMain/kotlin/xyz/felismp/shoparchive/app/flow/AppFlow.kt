@@ -23,7 +23,9 @@ import xyz.felismp.shoparchive.app.client.FoundServer
 import xyz.felismp.shoparchive.app.client.LiveConnection
 import xyz.felismp.shoparchive.app.client.Preferences
 import xyz.felismp.shoparchive.app.client.PreferencesStore
+import xyz.felismp.shoparchive.app.client.MemoryOutboxStore
 import xyz.felismp.shoparchive.app.client.NoDiscovery
+import xyz.felismp.shoparchive.app.client.OutboxStore
 import xyz.felismp.shoparchive.app.client.ServerApi
 import xyz.felismp.shoparchive.app.client.ServerDiscovery
 import xyz.felismp.shoparchive.app.client.mergeEndpoints
@@ -102,7 +104,13 @@ class AppFlow(
     private val discovery: ServerDiscovery = NoDiscovery,
     /** Makes what installs a newer app the server offers; null: this platform cannot, so no update is looked for. */
     private val updatesFactory: UpdatesFactory? = null,
+    /** Where a save with no answer yet is kept on disk; the default keeps it only while the app runs. */
+    private val outbox: OutboxStore = MemoryOutboxStore(),
 ) {
+    // A mirror of the outbox, keyed like it, kept until the answer is known: a disk that cannot be written still keeps a save over any number of locks,
+    // and a key set to null (the answer came, or the draft was dropped) wins over a file that could not be removed.
+    private val pendingSaves = mutableMapOf<Pair<String, String>, PendingSave?>()
+
     private val _state = MutableStateFlow<AppState>(AppState.Starting)
     val state: StateFlow<AppState> = _state.asStateFlow()
 
@@ -117,8 +125,6 @@ class AppFlow(
     private var lastActivity = 0L
     private var idleLimitMs = 0L
     private var watchJobs = emptyList<Job>()
-    // Saves with an unknown result, kept over a lock for the (server, user) that sent them; only in memory, and only that user's unlock gets one back.
-    private val pendingSaves = mutableMapOf<Pair<String, String>, PendingSave>()
     // Everything an unlocked user starts runs here; a lock cancels it all, so no late answer can land in the next user's session.
     private var sessionScope: CoroutineScope = newSessionScope()
     private var removing = false
@@ -766,6 +772,8 @@ class AppFlow(
                 savePolicy(policy)
             },
         )
+        // Who the save belongs to: a new account with a reused name has another credential and must not send it.
+        val owner = username + "\n" + (stored?.users?.firstOrNull { it.username == username }?.credential ?: "")
         workspace = Workspace(
             sessionScope, opened.api, calls, canWrite, connection.refetch, connection.messages,
             onConfig = { saveEndpoints(opened.api, it.endpoints); savePolicy(it.auth) },
@@ -773,7 +781,13 @@ class AppFlow(
             saveBranch = ::saveBranch, compressor = compressor, reader = reader,
             today = { Instant.fromEpochMilliseconds(now()).toLocalDateTime(TimeZone.currentSystemDefault()).date }, now = now,
             updatesFactory = updatesFactory, language = { language.value ?: systemLanguage() },
-            restored = pendingSaves.remove(opened.serverId to username),
+            restored = if ((opened.serverId to owner) in pendingSaves) pendingSaves[opened.serverId to owner]
+            else try { pendingSaveFrom(outbox.read(opened.serverId, owner)) } catch (_: Exception) { null },
+            onPending = { p ->
+                pendingSaves[opened.serverId to owner] = p
+                // A failed write must not stop the save: the memory copy still holds it over a lock.
+                try { outbox.write(opened.serverId, owner, p?.toText()) } catch (_: Exception) { }
+            },
         )
     }
 
@@ -843,11 +857,8 @@ class AppFlow(
         if (creds == null) showList(problem) else _state.value = lockedFor(creds, username, needsPassword, problem)
     }
 
-    /** Everything that exists only while unlocked; a save with an unknown result is kept for its user unless [keepPending] is false. */
-    private fun endSession(keepPending: Boolean = true) {
-        val user = unlocked?.username
-        val serverId = session?.serverId
-        if (keepPending && user != null && serverId != null) workspace?.record?.pending()?.let { pendingSaves[serverId to user] = it }
+    /** Everything that exists only while unlocked; a save with no answer yet is already in the outbox for its user. */
+    private fun endSession() {
         lastLiveSearchMs = null
         generation++
         sessionScope.cancel()
@@ -1050,7 +1061,7 @@ class AppFlow(
                 removing = false
             }
             if (cleared == null) return@launch
-            endSession(keepPending = false)
+            endSession()
             failReauth(ClientError.Locked())
             session?.api?.close()
             session = null
@@ -1084,6 +1095,7 @@ class AppFlow(
         // The last server takes the file with it.
         if (next.servers.isEmpty()) store.clear() else store.save(next)
         pendingSaves.keys.removeAll { it.first == serverId }
+        if (serverId != null) try { outbox.removeServer(serverId) } catch (_: Exception) { }
         all = next
         stored = null
         persisted = null

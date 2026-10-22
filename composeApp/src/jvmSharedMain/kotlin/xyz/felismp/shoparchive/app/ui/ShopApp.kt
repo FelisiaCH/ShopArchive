@@ -14,6 +14,7 @@ import xyz.felismp.shoparchive.app.AppBuild
 import xyz.felismp.shoparchive.app.client.ApiClient
 import xyz.felismp.shoparchive.app.client.PlatformContext
 import xyz.felismp.shoparchive.app.client.createCredentialStore
+import xyz.felismp.shoparchive.app.client.createOutboxStore
 import xyz.felismp.shoparchive.app.client.createPreferencesStore
 import xyz.felismp.shoparchive.app.client.createServerDiscovery
 import xyz.felismp.shoparchive.app.client.probeFingerprint
@@ -41,6 +42,7 @@ fun ShopApp(context: PlatformContext) {
                     updatesFactory = createAppUpdater(context)?.let { updater ->
                         { scope, api, calls -> UpdateState(scope, api, calls, updater, AppBuild.version) }
                     },
+                    outbox = createOutboxStore(context),
                 )
             }
             OnAppResume(flow::appResumed)

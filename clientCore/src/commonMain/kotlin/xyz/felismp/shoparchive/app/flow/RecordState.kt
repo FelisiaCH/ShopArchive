@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import xyz.felismp.shoparchive.app.client.ClientError
 import xyz.felismp.shoparchive.shared.CategoryDto
 import xyz.felismp.shoparchive.shared.CreateEntryRequest
@@ -24,6 +25,7 @@ import xyz.felismp.shoparchive.shared.TenderMethod
 import xyz.felismp.shoparchive.shared.covers
 import xyz.felismp.shoparchive.shared.formatAmount
 
+@Serializable
 class TenderRow(val key: Int, val currency: String, val method: TenderMethod, val amount: String)
 
 /**
@@ -31,8 +33,9 @@ class TenderRow(val key: Int, val currency: String, val method: TenderMethod, va
  * with that code (empty when none, or when the server was not asked); [twiceHere] says the same code is on another slip of this draft.
  * [check] is what the bank that printed the slip says about it (null when no bank was asked or none answered).
  */
+@Serializable
 class SlipItem(
-    val key: Int, val name: String, val bytes: ByteArray,
+    val key: Int, val name: String, @Serializable(with = Base64Bytes::class) val bytes: ByteArray,
     val code: String? = null, val uses: List<SlipUseDto> = emptyList(), val twiceHere: Boolean = false, val check: SlipCheckDto? = null,
 ) {
     fun copy(code: String? = this.code, uses: List<SlipUseDto> = this.uses, twiceHere: Boolean = this.twiceHere, check: SlipCheckDto? = this.check) =
@@ -40,9 +43,11 @@ class SlipItem(
 }
 
 /** A slip's QR code scanned without keeping its photo, added once the bank confirmed it ([check]). [uses] are the entries already recorded with that code. */
+@Serializable
 data class ScannedTransfer(val key: Int, val code: String, val check: SlipCheckDto, val uses: List<SlipUseDto> = emptyList())
 
 /** The entry being written. [id] is made once per draft and stays the same on every resend. */
+@Serializable
 class Draft(
     val id: String,
     val type: EntryType,
@@ -114,7 +119,8 @@ class RecordUi(
 }
 
 /** A save sent whose answer is not known, with its draft: kept by the app across a lock and sent again, with the same id, when the same user unlocks. */
-class PendingSave internal constructor(internal val draft: Draft, internal val request: CreateEntryRequest, internal val slips: List<ByteArray>)
+@Serializable
+class PendingSave internal constructor(internal val draft: Draft, internal val request: CreateEntryRequest, internal val slips: List<@Serializable(with = Base64Bytes::class) ByteArray>)
 
 /** Record: one entry at a time. The draft lives as long as the unlocked session; a [restored] save is sent again once the connection is up. */
 class RecordState(
@@ -123,6 +129,8 @@ class RecordState(
     private val compressor: SlipCompressor,
     private val reader: SlipReader,
     restored: PendingSave? = null,
+    /** Told the save sent while its answer is awaited or unknown, and null once the answer is known or the draft is dropped; the app keeps it on disk. */
+    private val onPending: (PendingSave?) -> Unit = {},
 ) {
     private class Inner(
         val draft: Draft,
@@ -501,6 +509,7 @@ class RecordState(
 
     /** Gives up a draft whose result is unknown and starts an empty one. */
     fun discardDraft() {
+        if (inner.value.phase is SavePhase.Unknown) onPending(null)
         if (inner.value.phase !is SavePhase.Saving) inner.update { Inner(freshDraft(it.draft.type, currencyCodes().firstOrNull().orEmpty()), recent = it.recent) }
     }
 
@@ -511,9 +520,12 @@ class RecordState(
         if (held != null && !env.canWrite.value) return
         inner.update { it.copy(phase = SavePhase.Saving, notice = null, sent = sent) }
         val d = inner.value.draft
+        // On disk before the request leaves: a crash after this point resends the same id instead of losing the entry.
+        onPending(PendingSave(d, sent.request, sent.slips))
         env.scope.launch {
             try {
                 val created = env.calls.run { env.api.createEntry(sent.request, sent.slips) }
+                onPending(null)
                 inner.update { Inner(freshDraft(d.type, d.tenders.first().currency), SavePhase.Saved(created.entry), it.recent) }
                 today.reload()
             } catch (e: CancellationException) {
@@ -521,6 +533,9 @@ class RecordState(
             } catch (e: Exception) {
                 // A refusal means nothing was recorded. A lost connection (or anything else unexpected) after sending may mean it was.
                 val unknown = e !is ClientError.Api && (e is ClientError.Unreachable || e !is ClientError)
+                // Off the disk only when the server refused it or the person cancelled the PIN prompt; an error that ends the session
+                // (locked, another key, another protocol) keeps it for the same user's next unlock, which sends it again.
+                if (e is ClientError.Api || e is ClientError.ReauthCancelled) onPending(null)
                 inner.update { it.copy(phase = if (unknown) SavePhase.Unknown(e.toFailure()) else SavePhase.Failed(e.toFailure()), sent = if (unknown) sent else null) }
                 // A bank answer that came while saving could not change the draft then.
                 if (!unknown) {

@@ -17,6 +17,8 @@ actual fun createCredentialStore(context: PlatformContext): CredentialStore =
 actual fun createPreferencesStore(context: PlatformContext): PreferencesStore =
     FilePreferencesStore(File(context.filesDir, "preferences.json"))
 
+actual fun createOutboxStore(context: PlatformContext): OutboxStore = FileOutboxStore(File(context.filesDir, "outbox"))
+
 private const val KEY_ALIAS = "shoparchive_credentials"
 
 /** AES-GCM with a non-exportable Android Keystore key; the file holds IV (12 bytes) + ciphertext in app-private storage. */
