@@ -114,7 +114,7 @@ it for good. You get one from whoever maintains your server. It is approved like
 The apps (Android APK, Windows MSI) are not part of this zip. Each release gets them next to it.
 
 - **Android**: copy the `.apk` to the phone and open it. Android asks to allow installing from this source (the browser or file manager you used); allow it for this install. The APK from the release is signed with the shop's key; builds without a key are not installable until signed.
-- **Windows**: run the `.msi`. It is not signed, so SmartScreen shows "Windows protected your PC": choose **More info**, then **Run anyway**.
+- **Windows**: run the `.msi`. It is not signed, so SmartScreen shows "Windows protected your PC": choose **More info**, then **Run anyway**. Uninstalling (Settings > Apps, or "Uninstall ShopArchive" in the Start menu) also deletes what the app keeps for that Windows user: `%APPDATA%\ShopArchive` (saved servers, sign-ins, settings, saves not sent yet) and `%LOCALAPPDATA%\ShopArchive` (downloaded updates). Installing a newer MSI over it keeps them.
 - **iPhone**: install [AltStore Classic](https://altstore.io) first, then in AltStore open **Sources**, tap **+** and add `https://github.com/FelisiaCH/ShopArchiveiOS/releases/latest/download/source.json`; ShopArchive is listed there. AltStore signs the app with your Apple ID and installs updates from that source; with a free Apple ID it must refresh the app every 7 days.
 
 ### Updating the apps from the server
