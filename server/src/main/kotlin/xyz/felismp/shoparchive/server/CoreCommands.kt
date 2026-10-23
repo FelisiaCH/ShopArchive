@@ -71,7 +71,12 @@ internal fun registerCoreCommands(
         sender.sendMessage("Heap: ${(runtime.totalMemory() - runtime.freeMemory()) / mb} MB used of ${runtime.maxMemory() / mb} MB")
         networkStatus().forEach(sender::sendMessage)
     }
-    add("stop", "Stop the server") { stop() }
+    // From the app, `stop` runs inside the HTTP request that stopping the listener waits for, so it gets a thread of its own.
+    // The console waits for it, so no command typed after `stop` runs.
+    add("stop", "Stop the server") { sender ->
+        val stopping = Thread(stop, "stop").apply { start() }
+        if (sender === ConsoleSender) stopping.join()
+    }
     commands.register(ReloadCommand(config, reloads, alsoOnReload, plugins), "core")
 }
 

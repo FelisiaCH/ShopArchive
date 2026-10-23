@@ -8,8 +8,12 @@ import xyz.felismp.shoparchive.server.config.RecordingLog
 import xyz.felismp.shoparchive.server.config.prepareRoot
 import xyz.felismp.shoparchive.server.config.text
 import xyz.felismp.shoparchive.server.config.write
+import org.junit.jupiter.api.Assertions.assertTimeoutPreemptively
 import java.nio.file.Path
+import java.time.Duration
 import java.time.ZoneId
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -41,7 +45,7 @@ class CommandsTest {
     private val sender = RecordingSender()
     private val commands = Commands()
     private lateinit var config: ConfigService
-    private var stopped = false
+    @Volatile private var stopped = false
 
     @BeforeTest
     fun setUp() {
@@ -117,7 +121,47 @@ class CommandsTest {
     fun stopCallsTheStopAction() {
         run("stop")
 
-        assertTrue(stopped)
+        assertTrue(waitUntil { stopped })
+    }
+
+    @Test
+    fun stopAnswersBeforeTheServerHasStopped() {
+        // From the app, `stop` runs inside an HTTP request that the stopping listener waits for: run inline, each waits on the other.
+        val other = Commands()
+        val running = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        registerCoreCommands(other, config) {
+            running.countDown()
+            release.await()
+        }
+
+        assertTimeoutPreemptively(Duration.ofSeconds(5)) { other.run(sender, "stop") }
+        assertTrue(running.await(5, TimeUnit.SECONDS))
+        release.countDown()
+    }
+
+    @Test
+    fun stopFromTheConsoleReturnsOnlyOnceTheServerHasStopped() {
+        // Else the console reads on, and a command typed after `stop` runs while the server shuts down.
+        val other = Commands()
+        val done = CountDownLatch(1)
+        registerCoreCommands(other, config) {
+            Thread.sleep(200)
+            done.countDown()
+        }
+
+        other.run(ConsoleSender, "stop")
+
+        assertEquals(0, done.count)
+    }
+
+    private fun waitUntil(condition: () -> Boolean): Boolean {
+        val end = System.currentTimeMillis() + 5_000
+        while (System.currentTimeMillis() < end) {
+            if (condition()) return true
+            Thread.sleep(20)
+        }
+        return false
     }
 
     @Test
