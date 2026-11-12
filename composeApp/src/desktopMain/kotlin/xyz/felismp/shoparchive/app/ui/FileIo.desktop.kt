@@ -28,6 +28,7 @@ actual fun rememberFileSaver(onResult: (SaveResult) -> Unit): FileSaver {
     return FileSaver { fileName, _, bytes ->
         val dialog = FileDialog(null as Frame?, title, FileDialog.SAVE).apply {
             file = fileName
+            directory = chooserStart(File(System.getProperty("user.home")), "Documents")
             isVisible = true // modal: returns when the dialog is closed
         }
         val chosen = dialog.file
