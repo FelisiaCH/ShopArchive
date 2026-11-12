@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -13,6 +14,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
@@ -164,10 +167,15 @@ private fun LockedScreen(s: AppState.Locked, flow: AppFlow) {
             ShopButton(stringResource(Res.string.lock_add_user), flow::addUser, Modifier.fillWidthOnPhone(), primary = false, enabled = !s.busy)
         } else {
             ShopText(stringResource(Res.string.locked_body, username, s.server))
+            val focus = remember { FocusRequester() }
+            // The disabled field dropped focus while busy: give it back after a failed try.
+            LaunchedEffect(s.busy, s.problem) { if (!s.busy && s.problem != null) focus.requestFocus() }
             ShopTextField(
                 secret, { secret = it },
                 stringResource(if (s.needsPassword) Res.string.password_enter else Res.string.pin_field),
+                Modifier.focusRequester(focus),
                 kind = if (s.needsPassword) FieldKind.Password else FieldKind.Pin, enabled = !s.busy,
+                onDone = { flow.unlock(secret) },
             )
             Status(s.busy, s.problem)
             ShopButton(

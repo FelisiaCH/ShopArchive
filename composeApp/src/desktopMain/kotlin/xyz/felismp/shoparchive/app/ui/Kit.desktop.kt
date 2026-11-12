@@ -95,9 +95,9 @@ actual fun ShopButton(text: String, onClick: () -> Unit, modifier: Modifier, pri
 }
 
 @Composable
-actual fun ShopTextField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier, kind: FieldKind, enabled: Boolean) {
+actual fun ShopTextField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier, kind: FieldKind, enabled: Boolean, onDone: (() -> Unit)?) {
     FluentTextBox(
-        value, onValueChange, label, modifier.widthIn(max = FIELD_MAX_WIDTH),
+        value, onValueChange, label, modifier.onEnter(onDone).widthIn(max = FIELD_MAX_WIDTH),
         singleLine = kind != FieldKind.Multiline,
         password = kind == FieldKind.Password || kind == FieldKind.Pin,
         enabled = enabled,

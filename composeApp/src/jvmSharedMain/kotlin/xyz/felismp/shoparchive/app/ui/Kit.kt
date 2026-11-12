@@ -4,6 +4,11 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.Dp
 import xyz.felismp.shoparchive.app.flow.ThisDevice
 import xyz.felismp.shoparchive.app.client.PlatformContext
@@ -38,6 +43,7 @@ expect fun ShopText(text: String, role: TextRole = TextRole.Body, muted: Boolean
 @Composable
 expect fun ShopButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = true, enabled: Boolean = true, icon: ShopIcon? = null)
 
+/** [onDone] is called on Enter or the keyboard's Done key. */
 @Composable
 expect fun ShopTextField(
     value: String,
@@ -46,7 +52,13 @@ expect fun ShopTextField(
     modifier: Modifier = Modifier,
     kind: FieldKind = FieldKind.Text,
     enabled: Boolean = true,
+    onDone: (() -> Unit)? = null,
 )
+
+internal fun Modifier.onEnter(onDone: (() -> Unit)?): Modifier =
+    if (onDone == null) this else onPreviewKeyEvent { e ->
+        if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) { onDone(); true } else false
+    }
 
 /** A day as `yyyy-MM-dd`: picked in a calendar on Android, typed on Windows. The field never holds "no date": nothing that uses it takes an empty one. */
 @Composable
