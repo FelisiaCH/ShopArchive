@@ -1,7 +1,9 @@
 package xyz.felismp.shoparchive.app.flow
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -64,7 +66,7 @@ data class NotesUi(
  * a change of rights and the live message that a note of the shown day was written or read. The server decides what the person may see and do.
  */
 @OptIn(ExperimentalAtomicApi::class)
-class NotesState(private val env: Env) {
+class NotesState(private val env: Env, workingDay: Flow<String?> = emptyFlow()) {
     private val date = MutableStateFlow(env.today())
     private val notes = MutableStateFlow<List<NoteDto>?>(null)
     private val loading = MutableStateFlow(false)
@@ -80,14 +82,26 @@ class NotesState(private val env: Env) {
     /** Made when a post starts and kept while the same text is sent again, so a resend after a lost answer is the same note. */
     private var pendingId: String? = null
 
+    /** The working day last seen (the open day, else today). Notes moves with it only while it shows that day, and a new branch opens on it. */
+    private var lastWorking = env.today()
+
     private val _ui = MutableStateFlow(snapshot())
     val ui: StateFlow<NotesUi> = _ui.asStateFlow()
 
     init {
         env.scope.launch {
+            workingDay.filterNotNull().distinctUntilChanged().collect { day ->
+                runCatching { LocalDate.parse(day) }.getOrNull()?.let { new ->
+                    val old = lastWorking
+                    lastWorking = new
+                    if (date.value == old) show(new)
+                }
+            }
+        }
+        env.scope.launch {
             merge(
                 // Another branch's notes are not shown, nor acted on, while its own are on the way.
-                env.branch.filterNotNull().onEach { clearDay() }.map { },
+                env.branch.filterNotNull().onEach { show(lastWorking); clearDay() }.map { },
                 date.map { }.drop(1), // the first value is the day the first load already sees
                 env.refetch,
                 env.config.map { env.can.noteCreate to env.can.noteRead }.distinctUntilChanged().drop(1).map { },
@@ -149,12 +163,16 @@ class NotesState(private val env: Env) {
 
     // ---- the day ----
 
-    fun previousDay() = show(date.value.minus(1, DateTimeUnit.DAY))
+    fun previousDay() {
+        show(date.value.minus(1, DateTimeUnit.DAY))
+    }
 
     /** Not past today: a note is never written for a day that has not come. */
     fun nextDay() {
         val next = date.value.plus(1, DateTimeUnit.DAY)
-        if (next <= env.today()) show(next)
+        if (next <= env.today()) {
+            show(next)
+        }
     }
 
     /** Shows [day] (`yyyy-MM-dd`), e.g. the open day Today names. A text that is not a date is ignored. */
