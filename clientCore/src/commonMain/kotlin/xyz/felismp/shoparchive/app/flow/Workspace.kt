@@ -78,7 +78,7 @@ class Workspace(
     val reports = ReportsState(env)
     val export = ExportState(env)
     val notifications = NotificationsState(env)
-    val notes = NotesState(env)
+    val notes = NotesState(env, this.today.ui.map { it.data?.date })
     val console = ConsoleState(env)
     val admin = AdminState(env) { load() }
 

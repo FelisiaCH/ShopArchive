@@ -1,7 +1,9 @@
 package xyz.felismp.shoparchive.app.flow
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -64,7 +66,7 @@ data class NotesUi(
  * a change of rights and the live message that a note of the shown day was written or read. The server decides what the person may see and do.
  */
 @OptIn(ExperimentalAtomicApi::class)
-class NotesState(private val env: Env) {
+class NotesState(private val env: Env, workingDay: Flow<String?> = emptyFlow()) {
     private val date = MutableStateFlow(env.today())
     private val notes = MutableStateFlow<List<NoteDto>?>(null)
     private val loading = MutableStateFlow(false)
@@ -80,10 +82,18 @@ class NotesState(private val env: Env) {
     /** Made when a post starts and kept while the same text is sent again, so a resend after a lost answer is the same note. */
     private var pendingId: String? = null
 
+    /** True until the person picks a day: then Notes follows the working day (the open day, else today). */
+    private var following = true
+
     private val _ui = MutableStateFlow(snapshot())
     val ui: StateFlow<NotesUi> = _ui.asStateFlow()
 
     init {
+        env.scope.launch {
+            workingDay.filterNotNull().distinctUntilChanged().collect { day ->
+                if (following) runCatching { LocalDate.parse(day) }.getOrNull()?.let(::show)
+            }
+        }
         env.scope.launch {
             merge(
                 // Another branch's notes are not shown, nor acted on, while its own are on the way.
@@ -149,16 +159,23 @@ class NotesState(private val env: Env) {
 
     // ---- the day ----
 
-    fun previousDay() = show(date.value.minus(1, DateTimeUnit.DAY))
+    fun previousDay() {
+        following = false
+        show(date.value.minus(1, DateTimeUnit.DAY))
+    }
 
     /** Not past today: a note is never written for a day that has not come. */
     fun nextDay() {
         val next = date.value.plus(1, DateTimeUnit.DAY)
-        if (next <= env.today()) show(next)
+        if (next <= env.today()) {
+            following = false
+            show(next)
+        }
     }
 
     /** Shows [day] (`yyyy-MM-dd`), e.g. the open day Today names. A text that is not a date is ignored. */
     fun show(day: String) {
+        following = false
         runCatching { LocalDate.parse(day) }.getOrNull()?.let(::show)
     }
 
