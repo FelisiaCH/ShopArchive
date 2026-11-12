@@ -84,7 +84,8 @@ private fun ServersScreen(s: AppState.Servers, flow: AppFlow) {
         s.saved.forEach { row ->
             ShopCard(Modifier.fillMaxWidth()) {
                 ShopText(row.name, TextRole.Title)
-                ShopText(row.endpoint + " · " + pluralStringResource(Res.plurals.server_users, row.userCount, row.userCount), TextRole.Caption, muted = true)
+                ShopText(row.endpoint + " · " + pluralStringResource(Res.plurals.server_users, row.userCount, row.userCount) +
+                    (if (row.userNames.isEmpty()) "" else " · " + row.userNames.take(3).joinToString(", ") + (if (row.userNames.size > 3) " +" + (row.userNames.size - 3) else "")), TextRole.Caption, muted = true)
                 if (confirmRemove == row.serverId) {
                     ShopBanner(stringResource(Res.string.remove_confirm_body), Tone.Error)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -245,10 +245,18 @@ class AppFlowTest {
         assertEquals(1, discovery.browses)
     }
 
+    @Test fun theServerListShowsEachServersSavedUserNamesInOrderAndNoCredential() {
+        // Two servers, because a single saved server goes straight to the lock screen.
+        store.all = StoredServers(listOf(server("sid-1", "10.0.0.5:8443", "zed", "alice", "bob", "carol"), server("sid-2", "10.0.0.6:8443", "dan")))
+        val row = assertIs<AppState.Servers>(flow().state.value).saved.first { it.serverId == "sid-1" }
+        assertEquals(listOf("zed", "alice", "bob", "carol"), row.userNames)
+        assertFalse(row.toString().contains("cred"), "no credential is in the row")
+    }
+
     @Test fun twoStoredServersStartAtTheServerList() {
         store.all = StoredServers(listOf(server("sid-1", "10.0.0.5:8443", "alice"), server("sid-2", "10.0.0.6:8443", "bob", "carol")))
         val s = assertIs<AppState.Servers>(flow().state.value)
-        assertEquals(listOf(ServerRow("sid-1", "Shop sid-1", "10.0.0.5:8443", 1), ServerRow("sid-2", "Shop sid-2", "10.0.0.6:8443", 2)), s.saved)
+        assertEquals(listOf(ServerRow("sid-1", "Shop sid-1", "10.0.0.5:8443", 1, listOf("alice")), ServerRow("sid-2", "Shop sid-2", "10.0.0.6:8443", 2, listOf("bob", "carol"))), s.saved)
         assertTrue(connected.isEmpty(), "no server is opened before one is picked")
     }
 
@@ -426,7 +434,7 @@ class AppFlowTest {
         f.lockNow()
         f.showServers()
         val s = assertIs<AppState.Servers>(f.state.value)
-        assertEquals(listOf(ServerRow("sid-1", "Shop", "10.0.0.5:8443", 1)), s.saved)
+        assertEquals(listOf(ServerRow("sid-1", "Shop", "10.0.0.5:8443", 1, listOf("alice"))), s.saved)
         assertTrue(api.closed)
         assertFalse(api.token)
         assertNull(f.workspace)
@@ -525,7 +533,7 @@ class AppFlowTest {
         val f = savedThenList(OTHER_FP)
         f.addServer("192.168.1.2:8443")
         f.cancelCertChanged()
-        assertEquals(listOf(ServerRow("sid-1", "Shop", oldAddress, 1)), assertIs<AppState.Servers>(f.state.value).saved)
+        assertEquals(listOf(ServerRow("sid-1", "Shop", oldAddress, 1, listOf("alice"))), assertIs<AppState.Servers>(f.state.value).saved)
         assertEquals(storedAlice(), store.stored)
         assertTrue(api.unlocks.isEmpty())
     }
