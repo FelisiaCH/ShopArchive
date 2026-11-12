@@ -24,6 +24,7 @@ actual fun rememberSlipPicker(onPicked: (name: String, bytes: ByteArray) -> Unit
             val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD).apply {
                 isMultipleMode = false
                 setFilenameFilter { _, name -> name.lowercase().let { it.endsWith(".jpg") || it.endsWith(".jpeg") || it.endsWith(".png") } }
+                directory = chooserStart(File(System.getProperty("user.home")), "Pictures")
                 isVisible = true // modal: returns when the dialog is closed
             }
             val name = dialog.file
