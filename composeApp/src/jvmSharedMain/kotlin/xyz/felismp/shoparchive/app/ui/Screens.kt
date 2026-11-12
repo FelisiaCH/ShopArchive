@@ -13,6 +13,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
@@ -167,6 +172,14 @@ private fun LockedScreen(s: AppState.Locked, flow: AppFlow) {
             ShopTextField(
                 secret, { secret = it },
                 stringResource(if (s.needsPassword) Res.string.password_enter else Res.string.pin_field),
+                Modifier.onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.Enter, Key.NumPadEnter -> if (!s.busy) flow.unlock(secret)
+                        else -> return@onPreviewKeyEvent false
+                    }
+                    true
+                },
                 kind = if (s.needsPassword) FieldKind.Password else FieldKind.Pin, enabled = !s.busy,
             )
             Status(s.busy, s.problem)
