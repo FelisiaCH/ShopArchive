@@ -72,13 +72,45 @@ class NotesStateTest {
         val working = MutableStateFlow<String?>("2026-10-04")
         val notes = NotesState(h.env, working)
         notes.previousDay()
-        working.value = "2026-10-03"
+        working.value = "2026-10-05"
         working.value = null
-        working.value = "2026-10-02"
+        working.value = "2026-10-06"
         assertEquals("2026-10-03", notes.ui.value.date)
         notes.show("2026-10-01")
-        working.value = "2026-10-05"
+        working.value = "2026-10-07"
         assertEquals("2026-10-01", notes.ui.value.date)
+    }
+
+    @Test fun showingTheWorkingDayFollowsItWhenItChanges() = runTest(UnconfinedTestDispatcher()) {
+        val h = harness(backgroundScope)
+        val working = MutableStateFlow<String?>("2026-10-04")
+        val notes = NotesState(h.env, working)
+        notes.previousDay()
+        notes.show("2026-10-04")
+        working.value = "2026-10-05"
+        assertEquals("2026-10-05", notes.ui.value.date)
+    }
+
+    @Test fun postingANoteOnTheWorkingDayFollowsItWhenItChanges() = runTest(UnconfinedTestDispatcher()) {
+        val h = harness(backgroundScope)
+        h.api.createdNoteDate = "2026-10-03"
+        val working = MutableStateFlow<String?>("2026-10-03")
+        val notes = NotesState(h.env, working)
+        notes.show("2026-10-01")
+        notes.setDraft("hi")
+        notes.post()
+        assertEquals("2026-10-03", notes.ui.value.date)
+        working.value = "2026-10-04"
+        assertEquals("2026-10-04", notes.ui.value.date)
+    }
+
+    @Test fun aNewBranchOpensOnTheWorkingDayNotTheDayPicked() = runTest(UnconfinedTestDispatcher()) {
+        val h = harness(backgroundScope)
+        val notes = NotesState(h.env, MutableStateFlow<String?>("2026-10-04"))
+        notes.previousDay()
+        h.branch.value = "market"
+        assertEquals("2026-10-04", notes.ui.value.date)
+        assertEquals("market", notes.ui.value.branch)
     }
 
     // ---- reading ----

@@ -82,8 +82,8 @@ class NotesState(private val env: Env, workingDay: Flow<String?> = emptyFlow()) 
     /** Made when a post starts and kept while the same text is sent again, so a resend after a lost answer is the same note. */
     private var pendingId: String? = null
 
-    /** True until the person picks a day: then Notes follows the working day (the open day, else today). */
-    private var following = true
+    /** The working day last seen (the open day, else today). Notes moves with it only while it shows that day, and a new branch opens on it. */
+    private var lastWorking = env.today()
 
     private val _ui = MutableStateFlow(snapshot())
     val ui: StateFlow<NotesUi> = _ui.asStateFlow()
@@ -91,13 +91,17 @@ class NotesState(private val env: Env, workingDay: Flow<String?> = emptyFlow()) 
     init {
         env.scope.launch {
             workingDay.filterNotNull().distinctUntilChanged().collect { day ->
-                if (following) runCatching { LocalDate.parse(day) }.getOrNull()?.let(::show)
+                runCatching { LocalDate.parse(day) }.getOrNull()?.let { new ->
+                    val old = lastWorking
+                    lastWorking = new
+                    if (date.value == old) show(new)
+                }
             }
         }
         env.scope.launch {
             merge(
                 // Another branch's notes are not shown, nor acted on, while its own are on the way.
-                env.branch.filterNotNull().onEach { clearDay() }.map { },
+                env.branch.filterNotNull().onEach { show(lastWorking); clearDay() }.map { },
                 date.map { }.drop(1), // the first value is the day the first load already sees
                 env.refetch,
                 env.config.map { env.can.noteCreate to env.can.noteRead }.distinctUntilChanged().drop(1).map { },
@@ -160,7 +164,6 @@ class NotesState(private val env: Env, workingDay: Flow<String?> = emptyFlow()) 
     // ---- the day ----
 
     fun previousDay() {
-        following = false
         show(date.value.minus(1, DateTimeUnit.DAY))
     }
 
@@ -168,14 +171,12 @@ class NotesState(private val env: Env, workingDay: Flow<String?> = emptyFlow()) 
     fun nextDay() {
         val next = date.value.plus(1, DateTimeUnit.DAY)
         if (next <= env.today()) {
-            following = false
             show(next)
         }
     }
 
     /** Shows [day] (`yyyy-MM-dd`), e.g. the open day Today names. A text that is not a date is ignored. */
     fun show(day: String) {
-        following = false
         runCatching { LocalDate.parse(day) }.getOrNull()?.let(::show)
     }
 
