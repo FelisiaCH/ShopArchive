@@ -41,7 +41,7 @@ sealed interface Problem {
 }
 
 /** A server saved on this device, as the server list shows it: [endpoint] is the address tried first. */
-data class ServerRow(val serverId: String, val name: String, val endpoint: String, val userCount: Int)
+data class ServerRow(val serverId: String, val name: String, val endpoint: String, val userCount: Int, val userNames: List<String> = emptyList())
 
 sealed interface AppState {
     data object Starting : AppState

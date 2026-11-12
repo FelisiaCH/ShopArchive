@@ -272,7 +272,7 @@ class AppFlow(
 
     private fun rows() = all.servers.map { s ->
         val endpoint = s.endpoints.firstOrNull().orEmpty()
-        ServerRow(s.serverId, s.name.ifBlank { endpoint }, endpoint, s.users.size)
+        ServerRow(s.serverId, s.name.ifBlank { endpoint }, endpoint, s.users.size, s.users.map { it.username })
     }
 
     private fun showList(problem: Problem? = null) {
