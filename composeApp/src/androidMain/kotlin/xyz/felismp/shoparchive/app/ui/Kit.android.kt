@@ -33,6 +33,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
@@ -79,6 +80,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -175,9 +177,9 @@ actual fun ShopButton(text: String, onClick: () -> Unit, modifier: Modifier, pri
 }
 
 @Composable
-actual fun ShopTextField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier, kind: FieldKind, enabled: Boolean) {
+actual fun ShopTextField(value: String, onValueChange: (String) -> Unit, label: String, modifier: Modifier, kind: FieldKind, enabled: Boolean, onDone: (() -> Unit)?) {
     OutlinedTextField(
-        value, onValueChange, modifier.fillMaxWidth().heightIn(min = MinTarget), enabled = enabled,
+        value, onValueChange, modifier.onEnter(onDone).fillMaxWidth().heightIn(min = MinTarget), enabled = enabled,
         label = { Text(label) },
         textStyle = if (kind == FieldKind.Amount) MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum") else LocalTextStyle.current,
         colors = fieldColors(),
@@ -191,7 +193,9 @@ actual fun ShopTextField(value: String, onValueChange: (String) -> Unit, label: 
                 FieldKind.Amount -> KeyboardType.Decimal
                 else -> KeyboardType.Text
             },
+            imeAction = if (onDone != null) ImeAction.Done else ImeAction.Default,
         ),
+        keyboardActions = if (onDone != null) KeyboardActions(onDone = { onDone() }) else KeyboardActions.Default,
     )
 }
 
