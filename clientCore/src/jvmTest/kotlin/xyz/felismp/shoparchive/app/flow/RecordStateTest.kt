@@ -39,10 +39,12 @@ class RecordStateTest {
         compressor: SlipCompressor = keep,
         reader: SlipReader = none,
         dayOpen: Boolean = true,
+        startType: () -> EntryType = { EntryType.INCOME },
+        onSavedType: (EntryType) -> Unit = {},
     ): Pair<Harness, RecordState> {
         val h = Harness(backgroundScope, ConfigState.Ready(testConfig(policy)))
         if (dayOpen) h.api.current = h.api.session("s1")
-        return h to RecordState(h.env, TodayState(h.env), compressor, reader)
+        return h to RecordState(h.env, TodayState(h.env), compressor, reader, startType = startType, onSavedType = onSavedType)
     }
 
     private fun RecordState.fillCash(amount: String = "1500") {
@@ -216,6 +218,30 @@ class RecordStateTest {
         assertNotEquals(id, record.ui.value.draft.id)
         assertEquals(EntryType.INCOME, record.ui.value.draft.type)
         assertEquals("", record.ui.value.draft.item)
+    }
+
+    @Test fun aNewDraftStartsOnIncomeByDefault() = runTest(UnconfinedTestDispatcher()) {
+        val (_, record) = setup()
+        assertEquals(EntryType.INCOME, record.ui.value.draft.type)
+    }
+
+    @Test fun afterASaveTheNextDraftFollowsTheStartSettingAndTheSavedTypeIsReported() = runTest(UnconfinedTestDispatcher()) {
+        val saved = mutableListOf<EntryType>()
+        val (_, record) = setup(startType = { EntryType.EXPENSE }, onSavedType = { saved += it })
+        record.setType(EntryType.INCOME)
+        record.fillCash()
+        record.save()
+        assertEquals(listOf(EntryType.INCOME), saved)
+        assertEquals(EntryType.EXPENSE, record.ui.value.draft.type)
+    }
+
+    @Test fun startingOnTheLastTypeKeepsTheTypeJustSaved() = runTest(UnconfinedTestDispatcher()) {
+        var last = EntryType.INCOME
+        val (_, record) = setup(startType = { last }, onSavedType = { last = it })
+        record.setType(EntryType.EXPENSE)
+        record.fillCash()
+        record.save()
+        assertEquals(EntryType.EXPENSE, record.ui.value.draft.type)
     }
 
     @Test fun savingTellsTodayToLoadAgain() = runTest(UnconfinedTestDispatcher()) {

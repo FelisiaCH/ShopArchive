@@ -5,6 +5,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import xyz.felismp.shoparchive.shared.CurrencyInfo
+import xyz.felismp.shoparchive.shared.TenderDto
+import xyz.felismp.shoparchive.shared.TenderMethod
 import xyz.felismp.shoparchive.shared.isUuidV7
 
 class MoneyTextTest {
@@ -14,6 +17,15 @@ class MoneyTextTest {
         assertEquals(0L, parseSignedTotal("0.00", 2))
         assertEquals(null, parseSignedTotal("-1.5", 0))
         assertEquals(null, parseSignedTotal("--1", 0))
+    }
+
+    @Test fun savedAmountSumsPerCurrencyAndJoinsThem() {
+        val currencies = listOf(CurrencyInfo("LAK", 0), CurrencyInfo("THB", 2))
+        val tenders = listOf(
+            TenderDto("THB", TenderMethod.CASH, "1000.50"), TenderDto("LAK", TenderMethod.CASH, "20000"),
+            TenderDto("THB", TenderMethod.ONLINE, "499.50"),
+        )
+        assertEquals(displayAmount(150_000, 2) + " THB + " + displayAmount(20_000, 0) + " LAK", savedAmountText(tenders, currencies))
     }
 
     @Test fun kipHasNoDecimalsAndGroupsThousands() {

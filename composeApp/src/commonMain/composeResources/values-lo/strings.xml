@@ -157,7 +157,10 @@
     <string name="block_no_day_other">ຍັງບໍ່ເປີດວັນ. ຂໍໃຫ້ຜູ້ຈັດການ ຫຼື ຜູ້ທີ່ມີສິດເປີດວັນ ເປີດວັນກ່ອນຈຶ່ງຈະບັນທຶກໄດ້.</string>
     <string name="record_save">ບັນທຶກ</string>
     <string name="record_saving">ກຳລັງບັນທຶກ…</string>
-    <string name="record_saved">ບັນທຶກແລ້ວ.</string>
+    <string name="record_saved_income">ບັນທຶກລາຍຮັບແລ້ວ · %1$s</string>
+    <string name="record_saved_expense">ບັນທຶກລາຍຈ່າຍແລ້ວ · %1$s</string>
+    <string name="record_start_label">ໜ້າບັນທຶກເລີ່ມທີ່</string>
+    <string name="record_start_last">ຊະນິດລ່າສຸດ</string>
     <string name="record_unknown">ຍັງບໍ່ໄດ້ຮັບຄຳຕອບຈາກເຊີບເວີ. ລາຍການອາດບັນທຶກແລ້ວ. ກວດອີກເທື່ອກ່ອນເຮັດອັນອື່ນ.</string>
     <string name="record_check_again">ກວດອີກເທື່ອ</string>
     <string name="record_discard">ຖິ້ມຮ່າງນີ້</string>

@@ -18,6 +18,7 @@ import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import xyz.felismp.shoparchive.app.AppBuild
+import xyz.felismp.shoparchive.app.client.RecordStart
 import xyz.felismp.shoparchive.app.flow.AppFlow
 import xyz.felismp.shoparchive.app.flow.AppState
 import xyz.felismp.shoparchive.app.flow.Problem
@@ -233,6 +234,16 @@ private fun ColumnScope.SettingsBody(s: AppState.Settings, flow: AppFlow) {
     OnBackPress(confirmRemove) { if (!s.busy) confirmRemove = false }
     ShopText(stringResource(Res.string.language_label), TextRole.Title)
     ShopSegmented(LANGUAGES.map { (tag, name) -> tag to stringResource(name) }, language, flow::setLanguage)
+    val recordStart by flow.recordStart.collectAsState()
+    ShopText(stringResource(Res.string.record_start_label), TextRole.Title)
+    ShopSegmented(
+        listOf(
+            RecordStart.INCOME to stringResource(Res.string.type_income),
+            RecordStart.EXPENSE to stringResource(Res.string.type_expense),
+            RecordStart.LAST to stringResource(Res.string.record_start_last),
+        ),
+        recordStart, flow::setRecordStart,
+    )
 
     ShopText(stringResource(Res.string.devices_title), TextRole.Title)
     val devices = s.devices

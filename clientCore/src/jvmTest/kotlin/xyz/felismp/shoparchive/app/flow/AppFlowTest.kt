@@ -16,6 +16,7 @@ import xyz.felismp.shoparchive.app.client.CredentialStore
 import xyz.felismp.shoparchive.app.client.ServerApi
 import xyz.felismp.shoparchive.app.client.Preferences
 import xyz.felismp.shoparchive.app.client.PreferencesStore
+import xyz.felismp.shoparchive.app.client.RecordStart
 import xyz.felismp.shoparchive.app.client.FoundServer
 import xyz.felismp.shoparchive.app.client.MemoryOutboxStore
 import xyz.felismp.shoparchive.app.client.StoredServer
@@ -1902,6 +1903,14 @@ class AppFlowTest {
         assertEquals(Preferences(language = "lo", branch = "second"), prefs.saved)
         f.setLanguage("th")
         assertEquals(Preferences(language = "th", branch = "second"), prefs.saved)
+    }
+
+    @Test fun theRecordStartIsSavedOnThisDevice() {
+        val f = lockedFlow()
+        assertEquals(RecordStart.INCOME, f.recordStart.value)
+        f.setRecordStart(RecordStart.LAST)
+        assertEquals(RecordStart.LAST, f.recordStart.value)
+        assertEquals(RecordStart.LAST, prefs.saved.recordStart)
     }
 
     @Test fun lockingWhileThePromptIsOpenEndsIt() {

@@ -131,6 +131,10 @@ class RecordState(
     restored: PendingSave? = null,
     /** Told the save sent while its answer is awaited or unknown, and null once the answer is known or the draft is dropped; the app keeps it on disk. */
     private val onPending: (PendingSave?) -> Unit = {},
+    /** The type a new draft starts as. */
+    private val startType: () -> EntryType = { EntryType.INCOME },
+    /** Told the type of each entry saved, so a start on the last type can follow it. */
+    private val onSavedType: (EntryType) -> Unit = {},
 ) {
     private class Inner(
         val draft: Draft,
@@ -154,7 +158,7 @@ class RecordState(
     private var keys = restored?.draft?.let { d -> (d.tenders.map { it.key } + d.slips.map { it.key } + d.transfers.map { it.key }).maxOrNull() } ?: 0
     private var suggestionJob: Job? = null
     private val inner = MutableStateFlow(
-        restored?.let { Inner(it.draft, SavePhase.Unknown(Failure.Unreachable), sent = Sent(it.request, it.slips)) } ?: Inner(freshDraft(EntryType.EXPENSE, "")),
+        restored?.let { Inner(it.draft, SavePhase.Unknown(Failure.Unreachable), sent = Sent(it.request, it.slips)) } ?: Inner(freshDraft(startType(), "")),
     )
 
     val ui: StateFlow<RecordUi> = combine(inner, env.config, env.canWrite, env.branch, today.ui) { s, config, canWrite, branch, day ->
@@ -510,7 +514,7 @@ class RecordState(
     /** Gives up a draft whose result is unknown and starts an empty one. */
     fun discardDraft() {
         if (inner.value.phase is SavePhase.Unknown) onPending(null)
-        if (inner.value.phase !is SavePhase.Saving) inner.update { Inner(freshDraft(it.draft.type, currencyCodes().firstOrNull().orEmpty()), recent = it.recent) }
+        if (inner.value.phase !is SavePhase.Saving) inner.update { Inner(freshDraft(startType(), currencyCodes().firstOrNull().orEmpty()), recent = it.recent) }
     }
 
     private fun send() {
@@ -526,7 +530,8 @@ class RecordState(
             try {
                 val created = env.calls.run { env.api.createEntry(sent.request, sent.slips) }
                 onPending(null)
-                inner.update { Inner(freshDraft(d.type, d.tenders.first().currency), SavePhase.Saved(created.entry), it.recent) }
+                onSavedType(d.type)
+                inner.update { Inner(freshDraft(startType(), d.tenders.first().currency), SavePhase.Saved(created.entry), it.recent) }
                 today.reload()
             } catch (e: CancellationException) {
                 throw e
