@@ -9,6 +9,7 @@ import xyz.felismp.shoparchive.server.records.BranchStore
 import xyz.felismp.shoparchive.server.users.NO_ROLE
 import xyz.felismp.shoparchive.server.users.UserException
 import xyz.felismp.shoparchive.server.users.UserStore
+import xyz.felismp.shoparchive.server.users.isUsableCredential
 import java.security.SecureRandom
 import java.util.Locale
 
@@ -19,8 +20,8 @@ private val random = SecureRandom()
 
 /**
  * What makes a server usable the first time it starts, without the console: with no users yet, the branch `setup.first-branch` (if there is
- * none) and the op `setup.first-user` in it; then, on every start while that user has no device, a new PIN of `auth.pin.length` digits for it,
- * replacing the last one (and its lock). Run it before the network starts, so the owner never has a moment without a PIN in which anyone could
+ * none) and the op `setup.first-user` in it; then, on every start while that user has no device and no setup code waiting (`user reset`
+ * leaves one), a new PIN of `auth.pin.length` digits for it, replacing the last one (and its lock). Run it before the network starts, so the owner never has a moment without a PIN in which anyone could
  * log in and choose one; [printFirstRun] shows the result later. A failure is logged and the server goes on: the admin can do the same by hand.
  */
 internal fun firstRunSetup(config: ConfigService, users: UserStore, branches: BranchStore, devices: DeviceStore, hasher: Hasher, sessions: Sessions): FirstRunLogin? {
@@ -39,7 +40,8 @@ internal fun firstRunSetup(config: ConfigService, users: UserStore, branches: Br
             Log.info("First start: user '$owner' made, an op")
         }
         val account = users.find(owner) ?: return null
-        if (!account.enabled || devices.devicesOf(account.id).isNotEmpty()) return null
+        // A setup code is waiting (`user reset`): the owner is to claim a PIN with it, so no new PIN is made over it.
+        if (!account.enabled || devices.devicesOf(account.id).isNotEmpty() || isUsableCredential(account.setupCode)) return null
         val pin = (1..config.auth.pinLength).joinToString("") { random.nextInt(10).toString() }
         val hash = hasher.hash(pin)
         // The same lock as a login, so one under way does not see half of the change.

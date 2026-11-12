@@ -129,6 +129,21 @@ class FirstRunTest {
     }
 
     @Test
+    fun aRestartAfterUserResetLeavesTheSetupCodeAloneAndPrintsNoNewPin() = env().run {
+        assertNotNull(start().ownerLogin())
+        console("user reset owner")
+        val afterReset = users.user("owner")
+        assertTrue(isUsableCredential(afterReset.setupCode), "the reset left a setup code")
+        assertNull(afterReset.pin)
+
+        assertEquals(emptyList(), start())
+
+        val afterStart = users.user("owner")
+        assertEquals(afterReset.setupCode, afterStart.setupCode)
+        assertNull(afterStart.pin, "the start did not give the owner a PIN over the setup code")
+    }
+
+    @Test
     fun onceTheOwnerHasLoggedInNothingIsMadeOrPrintedAndThePinStays() = env().run {
         val (_, pin) = assertNotNull(start().ownerLogin())
         api { assertEquals(HttpStatusCode.OK, login("owner", pin = pin).status) }
