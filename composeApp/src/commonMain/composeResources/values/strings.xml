@@ -157,7 +157,10 @@
     <string name="block_no_day_other">The day is not open. Ask a manager, or someone else who may open the day, to open it before you record.</string>
     <string name="record_save">Save</string>
     <string name="record_saving">Saving…</string>
-    <string name="record_saved">Saved.</string>
+    <string name="record_saved_income">Income saved · %1$s</string>
+    <string name="record_saved_expense">Expense saved · %1$s</string>
+    <string name="record_start_label">Record starts on</string>
+    <string name="record_start_last">Last used</string>
     <string name="record_unknown">No answer from the server yet. The entry may already be saved. Check again before doing anything else.</string>
     <string name="record_check_again">Check again</string>
     <string name="record_discard">Drop this draft</string>

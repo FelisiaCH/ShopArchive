@@ -28,6 +28,7 @@ import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.SlipCheckDto
 import xyz.felismp.shoparchive.shared.TenderMethod
 import xyz.felismp.shoparchive.app.flow.parseTypedAmount
+import xyz.felismp.shoparchive.app.flow.savedAmountText
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -172,7 +173,13 @@ private fun TenderCard(row: TenderRow, ui: RecordUi, ws: Workspace, editable: Bo
 private fun PhaseNotice(ui: RecordUi, ws: Workspace) {
     when (val phase = ui.phase) {
         SavePhase.Saving -> ShopBanner(stringResource(Res.string.record_saving), Tone.Info)
-        is SavePhase.Saved -> ShopBanner(stringResource(Res.string.record_saved), Tone.Success)
+        is SavePhase.Saved -> {
+            val amount = savedAmountText(phase.entry.tenders, ui.currencies)
+            ShopBanner(
+                if (phase.entry.type == EntryType.INCOME) stringResource(Res.string.record_saved_income, amount) else stringResource(Res.string.record_saved_expense, amount),
+                Tone.Success,
+            )
+        }
         is SavePhase.Unknown -> {
             ShopBanner(stringResource(Res.string.record_unknown), Tone.Info)
             ui.pendingBranch?.let { key -> ShopText(stringResource(Res.string.record_unknown_branch, ws.branches.firstOrNull { it.key == key }?.displayName ?: key), TextRole.Caption) }

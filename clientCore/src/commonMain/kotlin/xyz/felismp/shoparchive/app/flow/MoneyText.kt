@@ -1,5 +1,7 @@
 package xyz.felismp.shoparchive.app.flow
 
+import xyz.felismp.shoparchive.shared.CurrencyInfo
+import xyz.felismp.shoparchive.shared.TenderDto
 import xyz.felismp.shoparchive.shared.formatAmount
 import xyz.felismp.shoparchive.shared.parseAmount
 
@@ -16,6 +18,17 @@ fun groupThousands(amount: String, grouping: Char = localeGroupingSeparator(), d
 /** [minor] units of a currency with [exponent] decimals, written for the screen: `1,500,000` for LAK, `1,200.50` for THB. */
 fun displayAmount(minor: Long, exponent: Int, grouping: Char = localeGroupingSeparator(), decimal: Char = localeDecimalSeparator()): String =
     groupThousands(formatAmount(minor, exponent), grouping, decimal)
+
+/**
+ * What an entry's [tenders] add up to per currency, in order of first appearance, e.g. `1,500 THB + 20 USD`. A currency not in [currencies] takes the most
+ * decimals any of its amounts has; a group with an amount that still does not parse shows its amounts as sent, never a silent 0.
+ */
+fun savedAmountText(tenders: List<TenderDto>, currencies: List<CurrencyInfo>): String =
+    tenders.groupBy { it.currency }.entries.joinToString(" + ") { (code, rows) ->
+        val exponent = currencies.firstOrNull { it.code == code }?.exponent ?: rows.maxOf { it.amount.substringAfter('.', "").length }
+        val minors = rows.map { parseSignedTotal(it.amount, exponent) }
+        (if (null in minors) rows.joinToString(" + ") { it.amount } else displayAmount(minors.sumOf { it!! }, exponent)) + " " + code
+    }
 
 /** The thousands separator of the device's language and region (`,` in en-US, `.` in de-DE). */
 expect fun localeGroupingSeparator(): Char

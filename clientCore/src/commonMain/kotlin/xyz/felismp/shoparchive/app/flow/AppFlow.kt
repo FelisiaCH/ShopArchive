@@ -23,6 +23,8 @@ import xyz.felismp.shoparchive.app.client.FoundServer
 import xyz.felismp.shoparchive.app.client.LiveConnection
 import xyz.felismp.shoparchive.app.client.Preferences
 import xyz.felismp.shoparchive.app.client.PreferencesStore
+import xyz.felismp.shoparchive.app.client.RecordStart
+import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.app.client.MemoryOutboxStore
 import xyz.felismp.shoparchive.app.client.NoDiscovery
 import xyz.felismp.shoparchive.app.client.OutboxStore
@@ -167,6 +169,13 @@ class AppFlow(
 
     /** `en`, `lo`, `th`, or null for the system's. */
     val language: StateFlow<String?> = _language.asStateFlow()
+
+    private val _recordStart = MutableStateFlow(try { prefs.load().recordStart } catch (_: Exception) { RecordStart.INCOME })
+
+    /** What the Record screen starts on. */
+    val recordStart: StateFlow<RecordStart> = _recordStart.asStateFlow()
+
+    private var lastType: EntryType = try { prefs.load().lastType } catch (_: Exception) { null } ?: EntryType.INCOME
 
     init {
         scope.launch {
@@ -781,6 +790,8 @@ class AppFlow(
             saveBranch = ::saveBranch, compressor = compressor, reader = reader,
             today = { Instant.fromEpochMilliseconds(now()).toLocalDateTime(TimeZone.currentSystemDefault()).date }, now = now,
             updatesFactory = updatesFactory, language = { language.value ?: systemLanguage() },
+            startType = { when (_recordStart.value) { RecordStart.INCOME -> EntryType.INCOME; RecordStart.EXPENSE -> EntryType.EXPENSE; RecordStart.LAST -> lastType } },
+            onSavedType = ::saveLastType,
             restored = if ((opened.serverId to owner) in pendingSaves) pendingSaves[opened.serverId to owner]
             else try { pendingSaveFrom(outbox.read(opened.serverId, owner)) } catch (_: Exception) { null },
             onPending = { p ->
@@ -994,21 +1005,31 @@ class AppFlow(
 
     fun setLanguage(tag: String?) {
         _language.value = tag
-        scope.launch {
-            try {
-                withContext(io) { prefs.save(prefs.load().copy(language = tag)) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // The choice still applies until the app closes.
-            }
-        }
+        updatePrefs { it.copy(language = tag) }
+    }
+
+    fun setRecordStart(start: RecordStart) {
+        _recordStart.value = start
+        workspace?.record?.followStart()
+        updatePrefs { it.copy(recordStart = start) }
+    }
+
+    private fun saveLastType(type: EntryType) {
+        lastType = type
+        updatePrefs { it.copy(lastType = type) }
     }
 
     private fun saveBranch(key: String) {
+        updatePrefs { it.copy(branch = key) }
+    }
+
+    private val prefsLock = Mutex()
+
+    /** Changes one preference without losing another being saved at the same time. */
+    private fun updatePrefs(change: (Preferences) -> Preferences) {
         scope.launch {
             try {
-                withContext(io) { prefs.save(prefs.load().copy(branch = key)) }
+                prefsLock.withLock { withContext(io) { prefs.save(change(prefs.load())) } }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {

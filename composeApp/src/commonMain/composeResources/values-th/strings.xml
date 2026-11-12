@@ -157,7 +157,10 @@
     <string name="block_no_day_other">ยังไม่เปิดวัน ขอให้ผู้จัดการหรือผู้ที่มีสิทธิ์เปิดวันเปิดวันก่อนจึงจะบันทึกได้</string>
     <string name="record_save">บันทึก</string>
     <string name="record_saving">กำลังบันทึก…</string>
-    <string name="record_saved">บันทึกแล้ว</string>
+    <string name="record_saved_income">บันทึกรายรับแล้ว · %1$s</string>
+    <string name="record_saved_expense">บันทึกรายจ่ายแล้ว · %1$s</string>
+    <string name="record_start_label">หน้าบันทึกเริ่มที่</string>
+    <string name="record_start_last">ชนิดล่าสุด</string>
     <string name="record_unknown">ยังไม่ได้รับคำตอบจากเซิร์ฟเวอร์ รายการอาจบันทึกแล้ว ตรวจอีกครั้งก่อนทำอย่างอื่น</string>
     <string name="record_check_again">ตรวจอีกครั้ง</string>
     <string name="record_discard">ทิ้งฉบับร่างนี้</string>

@@ -14,6 +14,7 @@ import xyz.felismp.shoparchive.app.client.ServerApi
 import xyz.felismp.shoparchive.shared.BranchDto
 import xyz.felismp.shoparchive.shared.ConfigChangedMessage
 import xyz.felismp.shoparchive.shared.ConfigResponse
+import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.WsMessage
 import kotlinx.datetime.LocalDate
 
@@ -48,6 +49,10 @@ class Workspace(
     restored: PendingSave? = null,
     /** See [RecordState]. */
     onPending: (PendingSave?) -> Unit = {},
+    /** See [RecordState]. */
+    startType: () -> EntryType = { EntryType.INCOME },
+    /** See [RecordState]. */
+    onSavedType: (EntryType) -> Unit = {},
 ) {
     private val _config = MutableStateFlow<ConfigState>(ConfigState.Loading)
     val config: StateFlow<ConfigState> = _config.asStateFlow()
@@ -67,7 +72,7 @@ class Workspace(
     private val env = Env(scope, api, calls, canWrite, config, branch, refetch, messages, today, now, language)
     val today = TodayState(env)
     val openDay = OpenDayState(env, this.today)
-    val record = RecordState(env, this.today, compressor, reader, restored, onPending)
+    val record = RecordState(env, this.today, compressor, reader, restored, onPending, startType, onSavedType)
     val history = HistoryState(env, compressor, reader)
     val closeDay = CloseDayState(env, this.today)
     val reports = ReportsState(env)
