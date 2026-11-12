@@ -244,6 +244,27 @@ class RecordStateTest {
         assertEquals(EntryType.EXPENSE, record.ui.value.draft.type)
     }
 
+    @Test fun followStartMovesAnUntouchedDraftToTheNewStartType() = runTest(UnconfinedTestDispatcher()) {
+        var start = EntryType.INCOME
+        val (_, record) = setup(startType = { start })
+        start = EntryType.EXPENSE
+        record.followStart()
+        assertEquals(EntryType.EXPENSE, record.ui.value.draft.type)
+    }
+
+    @Test fun followStartLeavesATouchedDraftOnItsType() = runTest(UnconfinedTestDispatcher()) {
+        var start = EntryType.INCOME
+        val (_, typed) = setup(startType = { start })
+        typed.setItem("rice")
+        val (_, paid) = setup(startType = { start })
+        paid.fillCash()
+        start = EntryType.EXPENSE
+        typed.followStart()
+        paid.followStart()
+        assertEquals(EntryType.INCOME, typed.ui.value.draft.type)
+        assertEquals(EntryType.INCOME, paid.ui.value.draft.type)
+    }
+
     @Test fun savingTellsTodayToLoadAgain() = runTest(UnconfinedTestDispatcher()) {
         val (h, record) = setup()
         val before = h.api.dashboardCalls.size

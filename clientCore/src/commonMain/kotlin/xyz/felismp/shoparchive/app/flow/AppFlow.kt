@@ -1005,47 +1005,31 @@ class AppFlow(
 
     fun setLanguage(tag: String?) {
         _language.value = tag
-        scope.launch {
-            try {
-                withContext(io) { prefs.save(prefs.load().copy(language = tag)) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // The choice still applies until the app closes.
-            }
-        }
+        updatePrefs { it.copy(language = tag) }
     }
 
     fun setRecordStart(start: RecordStart) {
         _recordStart.value = start
-        scope.launch {
-            try {
-                withContext(io) { prefs.save(prefs.load().copy(recordStart = start)) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // The choice still applies until the app closes.
-            }
-        }
+        workspace?.record?.followStart()
+        updatePrefs { it.copy(recordStart = start) }
     }
 
     private fun saveLastType(type: EntryType) {
         lastType = type
-        scope.launch {
-            try {
-                withContext(io) { prefs.save(prefs.load().copy(lastType = type)) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // The type still applies until the app closes.
-            }
-        }
+        updatePrefs { it.copy(lastType = type) }
     }
 
     private fun saveBranch(key: String) {
+        updatePrefs { it.copy(branch = key) }
+    }
+
+    private val prefsLock = Mutex()
+
+    /** Changes one preference without losing another being saved at the same time. */
+    private fun updatePrefs(change: (Preferences) -> Preferences) {
         scope.launch {
             try {
-                withContext(io) { prefs.save(prefs.load().copy(branch = key)) }
+                prefsLock.withLock { withContext(io) { prefs.save(change(prefs.load())) } }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {

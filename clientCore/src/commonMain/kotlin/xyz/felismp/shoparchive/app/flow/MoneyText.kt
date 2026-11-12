@@ -19,11 +19,15 @@ fun groupThousands(amount: String, grouping: Char = localeGroupingSeparator(), d
 fun displayAmount(minor: Long, exponent: Int, grouping: Char = localeGroupingSeparator(), decimal: Char = localeDecimalSeparator()): String =
     groupThousands(formatAmount(minor, exponent), grouping, decimal)
 
-/** What an entry's [tenders] add up to per currency, in order of first appearance, e.g. `1,500 THB + 20 USD`; a currency not in [currencies] counts as having no decimals. */
+/**
+ * What an entry's [tenders] add up to per currency, in order of first appearance, e.g. `1,500 THB + 20 USD`. A currency not in [currencies] takes the most
+ * decimals any of its amounts has; a group with an amount that still does not parse shows its amounts as sent, never a silent 0.
+ */
 fun savedAmountText(tenders: List<TenderDto>, currencies: List<CurrencyInfo>): String =
     tenders.groupBy { it.currency }.entries.joinToString(" + ") { (code, rows) ->
-        val exponent = currencies.firstOrNull { it.code == code }?.exponent ?: 0
-        displayAmount(rows.sumOf { parseSignedTotal(it.amount, exponent) ?: 0L }, exponent) + " " + code
+        val exponent = currencies.firstOrNull { it.code == code }?.exponent ?: rows.maxOf { it.amount.substringAfter('.', "").length }
+        val minors = rows.map { parseSignedTotal(it.amount, exponent) }
+        (if (null in minors) rows.joinToString(" + ") { it.amount } else displayAmount(minors.sumOf { it!! }, exponent)) + " " + code
     }
 
 /** The thousands separator of the device's language and region (`,` in en-US, `.` in de-DE). */

@@ -28,6 +28,16 @@ class MoneyTextTest {
         assertEquals(displayAmount(150_000, 2) + " THB + " + displayAmount(20_000, 0) + " LAK", savedAmountText(tenders, currencies))
     }
 
+    @Test fun savedAmountOfAnUnknownCurrencyKeepsItsDecimals() {
+        val tenders = listOf(TenderDto("XYZ", TenderMethod.CASH, "1000.50"), TenderDto("XYZ", TenderMethod.ONLINE, "0.25"))
+        assertEquals(displayAmount(100_075, 2) + " XYZ", savedAmountText(tenders, emptyList()))
+    }
+
+    @Test fun savedAmountThatDoesNotParseShowsItsTextNotZero() {
+        val tenders = listOf(TenderDto("THB", TenderMethod.CASH, "12.5.1"), TenderDto("THB", TenderMethod.CASH, "3.00"))
+        assertEquals("12.5.1 + 3.00 THB", savedAmountText(tenders, listOf(CurrencyInfo("THB", 2))))
+    }
+
     @Test fun kipHasNoDecimalsAndGroupsThousands() {
         assertEquals("1,500,000", displayAmount(1_500_000, 0, ',', '.'))
         assertEquals("999", displayAmount(999, 0, ',', '.'))

@@ -239,6 +239,16 @@ class RecordState(
         inner.update { s -> if (s.phase is SavePhase.Saving || s.phase is SavePhase.Unknown) s else change(s) }
     }
 
+    /** Moves an untouched draft to the start type, for when the setting changes; a draft with anything typed keeps its type. */
+    fun followStart() {
+        inner.update { s ->
+            val d = s.draft
+            val untouched = (s.phase is SavePhase.Editing || s.phase is SavePhase.Saved) && d.category == null && d.item.isEmpty() && d.note.isEmpty() &&
+                d.slips.isEmpty() && d.transfers.isEmpty() && d.tenders.all { it.amount.isEmpty() }
+            if (untouched) s.copy(d.copy(type = startType())) else s
+        }
+    }
+
     fun setType(type: EntryType) {
         edit { d ->
             val categories = (env.config.value as? ConfigState.Ready)?.config?.categories.orEmpty()

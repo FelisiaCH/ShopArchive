@@ -26,6 +26,7 @@ import xyz.felismp.shoparchive.shared.AuthPolicy
 import xyz.felismp.shoparchive.shared.ConfigResponse
 import xyz.felismp.shoparchive.shared.DeviceInfo
 import xyz.felismp.shoparchive.shared.DeviceMode
+import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.ErrorReasons
 import xyz.felismp.shoparchive.shared.InfoResponse
@@ -74,6 +75,13 @@ private fun storedShared() = storedAlice(DeviceMode.SHARED).let { it.copy(users 
 
 private class FakePrefs(var saved: Preferences = Preferences()) : PreferencesStore {
     override fun load() = saved
+    override fun save(preferences: Preferences) { saved = preferences }
+}
+
+/** A store whose load is slow, so two saves at once would both read the old value. */
+private class SlowPrefs : PreferencesStore {
+    @Volatile var saved = Preferences()
+    override fun load(): Preferences = saved.also { Thread.sleep(50) }
     override fun save(preferences: Preferences) { saved = preferences }
 }
 
@@ -1911,6 +1919,52 @@ class AppFlowTest {
         f.setRecordStart(RecordStart.LAST)
         assertEquals(RecordStart.LAST, f.recordStart.value)
         assertEquals(RecordStart.LAST, prefs.saved.recordStart)
+    }
+
+    @Test fun theRecordDraftOpensOnTheStartTypeSet() {
+        prefs.saved = Preferences(recordStart = RecordStart.EXPENSE)
+        val f = savedFlow()
+        f.unlock("483926")
+        assertEquals(EntryType.EXPENSE, f.workspace!!.record.ui.value.draft.type)
+    }
+
+    @Test fun startingOnTheLastTypeOpensOnTheTypeSavedBeforeTheAppRestarted() {
+        val f = savedFlow()
+        f.unlock("483926")
+        f.workspace!!.record.run {
+            setType(EntryType.EXPENSE)
+            setAmount(ui.value.draft.tenders.first().key, "1500")
+            save()
+        }
+        assertEquals(EntryType.EXPENSE, prefs.saved.lastType)
+        prefs.saved = prefs.saved.copy(recordStart = RecordStart.LAST)
+        val again = flow()
+        again.unlock("483926")
+        assertEquals(EntryType.EXPENSE, again.workspace!!.record.ui.value.draft.type)
+    }
+
+    @Test fun changingTheRecordStartMovesAnUntouchedDraftButNotATouchedOne() {
+        val f = savedFlow()
+        f.unlock("483926")
+        f.setRecordStart(RecordStart.EXPENSE)
+        assertEquals(EntryType.EXPENSE, f.workspace!!.record.ui.value.draft.type)
+        f.workspace!!.record.setNote("rent")
+        f.setRecordStart(RecordStart.INCOME)
+        assertEquals(EntryType.EXPENSE, f.workspace!!.record.ui.value.draft.type)
+    }
+
+    @Test fun preferencesSavedAtTheSameTimeKeepEveryChange() {
+        val slow = SlowPrefs()
+        val f = AppFlow(
+            scope, store, ThisDevice("Test PC", "windows"),
+            connect = { _, _, eps -> api.also { it.endpoints = eps } }, probe = { PIN_FP },
+            prefs = slow, now = { clock }, io = Dispatchers.IO, discovery = discovery, outbox = outbox,
+        )
+        f.setLanguage("th")
+        f.setRecordStart(RecordStart.EXPENSE)
+        val end = System.currentTimeMillis() + 5_000
+        while (slow.saved != Preferences(language = "th", recordStart = RecordStart.EXPENSE) && System.currentTimeMillis() < end) Thread.sleep(10)
+        assertEquals(Preferences(language = "th", recordStart = RecordStart.EXPENSE), slow.saved)
     }
 
     @Test fun lockingWhileThePromptIsOpenEndsIt() {
