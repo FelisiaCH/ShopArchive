@@ -88,7 +88,7 @@ class NotifyConfigTest {
 
     @Test
     fun aVersionOneListThatHasItOrIsEmptyOrIsAbsentIsLeftAsItIs() {
-        assertEquals(listOf("note.created", "day.closed") + CHANGES, loaded("  events: [note.created, day.closed]\n", version = 1).events)
+        assertEquals(listOf("note.created", "day.closed"), loaded("  events: [note.created, day.closed]\n", version = 1).events)
         assertEquals(emptyList(), loaded("  events: []\n", version = 1).events)
         assertTrue("  events: []\n" in root.text("config/shoparchive.yml"), "messages the admin turned off stay off")
         assertEquals(ALL, loaded("  timeout-seconds: 20\n", version = 1).events)
@@ -103,14 +103,22 @@ class NotifyConfigTest {
     // --- the upgrade of a file written before entry.edited, entry.deleted and entry.moved existed (config-version 2) ---
 
     @Test
-    fun aVersionTwoListWithEventsGetsTheThreeChangeTypesAndAnEmptyOneStaysEmpty() {
-        val notify = loaded("  events: [day.closed, entry.edited]\n  max-attempts: 7\n", version = 2)
-        assertEquals(listOf("day.closed", "entry.edited", "entry.deleted", "entry.moved"), notify.events)
+    fun aVersionTwoListWithEntryCreatedGetsTheThreeChangeTypesOnceAndOthersAreLeft() {
+        val notify = loaded("  events: [day.closed, entry.created, entry.edited]\n  max-attempts: 7\n", version = 2)
+        assertEquals(listOf("day.closed", "entry.created", "entry.edited", "entry.deleted", "entry.moved"), notify.events)
         assertEquals(7, notify.maxAttempts)
+        assertEquals(listOf("day.closed", "entry.edited"), loaded("  events: [day.closed, entry.edited]\n", version = 2).events)
+        assertEquals(listOf("day.closed"), loaded("  events: [day.closed]\n", version = 2).events)
         assertEquals(emptyList(), loaded("  events: []\n", version = 2).events)
         assertTrue("  events: []\n" in root.text("config/shoparchive.yml"))
         assertEquals(ALL, loaded("  timeout-seconds: 20\n", version = 2).events)
         assertTrue("config-version: 3" in root.text("config/shoparchive.yml"))
+    }
+
+    @Test
+    fun theDottedFormOfAVersionTwoListWithoutEntryCreatedIsLeft() {
+        root.write("config/shoparchive.yml", "config-version: 2\nnotify.events: [day.closed]\n")
+        assertEquals(listOf("day.closed"), loaded().events)
     }
 
     @Test

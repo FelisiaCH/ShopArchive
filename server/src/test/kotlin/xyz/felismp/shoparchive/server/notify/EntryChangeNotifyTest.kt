@@ -148,11 +148,13 @@ class EntryChangeNotifyTest {
             assertEquals("20261003-" + e.id.takeLast(5).uppercase(), n.code)
             assertEquals("Main Shop", n.fields["branch"])
             assertEquals("noy", n.fields["user"])
-            assertEquals("coffee", n.fields["item.before"])
-            assertEquals("latte", n.fields["item.after"])
-            assertEquals("ເຄື່ອງດື່ມ", n.fields["category.before"])
-            assertEquals("ອາຫານ", n.fields["category.after"])
-            assertEquals("+150.000 LAK", n.fields["money.before"])
+            assertEquals("coffee", n.fields["before.item"])
+            assertEquals("latte", n.fields["item"])
+            assertEquals("ເຄື່ອງດື່ມ", n.fields["before.category"])
+            assertEquals("ອາຫານ", n.fields["category"])
+            assertEquals("food", n.fields["category.key"])
+            assertEquals("+150.000 LAK", n.fields["before.money"])
+            assertEquals("noy", n.fields["recordedBy"])
             assertTrue(describe(n).startsWith("[${n.code}] Main Shop ${n.fields["time"]}: noy edited entry"), describe(n))
         }
     }

@@ -2,6 +2,7 @@ package xyz.felismp.shoparchive.server.notify
 
 import xyz.felismp.shoparchive.api.DayClosedEvent
 import xyz.felismp.shoparchive.api.DeliveryResult
+import xyz.felismp.shoparchive.api.EntryChangedEvent
 import xyz.felismp.shoparchive.api.Notification
 import xyz.felismp.shoparchive.api.NotificationService
 import xyz.felismp.shoparchive.api.Notifier
@@ -119,6 +120,11 @@ internal class Notify(
             val draft = draftFor(event, config.locale, stamp(clock, config)) ?: return
             enqueueOnce(draft)
         } catch (e: Exception) {
+            if (event is EntryChangedEvent) {
+                // Reconcile builds messages from records and never makes a change message, so there is no second try.
+                Log.warn("Could not queue the message of ${event.type}: ${e.javaClass.simpleName}: ${e.message}; this message will not be sent again")
+                return
+            }
             // The record is saved; the worker's next round queues its message from the records.
             Log.warn("Could not queue the message of ${event.type}: ${e.javaClass.simpleName}: ${e.message}; it is queued again from the records shortly")
             reconcileNeeded = true

@@ -31,27 +31,25 @@ internal fun notificationFields(event: ShopEvent, locale: Locale): Map<String, S
 }
 
 private fun changeFields(event: EntryChangedEvent, locale: Locale): Map<String, String> {
-    fun name(names: LocalizedName?) = when (locale.language) {
-        "th" -> names?.th
-        "en" -> names?.en
-        else -> names?.lo
-    } ?: ""
-    return linkedMapOf(
-        "type" to event.after.type.wire(),
-        "branch" to event.branchName,
-        "user" to event.by.name,
-        "time" to event.after.updatedAt,
-        "date" to event.after.date,
-        "date.before" to event.before.date,
-        "item.before" to event.before.item,
-        "item.after" to event.after.item,
-        "category.before" to name(event.categoryBefore),
-        "category.after" to name(event.categoryAfter),
-        "amount.before" to event.before.tenders.joinToString(", ") { it.amount },
-        "amount.after" to event.after.tenders.joinToString(", ") { it.amount },
-        "money.before" to event.before.money(locale),
-        "money.after" to event.after.money(locale),
-    )
+    fun name(names: LocalizedName?) = localeName(names, locale) ?: ""
+    // The entry as it is now, as an entry.created message has it; `time` and `user` are of the change, `recordedBy` is who recorded the entry.
+    return LinkedHashMap(entryFieldsOf(event.after, event.categoryAfter, event.branchName, locale)).apply {
+        put("time", event.after.updatedAt)
+        put("user", event.by.name)
+        put("recordedBy", event.after.createdBy.name)
+        put("before.date", event.before.date)
+        put("before.item", event.before.item)
+        put("before.note", event.before.note)
+        put("before.category", name(event.categoryBefore))
+        put("before.amount", event.before.tenders.joinToString(", ") { it.amount })
+        put("before.money", event.before.money(locale))
+    }
+}
+
+private fun localeName(names: LocalizedName?, locale: Locale): String? = when (locale.language) {
+    "th" -> names?.th
+    "en" -> names?.en
+    else -> names?.lo
 }
 
 /** Read at a glance: signed by type and grouped as the app shows money, each amount with its own currency. */
@@ -65,14 +63,10 @@ private fun noteFields(event: NoteCreatedEvent): Map<String, String> = linkedMap
     "text" to event.note.text,
 )
 
-private fun entryFields(event: EntryCreatedEvent, locale: Locale): Map<String, String> {
-    val entry = event.entry
-    val names = event.categoryName
-    val inLocale = when (locale.language) {
-        "th" -> names?.th
-        "en" -> names?.en
-        else -> names?.lo
-    }
+private fun entryFields(event: EntryCreatedEvent, locale: Locale): Map<String, String> = entryFieldsOf(event.entry, event.categoryName, event.branchName, locale)
+
+private fun entryFieldsOf(entry: EntryDto, names: LocalizedName?, branchName: String, locale: Locale): Map<String, String> {
+    val inLocale = localeName(names, locale)
     return linkedMapOf(
         "type" to entry.type.wire(),
         "category" to (inLocale ?: ""),
@@ -91,7 +85,7 @@ private fun entryFields(event: EntryCreatedEvent, locale: Locale): Map<String, S
             "${t.source} ✓ ${groupThousands(t.amount, locale)} ${t.currency} · ${shortBankTime(t.time)}\n" +
                 listOfNotNull(t.from, t.to + if (t.toShop == false) " ⚠" else "").joinToString(" → ")
         },
-        "branch" to event.branchName,
+        "branch" to branchName,
         "user" to entry.createdBy.name,
         "time" to entry.createdAt,
         "date" to entry.date,
@@ -171,10 +165,10 @@ internal fun describe(n: Notification): String {
             "[${n.code}] ${f["branch"]} ${f["date"]}: day closed by ${n.user}; net ${f["net"]}; counted ${f["counted"]}; variance ${f["variance"]}; handover ${f["handover"]}; ${f["entries"]} entries" +
                 if (f["recomputed"] == "true") " (figures added up from the entries as they are now: the day was closed before they were kept)" else ""
         ShopEventTypes.ENTRY_EDITED, ShopEventTypes.ENTRY_DELETED, ShopEventTypes.ENTRY_MOVED -> buildString {
-            append("[${n.code}] ${f["branch"]} ${f["time"]}: ${n.user} ${n.event.removePrefix("entry.")} entry ${f["item.before"]} ${f["money.before"]}")
+            append("[${n.code}] ${f["branch"]} ${f["time"]}: ${n.user} ${n.event.removePrefix("entry.")} entry ${f["before.item"]} ${f["before.money"]}")
             when (n.event) {
-                ShopEventTypes.ENTRY_EDITED -> append(" -> ${f["item.after"]} ${f["money.after"]}")
-                ShopEventTypes.ENTRY_MOVED -> append(" from ${f["date.before"]} to ${f["date"]}")
+                ShopEventTypes.ENTRY_EDITED -> append(" -> ${f["item"]} ${f["money"]}")
+                ShopEventTypes.ENTRY_MOVED -> append(" from ${f["before.date"]} to ${f["date"]}")
                 else -> Unit
             }
         }

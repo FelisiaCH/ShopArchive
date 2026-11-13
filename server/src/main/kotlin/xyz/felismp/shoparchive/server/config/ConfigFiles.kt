@@ -43,12 +43,13 @@ private val addNoteEvent = MigrationStep(1) { content ->
 }
 
 /**
- * 2 -> 3: `entry.edited`, `entry.deleted` and `entry.moved` joined the default `notify.events`. A list that was kept as it stood and is not empty gets them too
- * (missing ones appended); an empty list is the admin's choice of no messages and is left. Both the nested and the dotted form are read.
+ * 2 -> 3: `entry.edited`, `entry.deleted` and `entry.moved` joined the default `notify.events`. A list that has `entry.created` (the admin wants entry messages)
+ * gets the missing ones appended; a list without it (e.g. only `day.closed`) and an empty list (no messages) are the admin's choice and are left.
+ * Both the nested and the dotted form are read.
  */
 private val addEntryChangeEvents = MigrationStep(2) { content ->
     val added = listOf(ShopEventTypes.ENTRY_EDITED, ShopEventTypes.ENTRY_DELETED, ShopEventTypes.ENTRY_MOVED)
-    fun withChanges(events: Any?): Any? = if (events is List<*> && events.isNotEmpty()) events + added.filter { it !in events } else events
+    fun withChanges(events: Any?): Any? = if (events is List<*> && ShopEventTypes.ENTRY_CREATED in events) events + added.filter { it !in events } else events
     val section = content["notify"] as? Map<*, *>
     LinkedHashMap(content).also { out ->
         if (section != null && "events" in section) out["notify"] = LinkedHashMap(section).also { it["events"] = withChanges(section["events"]) }
