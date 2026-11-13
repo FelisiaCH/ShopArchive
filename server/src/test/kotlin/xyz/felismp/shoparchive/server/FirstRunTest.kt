@@ -65,7 +65,7 @@ class FirstRunTest {
         assertEquals(
             listOf(
                 "Owner login: user 'owner'  PIN $pin",
-                "Open the app, pick this server and log in with these. A new PIN is made at every start until the owner has logged in.",
+                "Open the app, pick this server and log in with these. A new PIN is made at every start until the owner has logged in or is reset.",
             ),
             printed,
         )
@@ -141,6 +141,20 @@ class FirstRunTest {
         val afterStart = users.user("owner")
         assertEquals(afterReset.setupCode, afterStart.setupCode)
         assertNull(afterStart.pin, "the start did not give the owner a PIN over the setup code")
+    }
+
+    @Test
+    fun anOwnerWithAPinAndALeftoverSetupCodeStillGetsANewPinAtStart() = env().run {
+        // What the older start left after a reset: the setup code is still in the file, but a PIN was made over it, so the code no longer works.
+        assertNotNull(start().ownerLogin())
+        console("user reset owner")
+        users.replacePin(users.user("owner").id, auth.hasher.hash("123456"))
+        assertTrue(isUsableCredential(users.user("owner").setupCode))
+        assertTrue(isUsableCredential(users.user("owner").pin))
+
+        val (_, pin) = assertNotNull(start().ownerLogin(), "a PIN is made, since the code cannot be used")
+
+        api { assertEquals(HttpStatusCode.OK, login("owner", pin = pin).status) }
     }
 
     @Test

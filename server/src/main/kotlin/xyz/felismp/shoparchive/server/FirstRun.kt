@@ -40,8 +40,10 @@ internal fun firstRunSetup(config: ConfigService, users: UserStore, branches: Br
             Log.info("First start: user '$owner' made, an op")
         }
         val account = users.find(owner) ?: return null
-        // A setup code is waiting (`user reset`): the owner is to claim a PIN with it, so no new PIN is made over it.
-        if (!account.enabled || devices.devicesOf(account.id).isNotEmpty() || isUsableCredential(account.setupCode)) return null
+        // A setup code is waiting (`user reset` left one and there is no PIN yet): the owner is to claim a PIN with it, so no new PIN is made over it.
+        // A file with both a PIN and a code is not waiting: the code no longer works (login checks it only without a PIN), so the PIN is made as before.
+        val codeWaiting = isUsableCredential(account.setupCode) && !isUsableCredential(account.pin)
+        if (!account.enabled || devices.devicesOf(account.id).isNotEmpty() || codeWaiting) return null
         val pin = (1..config.auth.pinLength).joinToString("") { random.nextInt(10).toString() }
         val hash = hasher.hash(pin)
         // The same lock as a login, so one under way does not see half of the change.
@@ -67,5 +69,5 @@ internal fun firstBranchName(key: String, locale: Locale): String = when {
 internal fun printFirstRun(login: FirstRunLogin?, out: (String) -> Unit = Log::terminalOnly) {
     if (login == null) return
     out("Owner login: user '${login.name}'  PIN ${login.pin}")
-    out("Open the app, pick this server and log in with these. A new PIN is made at every start until the owner has logged in.")
+    out("Open the app, pick this server and log in with these. A new PIN is made at every start until the owner has logged in or is reset.")
 }
