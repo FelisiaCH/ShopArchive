@@ -107,6 +107,7 @@
     <string name="openday_again_btn">ເປີດຮອບໃໝ່</string>
     <string name="day_round">ຮອບທີ %1$d ຂອງມື້ນີ້</string>
     <string name="openday_hint">ນັບເງິນທອນໃນລິ້ນຊັກ: ຈຳນວນຕໍ່ສະກຸນເງິນ. ປ່ອຍຫວ່າງ = 0.</string>
+    <string name="openday_kept_hint">ເງິນທອນທີ່ເກັບໄວ້ຈາກຮອບກ່ອນ: %1$s. ນັບເງິນໃນລິ້ນຊັກແລ້ວຕື່ມເອງ (ລະບົບບໍ່ຕື່ມໃຫ້)</string>
     <string name="openday_amount">ເງິນທອນ %1$s</string>
     <string name="openday_invalid">ຈຳນວນບໍ່ຖືກຕ້ອງສຳລັບ %1$s.</string>
     <string name="openday_already">%1$s ໄດ້ເປີດວັນນີ້ແລ້ວ.</string>
