@@ -344,9 +344,9 @@
     <string name="notif_state_failed">ສົ່ງບໍ່ສຳເລັດ</string>
     <string name="notif_event_day">ປິດຍອດ</string>
     <string name="notif_event_entry">ລາຍການໃໝ່</string>
-    <string name="notif_event_entry_edited">ແກ້ໄຂລາຍການ</string>
-    <string name="notif_event_entry_deleted">ລຶບລາຍການ</string>
-    <string name="notif_event_entry_moved">ຍ້າຍລາຍການ</string>
+    <string name="notif_event_entry_edited">ແກ້ໄຂລາຍການແລ້ວ</string>
+    <string name="notif_event_entry_deleted">ລຶບລາຍການແລ້ວ</string>
+    <string name="notif_event_entry_moved">ຍ້າຍລາຍການແລ້ວ</string>
     <string name="notif_event_device">ອຸປະກອນໃໝ່</string>
     <string name="notif_attempts">ລອງແລ້ວ %1$d ເທື່ອ</string>
     <string name="notif_retry_at">ລອງໃໝ່ເວລາ %1$s</string>
