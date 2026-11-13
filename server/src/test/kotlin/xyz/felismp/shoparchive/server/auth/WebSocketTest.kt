@@ -100,18 +100,24 @@ class WebSocketTest {
 
     private lateinit var context: SSLContext
 
-    private fun connect(port: Int, token: String?, protocol: Boolean = true): Pair<WebSocket, Feed> {
+    private fun connect(
+        port: Int, token: String?, protocol: Boolean = true, subprotocols: List<String> = emptyList(), origin: String? = null,
+    ): Pair<WebSocket, Feed> {
         val feed = Feed()
         val socket = HttpClient.newBuilder().sslContext(context).build().newWebSocketBuilder().apply {
             if (protocol) header(PROTOCOL_HEADER, "$PROTOCOL_VERSION")
             if (token != null) header("Authorization", "Bearer $token")
+            if (origin != null) header("Origin", origin)
+            if (subprotocols.isNotEmpty()) subprotocols(subprotocols.first(), *subprotocols.drop(1).toTypedArray())
         }.buildAsync(URI("wss://127.0.0.1:$port/api/v1/ws"), feed).get(10, TimeUnit.SECONDS)
         openSockets += socket
         return socket to feed
     }
 
-    private fun handshakeStatus(port: Int, token: String?, protocol: Boolean = true): Int {
-        val failure = assertFailsWith<Exception> { connect(port, token, protocol) }
+    private fun handshakeStatus(
+        port: Int, token: String?, protocol: Boolean = true, subprotocols: List<String> = emptyList(), origin: String? = null,
+    ): Int {
+        val failure = assertFailsWith<Exception> { connect(port, token, protocol, subprotocols, origin) }
         val cause = (failure as? java.util.concurrent.ExecutionException)?.cause ?: (failure as? CompletionException)?.cause ?: failure
         return (cause as WebSocketHandshakeException).response.statusCode()
     }
@@ -151,6 +157,55 @@ class WebSocketTest {
         assertEquals(400, handshakeStatus(port, login.token, protocol = false))
         connect(port, login.token) // the right one gets in
         assertTrue(waitUntil { env.auth.events.openConnections() == 1 })
+    }
+
+    @Test
+    fun aBrowserSendsTheVersionAndTokenAsSubprotocolsAndOnlyTheVersionIsEchoed() {
+        val env = AuthEnv(root)
+        val port = start(env)
+        val token = env.login("mali").token
+        val version = "shoparchive.v$PROTOCOL_VERSION"
+
+        val (socket, _) = connect(port, null, protocol = false, subprotocols = listOf(version, "shoparchive.bearer.$token"))
+
+        assertEquals(version, socket.subprotocol)
+        assertTrue(waitUntil { env.auth.events.openConnections() == 1 })
+        assertEquals(401, handshakeStatus(port, null, protocol = false, subprotocols = listOf(version, "shoparchive.bearer.nope")))
+        assertEquals(400, handshakeStatus(port, null, protocol = false, subprotocols = listOf("shoparchive.v${PROTOCOL_VERSION + 1}", "shoparchive.bearer.$token")))
+        assertEquals(401, handshakeStatus(port, null, protocol = false, subprotocols = listOf(version)))
+    }
+
+    @Test
+    fun anOldClientWithNoSubprotocolStillConnectsAndGetsNoneBack() {
+        val env = AuthEnv(root)
+        val port = start(env)
+
+        val (socket, _) = connect(port, env.login("mali").token)
+
+        assertEquals("", socket.subprotocol)
+    }
+
+    @Test
+    fun theAuthorizationHeaderWinsOverTheSubprotocolToken() {
+        val env = AuthEnv(root)
+        val port = start(env)
+        val token = env.login("mali").token
+        val version = "shoparchive.v$PROTOCOL_VERSION"
+
+        assertEquals(401, handshakeStatus(port, "wrong", subprotocols = listOf(version, "shoparchive.bearer.$token")))
+        connect(port, token, subprotocols = listOf(version, "shoparchive.bearer.wrong"))
+    }
+
+    @Test
+    fun anOriginThatIsNotTheServersOwnAddressIsRefusedWith403() {
+        val env = AuthEnv(root)
+        val port = start(env)
+        val token = env.login("mali").token
+
+        assertEquals(403, handshakeStatus(port, token, origin = "https://evil.example"))
+        assertEquals(403, handshakeStatus(port, token, origin = "https://127.0.0.1:${port + 1}"))
+        assertEquals(403, handshakeStatus(port, token, origin = "null"))
+        connect(port, token, origin = "https://127.0.0.1:$port")
     }
 
     @Test
