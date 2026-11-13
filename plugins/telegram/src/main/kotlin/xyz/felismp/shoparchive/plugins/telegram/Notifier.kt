@@ -164,7 +164,7 @@ class TelegramNotifier(
     }
 
     private fun picturesOf(notification: Notification): List<SlipFile> =
-        try {
+        if (notification.event in CHANGE_EVENTS) emptyList() else try {
             images()?.images(notification).orEmpty()
         } catch (e: Exception) {
             log("no images for the message: ${e.javaClass.simpleName}")

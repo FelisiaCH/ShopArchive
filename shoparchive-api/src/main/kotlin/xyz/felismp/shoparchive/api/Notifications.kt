@@ -9,6 +9,8 @@ import xyz.felismp.shoparchive.shared.NotificationState
  * (the display name), `user` and `time`; for an entry paid in more than one currency [amount] and [currency] list each, in the same order, joined with `, `.
  * `day.closed` adds `date`, `closedBy`, `entries`, `slips`, `note` and, one text per field with the currencies joined by `; `
  * (`LAK 150000; THB 20.50`): `income`, `expense`, `net`, `cashIn`, `cashOut`, `onlineIn`, `onlineOut`, `float`, `counted`, `expected`, `variance`, `kept`, `handover`.
+ * `entry.edited`, `entry.deleted` and `entry.moved` have the fields of `entry.created` for the entry as it is after the change (`time` is the change's, `user` who made it), plus
+ * `recordedBy` (who recorded the entry) and, for the entry before it: `before.date`, `before.item`, `before.note`, `before.category`, `before.amount`, `before.money`.
  * `device.new` has only `user`, `device` (the device's label), `platform` and `deviceId`.
  * Every notification also has `code` and, but for `device.new`, `date`. The words are data, not text: the channel decides the language and layout.
  */
@@ -22,7 +24,7 @@ class Notification(
     val createdAt: String,
     /** The branch key. */
     val branch: String,
-    /** The name of the user the event is about: who recorded the entry, who closed the day, who logged in on a new device. */
+    /** The name of the user who did it: who recorded the entry, who made the edit, delete or move (`entry.edited`, `entry.deleted`, `entry.moved`), who closed the day, who logged in on a new device. */
     val user: String,
     /** The language the server speaks (`lo`, `th` or `en`): a default for a channel that has no language of its own. */
     val locale: String,
@@ -31,7 +33,7 @@ class Notification(
     val attempt: Int = 1,
     /** The id of the message this one repeats, if it was sent again by hand. */
     val resendOf: String? = null,
-    /** The id of the entry or the day the message is about; null for a message that is about neither (a new device) or was queued before the server kept it. */
+    /** The id of the entry or the day the message is about (`id@updatedAt` of the entry after the change for `entry.edited`, `entry.deleted` and `entry.moved`); null for a message that is about neither (a new device) or was queued before the server kept it. */
     val subject: String? = null,
 )
 

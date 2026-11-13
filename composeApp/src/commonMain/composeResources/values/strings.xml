@@ -344,6 +344,9 @@
     <string name="notif_state_failed">Not sent</string>
     <string name="notif_event_day">Day closed</string>
     <string name="notif_event_entry">New entry</string>
+    <string name="notif_event_entry_edited">Entry edited</string>
+    <string name="notif_event_entry_deleted">Entry deleted</string>
+    <string name="notif_event_entry_moved">Entry moved</string>
     <string name="notif_event_device">New device</string>
     <string name="notif_attempts">Tries: %1$d</string>
     <string name="notif_retry_at">Next try: %1$s</string>

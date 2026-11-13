@@ -3,11 +3,14 @@ package xyz.felismp.shoparchive.server.records
 import xyz.felismp.shoparchive.api.ApiError
 import xyz.felismp.shoparchive.api.CreatedEntry
 import xyz.felismp.shoparchive.api.EntryQuery
+import xyz.felismp.shoparchive.api.EntryChangedEvent
 import xyz.felismp.shoparchive.api.EntryCreatedEvent
 import xyz.felismp.shoparchive.api.EntryService
 import xyz.felismp.shoparchive.api.EventService
 import xyz.felismp.shoparchive.api.Principal
 import xyz.felismp.shoparchive.api.ServiceRegistry
+import xyz.felismp.shoparchive.api.ShopEvent
+import xyz.felismp.shoparchive.api.ShopEventTypes
 import xyz.felismp.shoparchive.api.ShopEvents
 import xyz.felismp.shoparchive.api.SlipChecker
 import xyz.felismp.shoparchive.api.SlipFile
@@ -291,11 +294,11 @@ internal class DefaultEntryService(
                 transfers = transfers,
             )
             val changes = differences(entry, changed)
-            if (changes.isEmpty()) return@run entry to null
+            if (changes.isEmpty()) return@run Triple(entry, null, entry)
             val by = UserRef(principal.userId, principal.username)
-            store.replace(changed, added.associate { it.file to it.bytes }, HistoryItem(now, by, "edit", changes)) to EntryUpdatedMessage(id, changed.date.toString(), changed.branch)
+            Triple(store.replace(changed, added.associate { it.file to it.bytes }, HistoryItem(now, by, "edit", changes)), EntryUpdatedMessage(id, changed.date.toString(), changed.branch), entry)
         }
-        result.second?.let { publish(it, result.first) }
+        result.second?.let { publish(it, result.first); publishEvent { changedEvent(ShopEventTypes.ENTRY_EDITED, result.third, result.first, principal) } }
         return result.first.toDto()
     }
 
@@ -304,13 +307,12 @@ internal class DefaultEntryService(
             val entry = lookup(principal, date, id)
             requireChange(principal, entry, ENTRY_DELETE_OWN_NODE, ENTRY_DELETE_ALL_NODE)
             access.requireRecentAuth(principal)
-            if (entry.deleted) return@run entry to null
+            if (entry.deleted) return@run Triple(entry, null, entry)
             val now = nextStamp(entry.updatedAt, clock, config)
             val by = UserRef(principal.userId, principal.username)
-            store.replace(entry.copy(deleted = true, updatedAt = now), emptyMap(), HistoryItem(now, by, "delete", emptyList())) to
-                EntryDeletedMessage(id, entry.date.toString(), entry.branch)
+            Triple(store.replace(entry.copy(deleted = true, updatedAt = now), emptyMap(), HistoryItem(now, by, "delete", emptyList())), EntryDeletedMessage(id, entry.date.toString(), entry.branch), entry)
         }
-        result.second?.let { publish(it, result.first) }
+        result.second?.let { publish(it, result.first); publishEvent { changedEvent(ShopEventTypes.ENTRY_DELETED, result.third, result.first, principal) } }
         return result.first.toDto()
     }
 
@@ -319,7 +321,7 @@ internal class DefaultEntryService(
             val entry = lookup(principal, date, id)
             requireChange(principal, entry, ENTRY_EDIT_OWN_NODE, ENTRY_EDIT_ALL_NODE)
             val target = date(request.date)
-            if (target == entry.date) return@run entry to null
+            if (target == entry.date) return@run Triple(entry, null, entry)
             if (target.isAfter(today())) throw badRequest("An entry cannot be moved to a day that has not come yet.", ErrorReasons.ENTRY_MOVE_FUTURE)
             if (!access.has(principal, ENTRY_EDIT_ALL_NODE) && !withinWindow(target)) {
                 throw access.forbidden("That day is past the edit window; moving an entry there needs $ENTRY_EDIT_ALL_NODE.", ErrorReasons.ENTRY_PAST_WINDOW)
@@ -327,10 +329,12 @@ internal class DefaultEntryService(
             val now = nextStamp(entry.updatedAt, clock, config)
             val by = UserRef(principal.userId, principal.username)
             val moved = entry.copy(date = target, updatedAt = now)
-            store.move(entry, moved, HistoryItem(now, by, "move", listOf(HistoryChange("date", entry.date.toString(), target.toString())))) to
-                EntryMovedMessage(id, target.toString(), entry.date.toString(), entry.branch)
+            Triple(
+                store.move(entry, moved, HistoryItem(now, by, "move", listOf(HistoryChange("date", entry.date.toString(), target.toString())))),
+                EntryMovedMessage(id, target.toString(), entry.date.toString(), entry.branch), entry,
+            )
         }
-        result.second?.let { publish(it, result.first) }
+        result.second?.let { publish(it, result.first); publishEvent { changedEvent(ShopEventTypes.ENTRY_MOVED, result.third, result.first, principal) } }
         return result.first.toDto()
     }
 
@@ -398,12 +402,18 @@ internal class DefaultEntryService(
     /** The event of [entry] being created, with the names of its branch and category as they are now. */
     fun createdEvent(entry: Entry) = EntryCreatedEvent(entry.toDto(), branches.find(entry.branch)?.displayName ?: entry.branch, entry.category?.let { categories.find(it)?.name })
 
+    /** The event of an entry changing from [before] to [after] by [principal], with the names of its branch and categories as they are now. */
+    private fun changedEvent(type: String, before: Entry, after: Entry, principal: Principal) = EntryChangedEvent(
+        type, before.toDto(), after.toDto(), UserRef(principal.userId, principal.username), branches.find(after.branch)?.displayName ?: after.branch,
+        before.category?.let { categories.find(it)?.name }, after.category?.let { categories.find(it)?.name },
+    )
+
     /** Tells the listeners of the shop events, after the entry is saved. They cannot fail the request that already wrote it. */
-    private fun publishEvent(event: () -> EntryCreatedEvent) {
+    private fun publishEvent(event: () -> ShopEvent) {
         try {
             services.get(ShopEvents::class.java)?.publish(event())
         } catch (e: Exception) {
-            Log.warn("could not publish entry.created: ${e.message}")
+            Log.warn("could not publish a shop event: ${e.message}")
         }
     }
 

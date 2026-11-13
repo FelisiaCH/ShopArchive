@@ -2,13 +2,16 @@ package xyz.felismp.shoparchive.server.notify
 
 import xyz.felismp.shoparchive.api.CurrencyDay
 import xyz.felismp.shoparchive.api.DayClosedEvent
+import xyz.felismp.shoparchive.api.EntryChangedEvent
 import xyz.felismp.shoparchive.api.EntryCreatedEvent
 import xyz.felismp.shoparchive.api.NewDeviceEvent
 import xyz.felismp.shoparchive.api.NoteCreatedEvent
 import xyz.felismp.shoparchive.api.Notification
 import xyz.felismp.shoparchive.api.ShopEvent
 import xyz.felismp.shoparchive.api.ShopEventTypes
+import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.EntryType
+import xyz.felismp.shoparchive.shared.LocalizedName
 import xyz.felismp.shoparchive.shared.wire
 import java.math.BigDecimal
 import java.text.DecimalFormatSymbols
@@ -23,8 +26,34 @@ internal fun notificationFields(event: ShopEvent, locale: Locale): Map<String, S
     is DayClosedEvent -> dayFields(event, locale)
     is NewDeviceEvent -> linkedMapOf("user" to event.username, "device" to event.deviceLabel, "platform" to event.platform, "deviceId" to event.deviceId)
     is NoteCreatedEvent -> noteFields(event)
+    is EntryChangedEvent -> changeFields(event, locale)
     else -> null
 }
+
+private fun changeFields(event: EntryChangedEvent, locale: Locale): Map<String, String> {
+    fun name(names: LocalizedName?) = localeName(names, locale) ?: ""
+    // The entry as it is now, as an entry.created message has it; `time` and `user` are of the change, `recordedBy` is who recorded the entry.
+    return LinkedHashMap(entryFieldsOf(event.after, event.categoryAfter, event.branchName, locale)).apply {
+        put("time", event.after.updatedAt)
+        put("user", event.by.name)
+        put("recordedBy", event.after.createdBy.name)
+        put("before.date", event.before.date)
+        put("before.item", event.before.item)
+        put("before.note", event.before.note)
+        put("before.category", name(event.categoryBefore))
+        put("before.amount", event.before.tenders.joinToString(", ") { it.amount })
+        put("before.money", event.before.money(locale))
+    }
+}
+
+private fun localeName(names: LocalizedName?, locale: Locale): String? = when (locale.language) {
+    "th" -> names?.th
+    "en" -> names?.en
+    else -> names?.lo
+}
+
+/** Read at a glance: signed by type and grouped as the app shows money, each amount with its own currency. */
+private fun EntryDto.money(locale: Locale) = tenders.joinToString(", ") { (if (type == EntryType.INCOME) "+" else "-") + groupThousands(it.amount, locale) + " " + it.currency }
 
 private fun noteFields(event: NoteCreatedEvent): Map<String, String> = linkedMapOf(
     "branch" to event.branchName,
@@ -34,14 +63,10 @@ private fun noteFields(event: NoteCreatedEvent): Map<String, String> = linkedMap
     "text" to event.note.text,
 )
 
-private fun entryFields(event: EntryCreatedEvent, locale: Locale): Map<String, String> {
-    val entry = event.entry
-    val names = event.categoryName
-    val inLocale = when (locale.language) {
-        "th" -> names?.th
-        "en" -> names?.en
-        else -> names?.lo
-    }
+private fun entryFields(event: EntryCreatedEvent, locale: Locale): Map<String, String> = entryFieldsOf(event.entry, event.categoryName, event.branchName, locale)
+
+private fun entryFieldsOf(entry: EntryDto, names: LocalizedName?, branchName: String, locale: Locale): Map<String, String> {
+    val inLocale = localeName(names, locale)
     return linkedMapOf(
         "type" to entry.type.wire(),
         "category" to (inLocale ?: ""),
@@ -53,15 +78,14 @@ private fun entryFields(event: EntryCreatedEvent, locale: Locale): Map<String, S
         "note" to entry.note,
         "amount" to entry.tenders.joinToString(", ") { it.amount },
         "currency" to entry.tenders.joinToString(", ") { it.currency },
-        // Read at a glance: signed by type and grouped as the app shows money, each amount with its own currency.
-        "money" to entry.tenders.joinToString(", ") { (if (entry.type == EntryType.INCOME) "+" else "-") + groupThousands(it.amount, locale) + " " + it.currency },
+        "money" to entry.money(locale),
         // What the bank confirmed, two lines per transfer so a phone does not break the names: "BCEL ✓ 850,000 LAK · 18/09 19:18" then
         // "payer → shop"; a payment to an account that is not the shop's is marked.
         "transfer" to entry.transfers.joinToString("\n") { t ->
             "${t.source} ✓ ${groupThousands(t.amount, locale)} ${t.currency} · ${shortBankTime(t.time)}\n" +
                 listOfNotNull(t.from, t.to + if (t.toShop == false) " ⚠" else "").joinToString(" → ")
         },
-        "branch" to event.branchName,
+        "branch" to branchName,
         "user" to entry.createdBy.name,
         "time" to entry.createdAt,
         "date" to entry.date,
@@ -140,6 +164,14 @@ internal fun describe(n: Notification): String {
         ShopEventTypes.DAY_CLOSED ->
             "[${n.code}] ${f["branch"]} ${f["date"]}: day closed by ${n.user}; net ${f["net"]}; counted ${f["counted"]}; variance ${f["variance"]}; handover ${f["handover"]}; ${f["entries"]} entries" +
                 if (f["recomputed"] == "true") " (figures added up from the entries as they are now: the day was closed before they were kept)" else ""
+        ShopEventTypes.ENTRY_EDITED, ShopEventTypes.ENTRY_DELETED, ShopEventTypes.ENTRY_MOVED -> buildString {
+            append("[${n.code}] ${f["branch"]} ${f["time"]}: ${n.user} ${n.event.removePrefix("entry.")} entry ${f["before.item"]} ${f["before.money"]}")
+            when (n.event) {
+                ShopEventTypes.ENTRY_EDITED -> append(" -> ${f["item"]} ${f["money"]}")
+                ShopEventTypes.ENTRY_MOVED -> append(" from ${f["before.date"]} to ${f["date"]}")
+                else -> Unit
+            }
+        }
         ShopEventTypes.NOTE_CREATED -> "[${n.code}] ${f["branch"]} ${f["time"]}: ${n.user} left a note: ${f["text"]}"
         ShopEventTypes.DEVICE_NEW -> "[${n.code}] New device: ${n.user} on ${f["device"]} (${f["platform"]})"
         else -> "[${n.code}] ${n.event} ${f["branch"] ?: n.branch}"
@@ -155,6 +187,8 @@ internal fun draftFor(event: ShopEvent, locale: Locale, createdAt: String, resen
         // Not a record: reconciling never makes it again, so there is no subject to look for.
         is NewDeviceEvent -> notificationCode(event.at.take(10), event.deviceId) to null
         is NoteCreatedEvent -> notificationCode(event.note.date, event.note.id) to event.note.id
+        // One entry has many changes: the version stamp makes each change its own subject, so two edits are two messages and a repeat of one is not.
+        is EntryChangedEvent -> notificationCode(event.after.date, event.after.id) to "${event.after.id}@${event.after.updatedAt}"
         else -> return null
     }
     return Draft(code, event.type, createdAt, event.branch, fields.getValue("user"), locale.toLanguageTag(), fields, resendOf, subject)

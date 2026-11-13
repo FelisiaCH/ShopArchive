@@ -5,8 +5,11 @@ import xyz.felismp.shoparchive.api.plugin.PluginConfig
 /** The languages a template exists in. */
 val LANGUAGES = listOf("lo", "th", "en")
 
+/** A recorded entry changed: a text only, never the slip images of the entry. */
+internal val CHANGE_EVENTS = listOf("entry.edited", "entry.deleted", "entry.moved")
+
 /** The events this channel knows how to write; `notify.events` in the server's config decides which of them reach any channel. */
-val KNOWN_EVENTS = listOf("entry.created", "day.closed", "device.new", "note.created")
+val KNOWN_EVENTS = listOf("entry.created", "day.closed", "device.new", "note.created") + CHANGE_EVENTS
 
 /** The key of an event's templates in config.yml: the dot of the event name would read as a level. */
 fun templateKey(event: String): String = event.replace('.', '-')
@@ -62,7 +65,8 @@ class TelegramSettings(
          *
          * The file itself is never rewritten, but a file from an older jar is read as if it had what the jar ships now (the way Bukkit's `getConfig()` falls back to the
          * defaults in the jar), and [info] says so once: a template the file lacks, for an event it sends, is the [shipped] one; the entry template of 0.1.1, unchanged, is the [shipped] one; and a file
-         * without `config-version` 2 whose `events` lists something gets `note.created` added (an empty list stays empty).
+         * without `config-version` 2 whose `events` lists something gets `note.created` added (an empty list stays empty), and a file without `config-version` 3
+         * whose `events` lists `entry.created` gets `entry.edited`, `entry.deleted` and `entry.moved` added.
          */
         fun read(config: PluginConfig, info: (String) -> Unit = {}, shipped: String? = ShippedConfig.text, warn: (String) -> Unit): TelegramSettings? {
             var ok = true
@@ -84,11 +88,20 @@ class TelegramSettings(
             }
 
             val upgraded = mutableListOf<String>()
+            val version = config.getInt("config-version", 1)
             val listed = config.getStringList("events").map { it.trim() }.filter { it.isNotEmpty() }.let { names ->
-                if (config.getInt("config-version", 1) < ShippedConfig.VERSION && names.isNotEmpty() && NOTE_CREATED !in names) {
+                var out = names
+                if (version < 2 && names.isNotEmpty() && NOTE_CREATED !in names) {
                     upgraded += "events: note.created"
-                    names + NOTE_CREATED
-                } else names
+                    out = out + NOTE_CREATED
+                }
+                // The same rule as the server's own notify.events: the change events join only a list that already has entry.created.
+                val changes = CHANGE_EVENTS.filter { it !in out }
+                if (version < ShippedConfig.VERSION && "entry.created" in names && changes.isNotEmpty()) {
+                    upgraded += "events: ${changes.joinToString()}"
+                    out = out + changes
+                }
+                out
             }
             val events = listed.filter {
                 (it in KNOWN_EVENTS).also { known -> if (!known) warn("events: '$it' is not an event this channel sends (${KNOWN_EVENTS.joinToString()}); ignored") }
