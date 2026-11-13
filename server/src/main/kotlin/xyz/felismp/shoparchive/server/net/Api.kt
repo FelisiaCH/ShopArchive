@@ -103,7 +103,7 @@ private fun gate(services: ServiceRegistry) = createApplicationPlugin("ShopArchi
         val path = call.request.path()
         if (!isApiPath(path)) return@onCall // the web client's files carry no protocol header
         val isGet = call.request.httpMethod == HttpMethod.Get
-        val isWebSocket = isGet && path == WS_PATH
+        val isWebSocket = isGet && isWebSocketPath(path)
         // A browser cannot set headers on a WebSocket: it names the version (and the token) in the subprotocols instead.
         val offeredVersion = isWebSocket && PROTOCOL_VERSION in call.webSocketProtocols().versions
         val versionOk = call.request.header(PROTOCOL_HEADER)?.trim()?.toIntOrNull() == PROTOCOL_VERSION || offeredVersion
@@ -135,7 +135,7 @@ private fun unauthorized(message: String = "Unlock the app first.") = ApiExcepti
 private fun ApplicationCall.bearerToken(): String? {
     val authorization = request.header(HttpHeaders.Authorization)
     // A browser's live connection carries the token as a subprotocol; Authorization wins when both are there.
-    if (authorization == null && request.httpMethod == HttpMethod.Get && request.path() == WS_PATH) return webSocketProtocols().token
+    if (authorization == null && request.httpMethod == HttpMethod.Get && isWebSocketPath(request.path())) return webSocketProtocols().token
     val parts = authorization?.trim()?.split(' ', limit = 2) ?: return null
     return parts.getOrNull(1)?.trim()?.takeIf { parts[0].equals("Bearer", ignoreCase = true) && it.isNotEmpty() }
 }
@@ -280,7 +280,9 @@ internal fun Application.apiModule(
             signedIn(services) { protectedRoutes(services) }
         }
         // The web client's files; /api/v1 is the more specific route, so it is tried first.
-        staticResources("/", "web")
+        staticResources("/", "web") {
+            modify { _, call -> call.response.header(HttpHeaders.CacheControl, staticCacheControl(call.request.path())) }
+        }
     }
 }
 

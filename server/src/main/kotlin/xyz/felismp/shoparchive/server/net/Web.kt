@@ -1,6 +1,7 @@
 package xyz.felismp.shoparchive.server.net
 
 import io.ktor.http.HttpHeaders
+import io.ktor.http.decodeURLPart
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.request.path
@@ -9,15 +10,25 @@ import java.net.URI
 import java.net.URISyntaxException
 import java.util.Locale
 
-internal const val API_PREFIX = "/api/"
 internal const val WS_PATH = "/api/v1/ws"
 
-/** Everything under `/api/` is the API; anything else is the web client's files. */
-internal fun isApiPath(path: String) = path.startsWith(API_PREFIX)
+/**
+ * The segments of [path] as the router sees them: split on `/`, empty ones dropped, each percent-decoded. Ktor matches routes on
+ * these, so `/%61pi/v1/x` and `//api/v1/x` reach the `/api/v1/x` route; anything that decides what is "the API" must look at the same thing.
+ * A segment that cannot be decoded is kept as it is (it matches no route).
+ */
+internal fun apiSegments(path: String): List<String> =
+    path.split('/').filter { it.isNotEmpty() }.map { try { it.decodeURLPart() } catch (e: Exception) { it } }
+
+/** Everything under `/api` is the API; anything else is the web client's files. */
+internal fun isApiPath(path: String) = apiSegments(path).firstOrNull() == "api"
+
+/** The live connection's path, however it is spelled. */
+internal fun isWebSocketPath(path: String) = apiSegments(path) == listOf("api", "v1", "ws")
 
 /** The policy of the web client's pages. One constant so it is easy to change. */
 internal const val WEB_CSP =
-    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; " +
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; connect-src 'self'; " +
         "object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 /**
@@ -41,7 +52,7 @@ internal val securityHeaders = createApplicationPlugin("ShopArchiveSecurityHeade
             call.response.header("X-Content-Type-Options", "nosniff")
             call.response.header("Referrer-Policy", "no-referrer")
             call.response.header("X-Frame-Options", "DENY")
-            call.response.header(HttpHeaders.CacheControl, staticCacheControl(path))
+            // Cache-Control for a file is set where the file is served (Api.kt), so a 403 or a 404 never gets `immutable`.
         }
     }
 }

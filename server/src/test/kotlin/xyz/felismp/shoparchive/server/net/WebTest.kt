@@ -68,6 +68,41 @@ class WebTest {
     }
 
     @Test
+    fun anEncodedOrDoubleSlashApiPathStillNeedsTheProtocolHeaderAndGetsNoStore() = web {
+        // "//api/v1/config" is not here: the test client reads a leading "//" as a host, so it cannot send it. apiSegments drops empty segments the way the router does.
+        for (path in listOf("/%61pi/v1/config", "/api/v1/%63onfig", "/%61pi/%76%31/config")) {
+            val without = client.get(path)
+            assertEquals(HttpStatusCode.BadRequest, without.status, path)
+            assertEquals(ErrorCode.PROTOCOL_MISMATCH, Json.decodeFromString(ErrorResponse.serializer(), without.bodyAsText()).code, path)
+            assertEquals("no-store", without.headers["Cache-Control"], path)
+            assertNull(without.headers["Content-Security-Policy"], path)
+        }
+    }
+
+    @Test
+    fun aMissingHashedFileIs404WithoutImmutableAndASlashlessApiNeedsTheHeader() = web {
+        val missing = client.get("/app.3f9a1c7e.js")
+        assertEquals(HttpStatusCode.NotFound, missing.status)
+        assertFalse("immutable" in missing.headers["Cache-Control"].orEmpty(), missing.headers["Cache-Control"])
+
+        assertEquals(HttpStatusCode.BadRequest, client.get("/api").status)
+    }
+
+    @Test
+    fun pathTraversalNeverServesAnythingButTheWebFiles() = web {
+        for (path in listOf("/../application.conf", "/%2e%2e/application.conf", "/..%2fapplication.conf", "/web/../../META-INF/MANIFEST.MF")) {
+            val response = client.get(path)
+            assertTrue(response.status == HttpStatusCode.NotFound || response.status == HttpStatusCode.BadRequest, "$path -> ${response.status}")
+            assertFalse("Manifest-Version" in response.bodyAsText(), path)
+        }
+    }
+
+    @Test
+    fun theContentSecurityPolicyLetsThePageShowABlobImage() {
+        assertTrue("img-src 'self' blob: data:" in WEB_CSP, WEB_CSP)
+    }
+
+    @Test
     fun aMissingPathUnderTheApiStaysTheJsonEnvelopeWithNoStoreAndNoWebHeaders() = web {
         val response = client.get("/api/v1/nope") { header(PROTOCOL_HEADER, "$PROTOCOL_VERSION") }
 
