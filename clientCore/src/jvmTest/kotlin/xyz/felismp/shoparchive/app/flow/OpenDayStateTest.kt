@@ -139,6 +139,15 @@ class OpenDayStateTest {
         assertEquals(mapOf("LAK" to "100000", "THB" to "500.00"), h.api.opened.single().second.float)
     }
 
+    @Test fun aNewRoundOfTheSameDayStartsFromWhatRoundOneLeftInTheDrawer() = runTest(UnconfinedTestDispatcher()) {
+        val (h, day) = setup()
+        h.api.pastSessions = listOf(h.api.closedDay("s1", "2026-10-04", mapOf("LAK" to "130000"), mapOf("LAK" to "30000"))) // closed today
+        h.refetch.tryEmit(Unit)
+        assertEquals(mapOf("LAK" to "100000"), day.ui.value.prefill)
+        day.confirm()
+        assertEquals(mapOf("LAK" to "100000"), h.api.opened.single().second.float)
+    }
+
     @Test fun aCurrencyWithNothingLeftInTheDrawerStaysEmpty() = runTest(UnconfinedTestDispatcher()) {
         val (h, day) = setup()
         h.api.pastSessions = listOf(h.api.closedDay("s1", "2026-10-03", mapOf("LAK" to "50000", "THB" to "10.00"), mapOf("LAK" to "50000", "THB" to "10.00")))

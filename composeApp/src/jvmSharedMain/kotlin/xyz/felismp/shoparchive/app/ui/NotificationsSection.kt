@@ -25,7 +25,7 @@ fun NotificationsSection(ws: Workspace) {
         ShopText(stringResource(Res.string.notif_closed_days), TextRole.Title)
         ui.closedDays.forEach { day ->
             ShopButton(
-                stringResource(Res.string.notif_send_day, day.businessDate), { ws.notifications.sendDay(day) }, primary = false,
+                ui.rounds[day.id]?.let { stringResource(Res.string.notif_send_day_round, day.businessDate, it) } ?: stringResource(Res.string.notif_send_day, day.businessDate), { ws.notifications.sendDay(day) }, primary = false,
                 enabled = !ui.blocked && day.id !in ui.working && !ui.dayWaiting(day),
             )
         }

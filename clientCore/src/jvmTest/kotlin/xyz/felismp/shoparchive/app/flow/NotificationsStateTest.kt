@@ -84,6 +84,25 @@ class NotificationsStateTest {
         assertEquals(listOf("main" to closed.id), h.api.dayNotifies)
     }
 
+    private fun closedRound(h: Harness, id: String, hour: String) =
+        h.api.session(id, status = SessionStatus.CLOSED).copy(
+            openedAt = "2026-10-04T${hour}:00:00+07:00",
+            close = SessionClose(mapOf("LAK" to "1"), mapOf("LAK" to "1"), mapOf("LAK" to "0"), mapOf("LAK" to "1"), emptyList(), "", h.api.alice, "2026-10-04T20:00:00+07:00"),
+        )
+
+    @Test fun aDayWithSeveralRoundsNumbersThemByOpeningTime() = runTest(UnconfinedTestDispatcher()) {
+        val h = harness(backgroundScope)
+        h.api.todaysSessions = listOf(closedRound(h, "s2", "14"), closedRound(h, "s1", "08"))
+        val ui = NotificationsState(h.env).ui.value
+        assertEquals(mapOf("s1" to 1, "s2" to 2), ui.rounds)
+    }
+
+    @Test fun aDayWithOneRoundHasNoRoundNumber() = runTest(UnconfinedTestDispatcher()) {
+        val h = harness(backgroundScope)
+        h.api.todaysSessions = listOf(closedRound(h, "s1", "08"))
+        assertTrue(NotificationsState(h.env).ui.value.rounds.isEmpty())
+    }
+
     @Test fun sendAgainIsNotOfferedWhileACopyIsWaitingAndNeitherIsTheDaySummary() = runTest(UnconfinedTestDispatcher()) {
         val h = harness(backgroundScope)
         val closed = h.api.session("s-12345", status = SessionStatus.CLOSED).copy(close = SessionClose(mapOf("LAK" to "1"), mapOf("LAK" to "1"), mapOf("LAK" to "0"), mapOf("LAK" to "1"), emptyList(), "", h.api.alice, "t"))
