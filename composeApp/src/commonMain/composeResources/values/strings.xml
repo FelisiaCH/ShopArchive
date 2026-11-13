@@ -107,6 +107,7 @@
     <string name="openday_again_btn">Open a new round</string>
     <string name="day_round">Round %1$d of today</string>
     <string name="openday_hint">Count the change in the drawer: one amount per currency. Leave empty for 0.</string>
+    <string name="openday_kept_hint">Change kept from the previous round: %1$s. Count the drawer and enter what is there; it is not filled in for you.</string>
     <string name="openday_amount">Change in %1$s</string>
     <string name="openday_invalid">Not a valid amount for %1$s.</string>
     <string name="openday_already">%1$s already opened this day.</string>

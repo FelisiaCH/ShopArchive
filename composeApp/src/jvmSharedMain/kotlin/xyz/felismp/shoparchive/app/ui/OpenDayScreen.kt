@@ -32,6 +32,11 @@ fun OpenDayScreen(ws: Workspace) {
     val saving = phase is OpenDayPhase.Saving
     ShopPage(stringResource(Res.string.openday_btn)) {
         ShopText(stringResource(Res.string.openday_hint), muted = true)
+        val kept = ui.currencies.mapNotNull { c ->
+            val minor = ui.keptHint[c.code]?.let { parseTypedAmount(it, c.exponent, allowZero = true) } ?: return@mapNotNull null
+            displayAmount(minor, c.exponent) + " " + c.code
+        }
+        if (kept.isNotEmpty()) ShopText(stringResource(Res.string.openday_kept_hint, kept.joinToString(", ")), muted = true)
         ui.currencies.forEach { currency ->
             val text = ui.amounts[currency.code] ?: ui.prefill[currency.code].orEmpty()
             ShopTextField(

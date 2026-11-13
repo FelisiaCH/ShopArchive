@@ -107,6 +107,7 @@
     <string name="openday_again_btn">เปิดรอบใหม่</string>
     <string name="day_round">รอบที่ %1$d ของวันนี้</string>
     <string name="openday_hint">นับเงินทอนในลิ้นชัก: หนึ่งจำนวนต่อสกุลเงิน เว้นว่าง = 0</string>
+    <string name="openday_kept_hint">เงินทอนที่เก็บไว้จากรอบก่อน: %1$s · นับเงินในลิ้นชักแล้วกรอกเอง (ระบบไม่เติมให้)</string>
     <string name="openday_amount">เงินทอน %1$s</string>
     <string name="openday_invalid">จำนวนไม่ถูกต้องสำหรับ %1$s</string>
     <string name="openday_already">%1$s เปิดวันนี้แล้ว</string>

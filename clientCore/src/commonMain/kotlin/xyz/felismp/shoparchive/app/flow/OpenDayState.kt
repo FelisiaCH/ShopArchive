@@ -44,12 +44,14 @@ enum class OpenDayBlock { OFFLINE, NO_BRANCH, LOADING }
 /**
  * [amounts] is what was typed; [prefill] is the change the last close of the branch left in the drawer, which a currency stays at until it is typed in
  * (a field with no key in [amounts] shows and sends [prefill]; a field cleared by hand has its key and is 0).
+ * A new round of the same day has no [prefill]: the drawer is counted and typed in, and [keptHint] is what the previous round kept (empty otherwise).
  * [invalid] are the currencies whose text is not an amount; [blocked] is why Confirm is off (null when it is on).
  */
 data class OpenDayUi(
     val currencies: List<CurrencyInfo> = emptyList(),
     val amounts: Map<String, String> = emptyMap(),
     val prefill: Map<String, String> = emptyMap(),
+    val keptHint: Map<String, String> = emptyMap(),
     val invalid: Set<String> = emptySet(),
     val phase: OpenDayPhase = OpenDayPhase.Idle,
     val blocked: OpenDayBlock? = OpenDayBlock.LOADING,
@@ -62,15 +64,18 @@ class OpenDayState(private val env: Env, private val today: TodayState) {
     private val form = MutableStateFlow(Form())
 
     /** What the last read of [branch]'s last close found ([close] is null when there is none or it could not be read). */
-    private class LastClose(val branch: String, val close: SessionClose?)
+    private class LastClose(val branch: String, val close: SessionClose?, val ofToday: Boolean = false)
 
     /** Read when the screen state starts, on a branch change, a reconnect and a live close; null while a read is on its way: Confirm waits for it, so the day never opens with fields the close was about to fill. */
     private val lastClose = MutableStateFlow<LastClose?>(null)
 
     val ui: StateFlow<OpenDayUi> = combine(form, lastClose, env.config, env.canWrite, env.branch) { f, last, config, canWrite, branch ->
         val currencies = (config as? ConfigState.Ready)?.config?.currencies.orEmpty()
+        val current = last?.takeIf { it.branch == branch }
+        val kept = keptBy(current?.close, currencies)
+        val ofToday = current?.ofToday == true
         OpenDayUi(
-            currencies, f.amounts, keptBy(last?.takeIf { it.branch == branch }?.close, currencies), f.invalid, f.phase,
+            currencies, f.amounts, if (ofToday) emptyMap() else kept, if (ofToday) kept else emptyMap(), f.invalid, f.phase,
             blocked = when {
                 config !is ConfigState.Ready -> OpenDayBlock.LOADING
                 branch == null -> OpenDayBlock.NO_BRANCH
@@ -94,19 +99,20 @@ class OpenDayState(private val env: Env, private val today: TodayState) {
     }
 
     private suspend fun loadLastClose(branch: String) {
-        val known = lastClose.value?.takeIf { it.branch == branch }?.close
+        val known = lastClose.value?.takeIf { it.branch == branch }
         lastClose.value = null
-        val close = if (!env.can.openDay) null else try {
+        val last = if (!env.can.openDay) LastClose(branch, null) else try {
             val today = env.today()
             val sessions = env.calls.run { env.api.sessionsBetween(branch, today.minus(365, DateTimeUnit.DAY).toString(), today.toString()) }
-            sessions.lastOrNull { it.close != null }?.close
+            val session = sessions.lastOrNull { it.close != null }
+            LastClose(branch, session?.close, ofToday = session?.businessDate == today.toString())
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
-            known // not read: the fields stay as they were (empty at first)
+            known ?: LastClose(branch, null) // not read: the fields stay as they were (empty at first)
         }
         // An answer for a branch no longer chosen is dropped; the read of the chosen one is on its way.
-        if (env.branch.value == branch) lastClose.value = LastClose(branch, close)
+        if (env.branch.value == branch) lastClose.value = last
     }
 
     /** What stayed in the drawer at [close], per currency: counted less what was handed over. A currency with nothing left has no entry. */
@@ -138,7 +144,7 @@ class OpenDayState(private val env: Env, private val today: TodayState) {
         val f = form.value
         if (!env.canWrite.value || f.phase is OpenDayPhase.Saving) return
         val last = lastClose.value?.takeIf { it.branch == branch } ?: return
-        val prefill = keptBy(last.close, config.currencies)
+        val prefill = if (last.ofToday) emptyMap() else keptBy(last.close, config.currencies)
         val float = linkedMapOf<String, String>()
         val invalid = mutableSetOf<String>()
         for (currency in config.currencies) {
