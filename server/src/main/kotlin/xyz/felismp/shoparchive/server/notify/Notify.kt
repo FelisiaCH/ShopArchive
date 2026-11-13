@@ -89,6 +89,7 @@ internal class Notify(
         if (days == 0) return 0
         val from = maxOf(outbox.since, clock.instant().minus(java.time.Duration.ofDays(days.toLong())))
         var queued = 0
+        // shortcut: no reconcile for entry.edited/deleted/moved (no history replay), upgrade if a missed edit message hurts
         for (event in recentEvents(from)) {
             if (event.type !in config.notify.events) continue
             val draft = draftFor(event, config.locale, stamp(clock, config)) ?: continue

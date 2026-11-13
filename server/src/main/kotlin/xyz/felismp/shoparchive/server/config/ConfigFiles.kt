@@ -42,8 +42,22 @@ private val addNoteEvent = MigrationStep(1) { content ->
     }
 }
 
+/**
+ * 2 -> 3: `entry.edited`, `entry.deleted` and `entry.moved` joined the default `notify.events`. A list that was kept as it stood and is not empty gets them too
+ * (missing ones appended); an empty list is the admin's choice of no messages and is left. Both the nested and the dotted form are read.
+ */
+private val addEntryChangeEvents = MigrationStep(2) { content ->
+    val added = listOf(ShopEventTypes.ENTRY_EDITED, ShopEventTypes.ENTRY_DELETED, ShopEventTypes.ENTRY_MOVED)
+    fun withChanges(events: Any?): Any? = if (events is List<*> && events.isNotEmpty()) events + added.filter { it !in events } else events
+    val section = content["notify"] as? Map<*, *>
+    LinkedHashMap(content).also { out ->
+        if (section != null && "events" in section) out["notify"] = LinkedHashMap(section).also { it["events"] = withChanges(section["events"]) }
+        if ("notify.events" in out) out["notify.events"] = withChanges(out["notify.events"])
+    }
+}
+
 /** `config/shoparchive.yml`: how the core behaves. Sections for later features are added by the phase that uses them. */
-internal object CoreConfig : YamlConfigFile<Values>("config-version", 2, listOf(addNoteEvent)) {
+internal object CoreConfig : YamlConfigFile<Values>("config-version", 3, listOf(addNoteEvent, addEntryChangeEvents)) {
     override val path = "config/shoparchive.yml"
     override val title = "ShopArchive core settings. Changes apply on restart or reload."
 
@@ -190,7 +204,10 @@ internal object CoreConfig : YamlConfigFile<Values>("config-version", 2, listOf(
     )
 
     val notifyEvents = WordListKey(
-        "notify.events", listOf(ShopEventTypes.DAY_CLOSED, ShopEventTypes.DEVICE_NEW, ShopEventTypes.ENTRY_CREATED, ShopEventTypes.NOTE_CREATED),
+        "notify.events", listOf(
+            ShopEventTypes.DAY_CLOSED, ShopEventTypes.DEVICE_NEW, ShopEventTypes.ENTRY_CREATED, ShopEventTypes.NOTE_CREATED,
+            ShopEventTypes.ENTRY_EDITED, ShopEventTypes.ENTRY_DELETED, ShopEventTypes.ENTRY_MOVED,
+        ),
         "The events that put a message into the outbox for the channel plugin: ${ShopEventTypes.all.joinToString(", ")}. An empty list turns messages off. A name the server does not publish is ignored with a warning.",
     )
     val notifyTimeoutSeconds = IntKey(

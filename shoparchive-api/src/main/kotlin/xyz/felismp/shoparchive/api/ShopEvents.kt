@@ -4,6 +4,7 @@ import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.LocalizedName
 import xyz.felismp.shoparchive.shared.NoteDto
 import xyz.felismp.shoparchive.shared.SessionDto
+import xyz.felismp.shoparchive.shared.UserRef
 
 /** The event types the core publishes. A plugin may publish and listen to types of its own. */
 object ShopEventTypes {
@@ -11,9 +12,12 @@ object ShopEventTypes {
     const val DAY_CLOSED = "day.closed"
     const val DEVICE_NEW = "device.new"
     const val NOTE_CREATED = "note.created"
+    const val ENTRY_EDITED = "entry.edited"
+    const val ENTRY_DELETED = "entry.deleted"
+    const val ENTRY_MOVED = "entry.moved"
 
     /** The types the core publishes. */
-    val all: List<String> = listOf(ENTRY_CREATED, DAY_CLOSED, DEVICE_NEW, NOTE_CREATED)
+    val all: List<String> = listOf(ENTRY_CREATED, DAY_CLOSED, DEVICE_NEW, NOTE_CREATED, ENTRY_EDITED, ENTRY_DELETED, ENTRY_MOVED)
 }
 
 /** Something that happened in the shop and was already saved. Events are facts: a listener cannot veto or change what they describe. */
@@ -33,6 +37,24 @@ class EntryCreatedEvent(val entry: EntryDto, val branchName: String, val categor
     override val type get() = ShopEventTypes.ENTRY_CREATED
     override val branch get() = entry.branch
     override val at get() = entry.createdAt
+}
+
+/**
+ * An entry was edited, deleted or moved to another day, and the change was saved (a change that left it as it was publishes nothing). [type] is `entry.edited`,
+ * `entry.deleted` or `entry.moved`; [before] is the entry as it was and [after] as it is now, [by] who changed it. [branchName] is the branch's display name,
+ * [categoryBefore] and [categoryAfter] the names of the category before and after, null if it had none.
+ */
+class EntryChangedEvent(
+    override val type: String,
+    val before: EntryDto,
+    val after: EntryDto,
+    val by: UserRef,
+    val branchName: String,
+    val categoryBefore: LocalizedName? = null,
+    val categoryAfter: LocalizedName? = null,
+) : ShopEvent {
+    override val branch get() = after.branch
+    override val at get() = after.updatedAt
 }
 
 /** A day note was written (not one that was sent again). [branchName] is the branch's display name. */
