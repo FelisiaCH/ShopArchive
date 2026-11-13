@@ -34,7 +34,7 @@ private class MapConfig(private val v: Map<String, Any>) : PluginConfig {
 
 private fun config(vararg overrides: Pair<String, Any>): PluginConfig {
     val base = mutableMapOf<String, Any>(
-        "config-version" to "2", "bot-token" to TOKEN, "chat-ids" to listOf("111", "-100222"), "language" to "en", "events" to listOf("entry.created", "day.closed"),
+        "config-version" to "3", "bot-token" to TOKEN, "chat-ids" to listOf("111", "-100222"), "language" to "en", "events" to listOf("entry.created", "day.closed"),
         "templates.entry-created.lo" to "LO {type} {category} {item} {code}", "templates.entry-created.th" to "TH {type}", "templates.entry-created.en" to "EN {type} {amount} {currency} {category} {item}\n{user} {time} #{code}",
         "templates.day-closed.lo" to "lo", "templates.day-closed.th" to "th", "templates.day-closed.en" to "Closed {date} float {float} handover {handover} {note}",
     )
@@ -375,7 +375,7 @@ class TelegramTest {
         val infos = mutableListOf<String>()
         val s = read(config("config-version" to "1", "events" to listOf("entry.created", "day.closed")), infos)!!
 
-        assertEquals(setOf("entry.created", "day.closed", "note.created"), s.events)
+        assertEquals(setOf("entry.created", "day.closed", "note.created") + CHANGE_EVENTS, s.events)
         for (language in LANGUAGES) assertEquals(shippedTemplate("note.created", language), s.templates.getValue("note.created").getValue(language))
         assertEquals(1, infos.size, infos.toString())
         assertTrue("events: note.created" in infos[0] && "templates.note-created.en" in infos[0], infos[0])
@@ -393,8 +393,64 @@ class TelegramTest {
     }
 
     @Test
-    fun aVersionTwoConfigKeepsItsEventsAsTheyAre() {
+    fun aCurrentVersionConfigKeepsItsEventsAsTheyAre() {
         assertEquals(setOf("entry.created"), read(config("events" to listOf("entry.created")))!!.events)
+    }
+
+    private val changeTypes = listOf("entry.edited", "entry.deleted", "entry.moved")
+
+    @Test
+    fun aVersionTwoConfigWithEntryCreatedGetsTheChangeEventsAndTheirShippedTemplatesInMemoryOnly() {
+        val infos = mutableListOf<String>()
+        val s = read(config("config-version" to "2", "events" to listOf("entry.created", "day.closed")), infos)!!
+
+        assertEquals(setOf("entry.created", "day.closed") + changeTypes, s.events, "no note.created: version 2 already had it")
+        for (event in changeTypes) for (language in LANGUAGES) assertEquals(shippedTemplate(event, language), s.templates.getValue(event).getValue(language))
+        assertEquals(1, infos.size, infos.toString())
+        assertTrue("events: entry.edited, entry.deleted, entry.moved" in infos[0] && "templates.entry-edited.lo" in infos[0], infos[0])
+    }
+
+    @Test
+    fun aChangeTemplateTheAdminWroteIsKeptAndOtherEventListsAreNotFilled() {
+        val s = read(config("config-version" to "2", "templates.entry-edited.en" to "my edit {user}"))!!
+        assertEquals("my edit {user}", s.templates.getValue("entry.edited").getValue("en"))
+        assertEquals(shippedTemplate("entry.edited", "lo"), s.templates.getValue("entry.edited").getValue("lo"))
+
+        assertEquals(setOf("day.closed"), read(config("config-version" to "2", "events" to listOf("day.closed")))!!.events)
+        assertEquals(setOf("day.closed", "entry.edited"), read(config("config-version" to "2", "events" to listOf("day.closed", "entry.edited")))!!.events)
+        val warns = mutableListOf<String>()
+        assertNull(read(config("config-version" to "2", "events" to emptyList<String>()), warns = warns))
+        assertTrue(warns.any { "events lists nothing" in it }, warns.toString())
+    }
+
+    private val changeFields = entryFields + mapOf(
+        "money" to "-50,000 LAK", "category" to "Drinks", "branch" to "Main Shop", "user" to "boss", "time" to "2026-10-04T09:30:00+07:00", "date" to "2026-10-03",
+        "recordedBy" to "noy", "before.money" to "-5,000 LAK", "before.category" to "Food", "before.item" to "tea", "before.date" to "2026-10-02",
+    )
+
+    @Test
+    fun eachChangeEventRendersItsShippedTemplateAndIsSentAsTextOnly() {
+        val expected = mapOf(
+            "entry.edited" to "✏️ Entry edited · Main Shop\n-5,000 LAK → -50,000 LAK\nFood tea → Drinks coffee\nEdited by boss · 2026-10-04 09:30\nRecorded by noy\nCode 20261003-A3F9C",
+            "entry.deleted" to "🗑 Entry deleted · Main Shop\n🟢 Income -50,000 LAK\nDrinks coffee\nDeleted by boss · 2026-10-04 09:30\nRecorded by noy\nCode 20261003-A3F9C",
+            "entry.moved" to "📅 Entry moved · Main Shop\n🟢 Income -50,000 LAK\nDrinks coffee\n2026-10-02 → 2026-10-03\nMoved by boss · 2026-10-04 09:30\nRecorded by noy\nCode 20261003-A3F9C",
+        )
+        val r = PlaceholderRenderer()
+        for (event in changeTypes) {
+            val n = note(event = event, fields = changeFields)
+            assertEquals(expected.getValue(event), r.render(shippedTemplate(event, "en"), n, "en"), event)
+            for (language in LANGUAGES) assertTrue("{" !in r.render(shippedTemplate(event, language), n, language), "$language $event")
+            // a change message never asks for the images, whatever the service would give
+            var asked = false
+            val t = FakeTransport()
+            val cfg = config("events" to changeTypes, "chat-ids" to listOf("111"))
+            val notifier = TelegramNotifier({ TelegramSettings.read(cfg) {} }, t, MemoryLedger(), images = { asked = true; NotificationImages { listOf(slip(1)) } })
+            assertTrue(notifier.deliver(n) is DeliveryResult.Sent)
+            assertFalse(asked, event)
+            assertEquals(listOf("sendMessage"), t.methods)
+            assertTrue(t.forms.isEmpty())
+            assertTrue(t.posted.single().second.contains(expected.getValue(event).substringBefore('\n')), t.posted.single().second)
+        }
     }
 
     @Test

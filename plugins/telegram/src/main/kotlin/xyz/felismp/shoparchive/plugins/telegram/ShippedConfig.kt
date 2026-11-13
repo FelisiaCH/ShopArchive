@@ -5,8 +5,8 @@ package xyz.felismp.shoparchive.plugins.telegram
  * gets the templates it lacks, and the new default of a template it never changed, from here; see [TelegramSettings.read].
  */
 internal object ShippedConfig {
-    /** The `config-version` the shipped file has: 2 added the `note.created` event and the revised entry template. */
-    const val VERSION = 2
+    /** The `config-version` the shipped file has: 2 added the `note.created` event and the revised entry template; 3 added the `entry.edited`, `entry.deleted` and `entry.moved` events. */
+    const val VERSION = 3
 
     /** The jar's config.yml, or null if it cannot be read. */
     val text: String? by lazy {

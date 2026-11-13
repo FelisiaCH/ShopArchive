@@ -76,7 +76,9 @@ Approving and revoking apply at the next start.
 
 ### Telegram
 
-Sends "entry recorded" and "day closed" messages to Telegram chats.
+Sends "entry recorded", "entry edited", "entry deleted", "entry moved" and "day closed" messages to Telegram chats (events `entry.created`, `entry.edited`, `entry.deleted`, `entry.moved`, `day.closed`).
+
+After updating the server, update `plugins/shoparchive-telegram.jar` too: an old jar ignores `entry.edited`, `entry.deleted` and `entry.moved`. The server adds these three to `notify.events` (core config v3) only when that list already has `entry.created`; if you changed the list yourself, add them by hand.
 
 1. In Telegram, talk to `@BotFather`, send `/newbot`, and keep the **token** it gives you. Make a new token for each server; if one leaks, `/revoke` it at BotFather.
 2. Press Start in a private chat with the bot, or add the bot to the group or channel that should get the messages.

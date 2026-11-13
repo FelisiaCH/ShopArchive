@@ -7,7 +7,7 @@
 #
 # This file is yours: the plugin never rewrites it. When a newer jar ships something this file lacks (a template, an event), the plugin uses the jar's
 # version of it without changing the file, and says so in the log; copy it from the config.yml in the jar when you want to edit it.
-config-version: 2
+config-version: 3
 
 # The bot's token from @BotFather. A secret: shown as *** by `plugins info Telegram` and never written to a log or a message status.
 bot-token: ""
@@ -21,11 +21,14 @@ language: lo
 
 # Which events are sent. The server's own notify.events decides which events reach any channel at all; this lists what this channel sends of them.
 # entry.created = a line was recorded, day.closed = the day was closed, device.new = someone logged in on a device they were not on before,
-# note.created = staff left a day note for the owner.
+# note.created = staff left a day note for the owner, entry.edited / entry.deleted / entry.moved = a recorded line was changed, deleted or moved to another day.
 events:
   - day.closed
   - device.new
   - entry.created
+  - entry.deleted
+  - entry.edited
+  - entry.moved
   - note.created
 
 # Where the Bot API lives. Change it only for a self-hosted Bot API server. Must be https (http only for localhost); otherwise the plugin is not used.
@@ -47,6 +50,8 @@ ledger-keep-days: 7
 #   {income} {expense} {net} {cashIn} {cashOut} {onlineIn} {onlineOut} {float} {counted} {expected} {variance} {kept} {handover}
 #   device.new has only {user} {device} (the device's name) {platform} {deviceId} and {code}.
 #   note.created has only {text} (the note) {branch} {user} {time} {date} and {code}.
+#   entry.edited, entry.deleted and entry.moved have the same words as entry.created, as the entry is now, except that {user} and {time} are of the change; also
+#   {recordedBy} (who recorded the entry) and what it was before the change: {before.money} {before.amount} {before.category} {before.item} {before.note} {before.date}.
 # A line whose words are all empty (no {category}, no {note}) is left out. An unknown word becomes empty.
 # {code} names the entry, the day or the device: a message that arrives twice has the same code both times.
 templates:
@@ -125,6 +130,75 @@ templates:
       อุปกรณ์ใหม่: {user} เข้าสู่ระบบบน {device} ({platform})
     en: |-
       New device: {user} logged in on {device} ({platform})
+  entry-edited:
+    lo: |-
+      ✏️ ແກ້ໄຂລາຍການ · {branch}
+      {before.money} → {money}
+      {before.category} {before.item} → {category} {item}
+      ແກ້ໄຂໂດຍ {user} · {time}
+      ບັນທຶກໂດຍ {recordedBy}
+      ລະຫັດ {code}
+    th: |-
+      ✏️ แก้ไขรายการ · {branch}
+      {before.money} → {money}
+      {before.category} {before.item} → {category} {item}
+      แก้ไขโดย {user} · {time}
+      บันทึกโดย {recordedBy}
+      รหัส {code}
+    en: |-
+      ✏️ Entry edited · {branch}
+      {before.money} → {money}
+      {before.category} {before.item} → {category} {item}
+      Edited by {user} · {time}
+      Recorded by {recordedBy}
+      Code {code}
+  entry-deleted:
+    lo: |-
+      🗑 ລຶບລາຍການ · {branch}
+      {type} {money}
+      {category} {item}
+      ລຶບໂດຍ {user} · {time}
+      ບັນທຶກໂດຍ {recordedBy}
+      ລະຫັດ {code}
+    th: |-
+      🗑 ลบรายการ · {branch}
+      {type} {money}
+      {category} {item}
+      ลบโดย {user} · {time}
+      บันทึกโดย {recordedBy}
+      รหัส {code}
+    en: |-
+      🗑 Entry deleted · {branch}
+      {type} {money}
+      {category} {item}
+      Deleted by {user} · {time}
+      Recorded by {recordedBy}
+      Code {code}
+  entry-moved:
+    lo: |-
+      📅 ຍ້າຍລາຍການ · {branch}
+      {type} {money}
+      {category} {item}
+      {before.date} → {date}
+      ຍ້າຍໂດຍ {user} · {time}
+      ບັນທຶກໂດຍ {recordedBy}
+      ລະຫັດ {code}
+    th: |-
+      📅 ย้ายรายการ · {branch}
+      {type} {money}
+      {category} {item}
+      {before.date} → {date}
+      ย้ายโดย {user} · {time}
+      บันทึกโดย {recordedBy}
+      รหัส {code}
+    en: |-
+      📅 Entry moved · {branch}
+      {type} {money}
+      {category} {item}
+      {before.date} → {date}
+      Moved by {user} · {time}
+      Recorded by {recordedBy}
+      Code {code}
   note-created:
     lo: |-
       📝 ບັນທຶກຫາເຈົ້າຂອງ · {branch}

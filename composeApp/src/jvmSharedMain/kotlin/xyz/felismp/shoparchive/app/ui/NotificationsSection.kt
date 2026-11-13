@@ -49,6 +49,9 @@ private fun Message(ws: Workspace, n: NotificationDto, canSend: Boolean, enabled
             when (n.event) {
                 "day.closed" -> stringResource(Res.string.notif_event_day)
                 "entry.created" -> stringResource(Res.string.notif_event_entry)
+                "entry.edited" -> stringResource(Res.string.notif_event_entry_edited)
+                "entry.deleted" -> stringResource(Res.string.notif_event_entry_deleted)
+                "entry.moved" -> stringResource(Res.string.notif_event_entry_moved)
                 "device.new" -> stringResource(Res.string.notif_event_device)
                 "note.created" -> stringResource(Res.string.notif_event_note)
                 else -> n.event
