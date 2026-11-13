@@ -104,6 +104,8 @@
     <string name="openday_card_body">Count the change in the drawer to start recording.</string>
     <string name="openday_card_body_other">Someone who may open the day needs to count the change in the drawer first.</string>
     <string name="openday_btn">Open day</string>
+    <string name="openday_again_btn">Open a new round</string>
+    <string name="day_round">Round %1$d of today</string>
     <string name="openday_hint">Count the change in the drawer: one amount per currency. Leave empty for 0.</string>
     <string name="openday_amount">Change in %1$s</string>
     <string name="openday_invalid">Not a valid amount for %1$s.</string>

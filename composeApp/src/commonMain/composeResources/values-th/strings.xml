@@ -104,6 +104,8 @@
     <string name="openday_card_body">นับเงินทอนในลิ้นชักเพื่อเริ่มบันทึก</string>
     <string name="openday_card_body_other">ต้องให้ผู้ที่มีสิทธิ์เปิดวันนับเงินทอนในลิ้นชักก่อน</string>
     <string name="openday_btn">เปิดวัน</string>
+    <string name="openday_again_btn">เปิดรอบใหม่</string>
+    <string name="day_round">รอบที่ %1$d ของวันนี้</string>
     <string name="openday_hint">นับเงินทอนในลิ้นชัก: หนึ่งจำนวนต่อสกุลเงิน เว้นว่าง = 0</string>
     <string name="openday_amount">เงินทอน %1$s</string>
     <string name="openday_invalid">จำนวนไม่ถูกต้องสำหรับ %1$s</string>

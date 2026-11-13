@@ -55,6 +55,8 @@ data class TodayData(
     val oldestUnreadNote: String? = null,
     /** The minutes the server's clock is off the device's when that is more than five (business dates would be wrong), else null. */
     val clockOffMinutes: Int? = null,
+    /** The ordinal of the day's round among the branch's sessions of [date], by opening time (1 = first). */
+    val round: Int = 1,
 )
 
 /** [loading] only before the first answer; a reload keeps showing the last [data]. [failure] is set when the day itself could not be read. */
@@ -122,12 +124,26 @@ class TodayState(private val env: Env) {
                     currencies = stats?.currencies, recent = stats?.recent.orEmpty(), statsFailure = statsFailure, showStats = showStats, mine = mine,
                     slips = stats?.slips ?: 0, unreadNotes = unread?.unread, oldestUnreadNote = unread?.oldest,
                     clockOffMinutes = clockWarningMinutes(env.api.serverClockOffsetMillis),
+                    round = round(branch, status),
                 ),
             )
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             _ui.value = _ui.value.copy(loading = false, failure = e.toFailure())
+        }
+    }
+
+    /** Never fails Today: 1 when the sessions cannot be read or the session is not among them. */
+    private suspend fun round(branch: String, status: DayStatus): Int {
+        val session = (status as? DayStatus.Open)?.session ?: (status as? DayStatus.Closed)?.session ?: return 1
+        return try {
+            val index = env.calls.run { env.api.sessionsOn(branch, session.businessDate) }.sortedBy { it.openedAt }.indexOfFirst { it.id == session.id }
+            if (index < 0) 1 else index + 1
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            1
         }
     }
 

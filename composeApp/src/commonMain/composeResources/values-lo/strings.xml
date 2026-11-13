@@ -104,6 +104,8 @@
     <string name="openday_card_body">ນັບເງິນທອນໃນລິ້ນຊັກເພື່ອເລີ່ມບັນທຶກ.</string>
     <string name="openday_card_body_other">ຕ້ອງໃຫ້ຜູ້ທີ່ມີສິດເປີດວັນນັບເງິນທອນໃນລິ້ນຊັກກ່ອນ</string>
     <string name="openday_btn">ເປີດວັນ</string>
+    <string name="openday_again_btn">ເປີດຮອບໃໝ່</string>
+    <string name="day_round">ຮອບທີ %1$d ຂອງມື້ນີ້</string>
     <string name="openday_hint">ນັບເງິນທອນໃນລິ້ນຊັກ: ຈຳນວນຕໍ່ສະກຸນເງິນ. ປ່ອຍຫວ່າງ = 0.</string>
     <string name="openday_amount">ເງິນທອນ %1$s</string>
     <string name="openday_invalid">ຈຳນວນບໍ່ຖືກຕ້ອງສຳລັບ %1$s.</string>

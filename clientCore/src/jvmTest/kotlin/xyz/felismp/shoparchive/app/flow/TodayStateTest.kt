@@ -62,6 +62,35 @@ class TodayStateTest {
         assertIs<DayStatus.Closed>(TodayState(h.env).ui.value.data!!.status)
     }
 
+    private fun FakeRecordsApi.round(id: String, hour: String, status: SessionStatus) =
+        session(id, status = status).copy(openedAt = "2026-10-04T${hour}:00:00+07:00")
+
+    @Test fun theFirstRoundOpenIsRound1() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(backgroundScope)
+        h.api.current = h.api.round("s1", "08", SessionStatus.OPEN)
+        h.api.todaysSessions = listOf(h.api.current!!)
+        assertEquals(1, TodayState(h.env).ui.value.data!!.round)
+    }
+
+    @Test fun theFirstRoundClosedIsRound1() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(backgroundScope)
+        h.api.todaysSessions = listOf(h.api.round("s1", "08", SessionStatus.CLOSED))
+        assertEquals(1, TodayState(h.env).ui.value.data!!.round)
+    }
+
+    @Test fun aSecondRoundOpenIsRound2() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(backgroundScope)
+        h.api.current = h.api.round("s2", "14", SessionStatus.OPEN)
+        h.api.todaysSessions = listOf(h.api.round("s2", "14", SessionStatus.OPEN), h.api.round("s1", "08", SessionStatus.CLOSED)) // not in order: sorted by openedAt
+        assertEquals(2, TodayState(h.env).ui.value.data!!.round)
+    }
+
+    @Test fun aSecondRoundClosedIsRound2() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(backgroundScope)
+        h.api.todaysSessions = listOf(h.api.round("s1", "08", SessionStatus.CLOSED), h.api.round("s2", "14", SessionStatus.CLOSED))
+        assertEquals(2, TodayState(h.env).ui.value.data!!.round)
+    }
+
     @Test fun aServerThatCannotBeReachedIsAnErrorNotAnEmptyDay() = runTest(UnconfinedTestDispatcher()) {
         val h = Harness(backgroundScope)
         h.api.currentError = ClientError.Unreachable()

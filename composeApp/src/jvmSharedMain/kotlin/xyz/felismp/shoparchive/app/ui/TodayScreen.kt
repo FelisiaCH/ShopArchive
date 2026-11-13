@@ -69,11 +69,18 @@ private fun TodayContent(ws: Workspace, data: TodayData, canWrite: Boolean, can:
         is DayStatus.Open -> {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                 ShopChip(stringResource(Res.string.day_open_by, clockTime(status.session.openedAt), status.session.openedBy.name), Tone.Success)
+                if (data.round >= 2) ShopChip(stringResource(Res.string.day_round, data.round), Tone.Info)
                 if (can.closeDay) ShopButton(stringResource(Res.string.closeday_btn), closeDay, primary = data.staleFrom != null, icon = ShopIcon.CloseDay)
             }
             data.staleFrom?.let { ShopBanner(stringResource(if (can.closeDay) Res.string.day_stale else Res.string.day_stale_other, it), Tone.Error) }
         }
-        is DayStatus.Closed -> ShopChip(stringResource(Res.string.day_closed), Tone.Info)
+        is DayStatus.Closed -> {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+                ShopChip(stringResource(Res.string.day_closed), Tone.Info)
+                if (data.round >= 2) ShopChip(stringResource(Res.string.day_round, data.round), Tone.Info)
+                if (can.openDay) ShopButton(stringResource(Res.string.openday_again_btn), openDay, primary = false, enabled = canWrite, icon = ShopIcon.OpenDay)
+            }
+        }
     }
     TodayCounts(data, can, openHistory, openNotes)
     if (!data.showStats) {
