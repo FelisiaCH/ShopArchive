@@ -139,13 +139,13 @@ class OpenDayStateTest {
         assertEquals(mapOf("LAK" to "100000", "THB" to "500.00"), h.api.opened.single().second.float)
     }
 
-    @Test fun aNewRoundOfTheSameDayStartsEmpty() = runTest(UnconfinedTestDispatcher()) {
+    @Test fun aNewRoundOfTheSameDayStartsFromWhatRoundOneLeftInTheDrawer() = runTest(UnconfinedTestDispatcher()) {
         val (h, day) = setup()
         h.api.pastSessions = listOf(h.api.closedDay("s1", "2026-10-04", mapOf("LAK" to "130000"), mapOf("LAK" to "30000"))) // closed today
         h.refetch.tryEmit(Unit)
-        assertTrue(day.ui.value.prefill.isEmpty())
+        assertEquals(mapOf("LAK" to "100000"), day.ui.value.prefill)
         day.confirm()
-        assertTrue(h.api.opened.single().second.float.isEmpty())
+        assertEquals(mapOf("LAK" to "100000"), h.api.opened.single().second.float)
     }
 
     @Test fun aCurrencyWithNothingLeftInTheDrawerStaysEmpty() = runTest(UnconfinedTestDispatcher()) {
@@ -188,11 +188,11 @@ class OpenDayStateTest {
         h.api.pastSessions = listOf(h.api.closedDay("s1", "2026-10-01", mapOf("LAK" to "100000"), mapOf("LAK" to "0")))
         h.refetch.tryEmit(Unit)
         assertEquals(mapOf("LAK" to "100000"), day.ui.value.prefill)
-        h.api.pastSessions += h.api.closedDay("s2", "2026-10-02", mapOf("LAK" to "120000"), mapOf("LAK" to "20000"))
-        h.messages.tryEmit(SessionClosedMessage("s2", "main", "2026-10-02"))
+        h.api.pastSessions += h.api.closedDay("s2", "2026-10-03", mapOf("LAK" to "120000"), mapOf("LAK" to "20000"))
+        h.messages.tryEmit(SessionClosedMessage("s2", "main", "2026-10-03"))
         assertEquals(mapOf("LAK" to "100000"), day.ui.value.prefill) // same kept amount, taken from the newer close
-        h.api.pastSessions += h.api.closedDay("s4", "2026-10-03", mapOf("LAK" to "80000"), mapOf("LAK" to "0"))
-        h.messages.tryEmit(SessionClosedMessage("s4", "main", "2026-10-03"))
+        h.api.pastSessions += h.api.closedDay("s4", "2026-10-04", mapOf("LAK" to "80000"), mapOf("LAK" to "0"))
+        h.messages.tryEmit(SessionClosedMessage("s4", "main", "2026-10-04"))
         assertEquals(mapOf("LAK" to "80000"), day.ui.value.prefill)
     }
 

@@ -356,6 +356,7 @@
     <string name="notif_resend_failed">ສົ່ງອີກຄັ້ງບໍ່ໄດ້.</string>
     <string name="notif_closed_days">ວັນທີ່ປິດຍອດແລ້ວ</string>
     <string name="notif_send_day">ສົ່ງສະຫຼຸບປິດຍອດວັນທີ %1$s ອີກຄັ້ງ</string>
+    <string name="notif_send_day_round">ສົ່ງສະຫຼຸບປິດຍອດວັນທີ %1$s ຮອບທີ %2$d ອີກຄັ້ງ</string>
     <string name="update_available">ມີເວີຊັນໃໝ່ %1$s</string>
     <string name="update_install">ຕິດຕັ້ງ</string>
     <string name="update_later">ພາຍຫຼັງ</string>

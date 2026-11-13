@@ -53,6 +53,8 @@ class FakeRecordsApi : RecordsApi {
     val alice = UserRef("u1", "alice")
     var current: SessionDto? = null
     var todaysSessions: List<SessionDto> = emptyList()
+    var todaysSessionsError: Exception? = null
+    var sessionsOnCalls = 0
     var dashboard: DashboardDto = DashboardDto("2026-10-04", "2026-10-04", emptyList(), emptyList())
     var dashboardError: Exception? = null
     var currentError: Exception? = null
@@ -82,7 +84,11 @@ class FakeRecordsApi : RecordsApi {
         return current ?: throw ClientError.Api(404, ErrorCode.NO_OPEN_SESSION, "No day is open.")
     }
 
-    override suspend fun sessionsOn(branch: String, date: String) = todaysSessions
+    override suspend fun sessionsOn(branch: String, date: String): List<SessionDto> {
+        sessionsOnCalls++
+        todaysSessionsError?.let { throw it }
+        return todaysSessions
+    }
 
     /** Every session the fake server holds, oldest first; [sessionsBetween] answers the ones of the branch inside the range. */
     var pastSessions: List<SessionDto> = emptyList()

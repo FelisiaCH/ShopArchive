@@ -95,7 +95,7 @@ class TodayState(private val env: Env) {
         _ui.value = if (before.data?.branch == branch) before.copy(failure = null) else TodayUi()
         try {
             val today = env.today().toString()
-            val status = status(branch, today)
+            val (status, sessionsToday) = status(branch, today)
             val open = (status as? DayStatus.Open)?.session
             val date = open?.businessDate ?: today
             var stats: DashboardDto? = null
@@ -124,7 +124,7 @@ class TodayState(private val env: Env) {
                     currencies = stats?.currencies, recent = stats?.recent.orEmpty(), statsFailure = statsFailure, showStats = showStats, mine = mine,
                     slips = stats?.slips ?: 0, unreadNotes = unread?.unread, oldestUnreadNote = unread?.oldest,
                     clockOffMinutes = clockWarningMinutes(env.api.serverClockOffsetMillis),
-                    round = round(branch, status),
+                    round = round(branch, status, sessionsToday),
                 ),
             )
         } catch (e: CancellationException) {
@@ -134,11 +134,12 @@ class TodayState(private val env: Env) {
         }
     }
 
-    /** Never fails Today: 1 when the sessions cannot be read or the session is not among them. */
-    private suspend fun round(branch: String, status: DayStatus): Int {
+    /** Never fails Today: 1 when the sessions cannot be read or the session is not among them. [known] is the list [status] already read (Closed); else it is asked for. */
+    private suspend fun round(branch: String, status: DayStatus, known: List<SessionDto>?): Int {
         val session = (status as? DayStatus.Open)?.session ?: (status as? DayStatus.Closed)?.session ?: return 1
         return try {
-            val index = env.calls.run { env.api.sessionsOn(branch, session.businessDate) }.sortedBy { it.openedAt }.indexOfFirst { it.id == session.id }
+            val sessions = known ?: env.calls.run { env.api.sessionsOn(branch, session.businessDate) }
+            val index = sessions.sortedBy { it.openedAt }.indexOfFirst { it.id == session.id }
             if (index < 0) 1 else index + 1
         } catch (e: CancellationException) {
             throw e
@@ -156,18 +157,20 @@ class TodayState(private val env: Env) {
         null
     }
 
-    private suspend fun status(branch: String, today: String): DayStatus = try {
-        DayStatus.Open(env.calls.run { env.api.currentSession(branch) })
+    /** The status, with today's sessions when reading them was how a Closed day was found. */
+    private suspend fun status(branch: String, today: String): Pair<DayStatus, List<SessionDto>?> = try {
+        DayStatus.Open(env.calls.run { env.api.currentSession(branch) }) to null
     } catch (e: ClientError.Api) {
         if (e.code != ErrorCode.NO_OPEN_SESSION) throw e
         // No day is open: it may have been opened and closed today.
-        val closed = try {
-            env.calls.run { env.api.sessionsOn(branch, today) }.lastOrNull()
+        val sessions = try {
+            env.calls.run { env.api.sessionsOn(branch, today) }
         } catch (c: CancellationException) {
             throw c
         } catch (_: Exception) {
-            null
+            emptyList()
         }
-        if (closed == null) DayStatus.NotOpened else DayStatus.Closed(closed)
+        val closed = sessions.lastOrNull()
+        (if (closed == null) DayStatus.NotOpened else DayStatus.Closed(closed)) to sessions
     }
 }

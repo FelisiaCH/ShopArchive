@@ -28,6 +28,7 @@ fun NotificationDto.canResend(): Boolean = state == NotificationState.SENT || st
 /**
  * [items] are the newest messages (null before the first answer); [closedDays] the days of today and yesterday that are closed in the branch,
  * whose summary may be sent again; [failure] says why the list is not there; [actionFailure] why the last send-again was refused.
+ * [rounds] maps a session id to its round of the day, only for days with more than one round.
  * [working] holds the ids of what is being sent again right now (a message id or a day's session id).
  */
 data class NotificationsUi(
@@ -39,6 +40,7 @@ data class NotificationsUi(
     val working: Set<String>,
     val canSend: Boolean,
     val blocked: Boolean,
+    val rounds: Map<String, Int> = emptyMap(),
 ) {
     private fun waiting(event: String, code: String) =
         items.orEmpty().any { it.event == event && it.code == code && (it.state == NotificationState.QUEUED || it.state == NotificationState.UNKNOWN) }
@@ -57,6 +59,7 @@ internal fun dayCode(session: SessionDto): String = session.businessDate.replace
 class NotificationsState(private val env: Env) {
     private val items = MutableStateFlow<List<NotificationDto>?>(null)
     private val closedDays = MutableStateFlow<List<SessionDto>>(emptyList())
+    private val rounds = MutableStateFlow<Map<String, Int>>(emptyMap())
     private val failure = MutableStateFlow<Failure?>(null)
     private val actionFailure = MutableStateFlow<Failure?>(null)
     private val working = MutableStateFlow<Set<String>>(emptySet())
@@ -66,7 +69,7 @@ class NotificationsState(private val env: Env) {
 
     private fun snapshot() = NotificationsUi(
         loading.value, items.value, closedDays.value, failure.value, actionFailure.value, working.value,
-        canSend = env.can.sendNotifications, blocked = !env.canWrite.value,
+        canSend = env.can.sendNotifications, blocked = !env.canWrite.value, rounds = rounds.value,
     )
 
     private fun publish() {
@@ -94,6 +97,7 @@ class NotificationsState(private val env: Env) {
         if (!env.can.viewNotifications) {
             items.value = null
             closedDays.value = emptyList()
+            rounds.value = emptyMap()
             failure.value = null
             loading.value = false
             publish()
@@ -110,23 +114,27 @@ class NotificationsState(private val env: Env) {
             items.value = null
             failure.value = e.toFailure()
         }
-        closedDays.value = loadClosedDays()
+        val (days, dayRounds) = loadClosedDays()
+        closedDays.value = days
+        rounds.value = dayRounds
         loading.value = false
         publish()
     }
 
     /** The closed days of today and yesterday in the branch; empty without the right to send or when they cannot be read (the list above still works). */
-    private suspend fun loadClosedDays(): List<SessionDto> {
+    private suspend fun loadClosedDays(): Pair<List<SessionDto>, Map<String, Int>> {
         val branch = env.branch.value
-        if (!env.can.sendNotifications || branch == null) return emptyList()
+        if (!env.can.sendNotifications || branch == null) return emptyList<SessionDto>() to emptyMap()
         val today: LocalDate = env.today()
         return try {
-            listOf(today, today.minus(1, DateTimeUnit.DAY)).flatMap { day -> env.calls.run { env.api.sessionsOn(branch, day.toString()) } }
-                .filter { it.status == SessionStatus.CLOSED && it.close != null }.distinctBy { it.id }
+            val all = listOf(today, today.minus(1, DateTimeUnit.DAY)).map { day -> env.calls.run { env.api.sessionsOn(branch, day.toString()) } }
+            // A day with one round has no number; with more, it is the place by opening time (open rounds count).
+            val rounds = all.filter { it.size > 1 }.flatMap { day -> day.sortedBy { it.openedAt }.mapIndexed { i, s -> s.id to i + 1 } }.toMap()
+            all.flatten().filter { it.status == SessionStatus.CLOSED && it.close != null }.distinctBy { it.id } to rounds
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            emptyList()
+            emptyList<SessionDto>() to emptyMap()
         }
     }
 

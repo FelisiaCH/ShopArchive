@@ -89,6 +89,17 @@ class TodayStateTest {
         val h = Harness(backgroundScope)
         h.api.todaysSessions = listOf(h.api.round("s1", "08", SessionStatus.CLOSED), h.api.round("s2", "14", SessionStatus.CLOSED))
         assertEquals(2, TodayState(h.env).ui.value.data!!.round)
+        assertEquals(1, h.api.sessionsOnCalls) // the list that found the closed day is reused
+    }
+
+    @Test fun roundsThatCannotBeReadLeaveTodayWorkingWithoutARoundLabel() = runTest(UnconfinedTestDispatcher()) {
+        val h = Harness(backgroundScope)
+        h.api.current = h.api.round("s2", "14", SessionStatus.OPEN)
+        h.api.todaysSessionsError = ClientError.Unreachable()
+        val ui = TodayState(h.env).ui.value
+        assertNull(ui.failure)
+        assertIs<DayStatus.Open>(ui.data!!.status)
+        assertEquals(1, ui.data!!.round) // 1 = no label (the screen shows it from 2)
     }
 
     @Test fun aServerThatCannotBeReachedIsAnErrorNotAnEmptyDay() = runTest(UnconfinedTestDispatcher()) {

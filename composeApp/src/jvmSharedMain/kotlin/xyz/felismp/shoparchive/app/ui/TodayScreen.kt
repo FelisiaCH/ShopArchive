@@ -78,7 +78,10 @@ private fun TodayContent(ws: Workspace, data: TodayData, canWrite: Boolean, can:
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                 ShopChip(stringResource(Res.string.day_closed), Tone.Info)
                 if (data.round >= 2) ShopChip(stringResource(Res.string.day_round, data.round), Tone.Info)
-                if (can.openDay) ShopButton(stringResource(Res.string.openday_again_btn), openDay, primary = false, enabled = canWrite, icon = ShopIcon.OpenDay)
+                if (can.openDay) {
+                    if (!canWrite) ShopText(stringResource(Res.string.needs_connection), TextRole.Caption, muted = true)
+                    ShopButton(stringResource(Res.string.openday_again_btn), openDay, primary = false, enabled = canWrite, icon = ShopIcon.OpenDay)
+                }
             }
         }
     }

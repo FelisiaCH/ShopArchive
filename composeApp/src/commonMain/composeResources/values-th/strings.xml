@@ -356,6 +356,7 @@
     <string name="notif_resend_failed">ส่งอีกครั้งไม่ได้</string>
     <string name="notif_closed_days">วันที่ปิดยอดแล้ว</string>
     <string name="notif_send_day">ส่งสรุปปิดยอดวันที่ %1$s อีกครั้ง</string>
+    <string name="notif_send_day_round">ส่งสรุปปิดยอดวันที่ %1$s รอบที่ %2$d อีกครั้ง</string>
     <string name="update_available">มีเวอร์ชันใหม่ %1$s</string>
     <string name="update_install">ติดตั้ง</string>
     <string name="update_later">ภายหลัง</string>

@@ -356,6 +356,7 @@
     <string name="notif_resend_failed">Could not send it again.</string>
     <string name="notif_closed_days">Closed days</string>
     <string name="notif_send_day">Send the summary of %1$s again</string>
+    <string name="notif_send_day_round">Send the summary of %1$s, round %2$d, again</string>
     <string name="update_available">New version %1$s is available</string>
     <string name="update_install">Install</string>
     <string name="update_later">Later</string>
