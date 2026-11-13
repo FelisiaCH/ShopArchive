@@ -8,6 +8,7 @@ kotlin {
     jvmToolchain(21)
 
     jvm()
+    js { browser() }
     android {
         namespace = "xyz.felismp.shoparchive.shared"
         compileSdk = libs.versions.android.compileSdk.get().toInt()

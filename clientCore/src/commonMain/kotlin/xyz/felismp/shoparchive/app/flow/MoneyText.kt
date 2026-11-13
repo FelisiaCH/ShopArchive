@@ -1,5 +1,6 @@
 package xyz.felismp.shoparchive.app.flow
 
+import kotlinx.coroutines.CoroutineDispatcher
 import xyz.felismp.shoparchive.shared.CurrencyInfo
 import xyz.felismp.shoparchive.shared.TenderDto
 import xyz.felismp.shoparchive.shared.formatAmount
@@ -38,6 +39,9 @@ expect fun localeDecimalSeparator(): Char
 
 /** The language of the device: `lo` or `th`, else `en` (the app's three). Where the person chose one in the app, that is the one the platform answers with. */
 expect fun systemLanguage(): String
+
+/** Where blocking work runs: `Dispatchers.IO` where it exists, `Dispatchers.Default` on JS. */
+expect val ioDispatcher: CoroutineDispatcher
 
 /** A total the server sent (`-700`, `1200.50`, `0`) in minor units; unlike [parseTypedAmount] it may be negative or zero. Null if it is not a number with at most [exponent] decimals. */
 fun parseSignedTotal(text: String, exponent: Int): Long? {

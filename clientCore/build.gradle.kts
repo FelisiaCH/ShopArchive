@@ -8,6 +8,7 @@ kotlin {
     jvmToolchain(21)
 
     jvm()
+    js { browser() }
     android {
         namespace = "xyz.felismp.shoparchive.client"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -35,6 +36,11 @@ kotlin {
             dependencies {
                 implementation(libs.ktor.client.okhttp)
                 implementation(libs.okhttp)
+            }
+        }
+        named("jsMain").configure {
+            dependencies {
+                implementation(libs.ktor.client.js)
             }
         }
         commonTest.dependencies {

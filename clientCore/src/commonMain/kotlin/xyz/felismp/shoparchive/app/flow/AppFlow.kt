@@ -8,7 +8,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,7 +45,6 @@ import xyz.felismp.shoparchive.shared.LoginResponse
 import xyz.felismp.shoparchive.shared.PROTOCOL_VERSION
 import xyz.felismp.shoparchive.shared.ReauthRequest
 import xyz.felismp.shoparchive.shared.UnlockRequest
-import kotlinx.coroutines.IO
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
@@ -96,7 +94,7 @@ class AppFlow(
     private val prefs: PreferencesStore,
     /** Milliseconds; injected so tests can move time. */
     private val now: () -> Long = { Clock.System.now().toEpochMilliseconds() },
-    private val io: CoroutineDispatcher = Dispatchers.IO,
+    private val io: CoroutineDispatcher = ioDispatcher,
     private val compressor: SlipCompressor = SlipCompressor { it },
     /** What reads the amount off a slip photo; the default reads nothing. */
     private val reader: SlipReader = SlipReader { null },
