@@ -31,6 +31,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.RouteSelector
 import io.ktor.server.routing.RouteSelectorEvaluation
 import io.ktor.server.routing.RoutingResolveContext
+import io.ktor.server.http.content.staticResources
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -99,12 +100,26 @@ private fun gate(services: ServiceRegistry) = createApplicationPlugin("ShopArchi
         if (services.require<IpBanService>().isBanned(call.request.local.remoteAddress)) {
             throw ApiException(HttpStatusCode.Forbidden, ErrorCode.BANNED, "This address is banned from the server.")
         }
-        val isInfo = call.request.httpMethod == HttpMethod.Get && call.request.path() == INFO_PATH
-        if (!isInfo && call.request.header(PROTOCOL_HEADER)?.trim()?.toIntOrNull() != PROTOCOL_VERSION) {
+        val path = call.request.path()
+        if (!isApiPath(path)) return@onCall // the web client's files carry no protocol header
+        val isGet = call.request.httpMethod == HttpMethod.Get
+        val isWebSocket = isGet && isWebSocketPath(path)
+        // A browser cannot set headers on a WebSocket: it names the version (and the token) in the subprotocols instead.
+        val offeredVersion = isWebSocket && PROTOCOL_VERSION in call.webSocketProtocols().versions
+        val versionOk = call.request.header(PROTOCOL_HEADER)?.trim()?.toIntOrNull() == PROTOCOL_VERSION || offeredVersion
+        if (!(isGet && path == INFO_PATH) && !versionOk) {
             throw ApiException(
                 HttpStatusCode.BadRequest, ErrorCode.PROTOCOL_MISMATCH,
                 "This server speaks protocol $PROTOCOL_VERSION; send $PROTOCOL_HEADER: $PROTOCOL_VERSION. Update the app or the server so both match.",
             )
+        }
+        if (isWebSocket) {
+            val origin = call.request.header(HttpHeaders.Origin)
+            if (origin != null && !originMatchesHost(origin, call.request.header(HttpHeaders.Host))) {
+                throw ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "This page may not open the live connection: its address is not the server's.")
+            }
+            // Only the version is echoed, never the token entry. Set here, not with webSocket(path, protocol), which would refuse clients that offer none.
+            if (offeredVersion) call.response.header(HttpHeaders.SecWebSocketProtocol, "shoparchive.v$PROTOCOL_VERSION")
         }
     }
 }
@@ -118,7 +133,10 @@ private fun unauthorized(message: String = "Unlock the app first.") = ApiExcepti
 
 /** The token in `Authorization: Bearer <token>`, or null. Which kind of token it is, is for the service to say. */
 private fun ApplicationCall.bearerToken(): String? {
-    val parts = request.header(HttpHeaders.Authorization)?.trim()?.split(' ', limit = 2) ?: return null
+    val authorization = request.header(HttpHeaders.Authorization)
+    // A browser's live connection carries the token as a subprotocol; Authorization wins when both are there.
+    if (authorization == null && request.httpMethod == HttpMethod.Get && isWebSocketPath(request.path())) return webSocketProtocols().token
+    val parts = authorization?.trim()?.split(' ', limit = 2) ?: return null
     return parts.getOrNull(1)?.trim()?.takeIf { parts[0].equals("Bearer", ignoreCase = true) && it.isNotEmpty() }
 }
 
@@ -223,7 +241,10 @@ internal fun Application.apiModule(
             Log.error("Request ${call.request.httpMethod.value} ${call.request.path()} failed", e)
             call.respondError(HttpStatusCode.InternalServerError, ErrorCode.INTERNAL, "The server failed to handle the request.")
         }
-        status(HttpStatusCode.NotFound) { call, _ -> call.respondError(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No such endpoint.") }
+        status(HttpStatusCode.NotFound) { call, _ ->
+            if (isApiPath(call.request.path())) call.respondError(HttpStatusCode.NotFound, ErrorCode.NOT_FOUND, "No such endpoint.")
+            else call.respondText("Not found", ContentType.Text.Plain, HttpStatusCode.NotFound)
+        }
         // The rate limiter answers with the bare status and its Retry-After header; this gives it the shared envelope.
         status(HttpStatusCode.TooManyRequests) { call, _ ->
             call.respondError(HttpStatusCode.TooManyRequests, ErrorCode.RATE_LIMITED, "Too many requests from this address. Wait and try again.")
@@ -237,6 +258,7 @@ internal fun Application.apiModule(
     }
     install(RequestBodyLimit) { bodyLimit { call -> if (call.request.path().startsWith(ENTRIES_PATH)) entryBodyBytes() else maxBodyBytes } }
     install(serverClock)
+    install(securityHeaders)
     install(gate(services))
 
     routing {
@@ -256,6 +278,10 @@ internal fun Application.apiModule(
             }
 
             signedIn(services) { protectedRoutes(services) }
+        }
+        // The web client's files; /api/v1 is the more specific route, so it is tried first.
+        staticResources("/", "web") {
+            modify { _, call -> call.response.header(HttpHeaders.CacheControl, staticCacheControl(call.request.path())) }
         }
     }
 }

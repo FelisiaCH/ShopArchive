@@ -83,8 +83,10 @@ internal class Network(
         http = server
         onStop("https") { server.stop() }
 
-        urls = listenHosts(settings.bindAddress, hosts.addresses).map { "https://${urlHost(it)}:${settings.port}" }
+        val listen = listenHosts(settings.bindAddress, hosts.addresses)
+        urls = listen.map { "https://${urlHost(it)}:${settings.port}" }
         Log.info("HTTPS listening on ${urls.joinToString(", ")} - certificate fingerprint ${cert.fingerprint}")
+        webLines(listen, settings.port).forEach { Log.info(it) }
 
         if (config.lanDiscovery) {
             val mdns = Mdns()
@@ -117,8 +119,6 @@ internal class Network(
 
     private fun listenHosts(bindAddress: String, lanAddresses: List<String>): List<String> =
         if (bindAddress == "0.0.0.0" || bindAddress == "::") lanAddresses + "localhost" else listOf(bindAddress)
-
-    private fun urlHost(host: String) = if (host.contains(':')) "[$host]" else host
 
     private companion object {
         val DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC)
