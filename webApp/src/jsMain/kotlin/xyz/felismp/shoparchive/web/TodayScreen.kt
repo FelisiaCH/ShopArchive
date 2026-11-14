@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.H2
+import org.jetbrains.compose.web.dom.Nav
 import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
 import xyz.felismp.shoparchive.app.client.ConnectionStatus
@@ -16,12 +17,13 @@ import xyz.felismp.shoparchive.app.flow.Destination
 import xyz.felismp.shoparchive.app.flow.OpenDayPhase
 import xyz.felismp.shoparchive.app.flow.Workspace
 
-/** After unlock: the connection banner, the branch to work in, and Today or Open day. */
+/** After unlock: the connection banner, the branch to work in, the nav bar, and the chosen screen. */
 @Composable
 fun Shell(t: Translator, s: AppState.Unlocked, flow: AppFlow, ws: Workspace) {
     val config by ws.config.collectAsState()
     val branch by ws.branch.collectAsState()
     val destination by ws.destination.collectAsState()
+    val can by ws.capabilities.collectAsState()
     val status by s.connection.collectAsState()
     Div(attrs = { classes("shell") }) {
         Div(attrs = { classes("bar") }) {
@@ -44,7 +46,20 @@ fun Shell(t: Translator, s: AppState.Unlocked, flow: AppFlow, ws: Workspace) {
                 Btn(t.t("retry"), action = ws::retry)
             }
             ShellBody.NoBranch -> Screen("") { Banner(t.t("no_branch")) }
-            ShellBody.Ready -> if (destination == Destination.OPEN_DAY) OpenDayScreen(t, ws) else TodayScreen(t, ws)
+            ShellBody.Ready -> {
+                Nav(attrs = { classes("nav") }) {
+                    navItems(can).forEach { item ->
+                        val current = item.destination == destination
+                        Btn(t.t(item.label), primary = current, current = current) { ws.go(item.destination) }
+                    }
+                }
+                when (destination) {
+                    Destination.OPEN_DAY -> OpenDayScreen(t, ws)
+                    Destination.RECORD -> RecordScreen(t, ws)
+                    Destination.HISTORY -> HistoryScreen(t, ws)
+                    else -> TodayScreen(t, ws)
+                }
+            }
         }
     }
 }

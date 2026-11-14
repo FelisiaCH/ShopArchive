@@ -92,4 +92,26 @@ class TextTest {
         )
         keys.forEach(::assertWorded)
     }
+
+    /** Every key the Record and History screens use, in all three languages. */
+    @Test
+    fun theKeysTheRecordAndHistoryScreensUseExist() {
+        val keys = listOf(
+            "nav_today", "nav_record", "nav_history",
+            "record_title", "block_no_day", "block_no_day_other", "openday_btn", "type_income", "type_expense",
+            "category_label", "category_none", "item_label", "note_label", "tenders_title", "method_cash", "method_online",
+            "amount_label", "record_amount_shown", "issue_amount_invalid", "issue_amount_missing", "issue_slip_needed", "issue_slip_not_allowed",
+            "issue_too_many_slips", "issue_category_needed", "tender_remove", "tender_add",
+            "slips_title", "slips_count", "slip_file", "slip_preparing", "detail_slip", "slip_remove", "slip_used_before", "slip_attached_twice",
+            "slip_check_unknown", "slip_check_not_shop", "slip_check_known", "slip_check_to",
+            "notice_too_many", "notice_too_big", "notice_unreadable", "notice_no_qr", "notice_not_confirmed",
+            "record_saving", "record_saved_income", "record_saved_expense", "record_unknown", "record_unknown_branch",
+            "record_check_again", "record_discard", "record_failed", "record_save", "needs_connection",
+            "filter_range", "filter_from", "filter_to", "range_not_a_date", "range_backwards", "range_too_long",
+            "history_failed", "history_empty", "history_deleted", "working", "retry", "back", "cancel",
+            "detail_created", "detail_updated", "detail_delete", "detail_delete_ask", "detail_delete_body", "detail_delete_yes",
+            "detail_move", "detail_move_date", "detail_move_to", "detail_move_yes", "detail_failed",
+        )
+        keys.forEach(::assertWorded)
+    }
 }

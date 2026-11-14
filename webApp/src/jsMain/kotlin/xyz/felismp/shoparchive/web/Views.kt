@@ -5,20 +5,35 @@ import xyz.felismp.shoparchive.app.flow.AppState
 import xyz.felismp.shoparchive.app.flow.Capabilities
 import xyz.felismp.shoparchive.app.flow.ConfigState
 import xyz.felismp.shoparchive.app.flow.DayStatus
+import xyz.felismp.shoparchive.app.flow.Destination
 import xyz.felismp.shoparchive.app.flow.Failure
 import xyz.felismp.shoparchive.app.flow.OpenDayBlock
 import xyz.felismp.shoparchive.app.flow.OpenDayPhase
 import xyz.felismp.shoparchive.app.flow.OpenDayUi
 import xyz.felismp.shoparchive.app.flow.Problem
+import xyz.felismp.shoparchive.app.flow.RangeProblem
+import xyz.felismp.shoparchive.app.flow.RecordIssue
+import xyz.felismp.shoparchive.app.flow.RecordUi
+import xyz.felismp.shoparchive.app.flow.SavePhase
+import xyz.felismp.shoparchive.app.flow.SlipNotice
+import xyz.felismp.shoparchive.app.flow.TenderRow
 import xyz.felismp.shoparchive.app.flow.TodayData
+import xyz.felismp.shoparchive.app.flow.Workspace
+import xyz.felismp.shoparchive.app.flow.bankTimeText
 import xyz.felismp.shoparchive.app.flow.displayAmount
 import xyz.felismp.shoparchive.app.flow.groupThousands
 import xyz.felismp.shoparchive.app.flow.parseTypedAmount
+import xyz.felismp.shoparchive.app.flow.savedAmountText
+import xyz.felismp.shoparchive.shared.CategoryDto
+import xyz.felismp.shoparchive.shared.CurrencyInfo
 import xyz.felismp.shoparchive.shared.DashboardCurrency
 import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.LocalizedName
+import xyz.felismp.shoparchive.shared.RecordsPolicy
+import xyz.felismp.shoparchive.shared.SlipCheckDto
+import xyz.felismp.shoparchive.shared.TenderMethod
 
 // What each screen shows, worked out from clientCore's state without touching the DOM (so Node can test it). Same rules as composeApp's screens.
 
@@ -115,6 +130,17 @@ fun connectionBanner(status: ConnectionStatus): Message? = when (status) {
     ConnectionStatus.CONNECTING -> Message("status_connecting")
     ConnectionStatus.OFFLINE -> Message("offline_banner")
 }
+
+// ---- navigation ----
+
+class NavItem(val destination: Destination, val label: String)
+
+/** Today, then the screens the person's rights allow; the shell shows only these. */
+fun navItems(can: Capabilities): List<NavItem> = listOf(
+    NavItem(Destination.TODAY, "nav_today"),
+    NavItem(Destination.RECORD, "nav_record"),
+    NavItem(Destination.HISTORY, "nav_history"),
+).filter { can.allows(it.destination) }
 
 // ---- Today ----
 
@@ -269,3 +295,105 @@ fun openDayView(ui: OpenDayUi): OpenDayView {
         confirmEnabled = ui.blocked == null && !saving, saving = saving,
     )
 }
+
+// ---- Record ----
+
+/** The branch's name on this device, or its key when the shop no longer lists it. */
+fun Workspace.branchName(key: String): String = branches.firstOrNull { it.key == key }?.displayName ?: key
+
+/** A category's name in the page's language, or the key when the shop no longer lists it. Null for no category. */
+fun categoryName(categories: List<CategoryDto>, key: String?, language: String): String? =
+    key?.let { k -> categories.firstOrNull { it.key == k }?.name?.pick(language) ?: k }
+
+fun recordIssueKey(issue: RecordIssue): String = when (issue) {
+    RecordIssue.AMOUNT_MISSING -> "issue_amount_missing"
+    RecordIssue.AMOUNT_INVALID -> "issue_amount_invalid"
+    RecordIssue.SLIP_NEEDED -> "issue_slip_needed"
+    RecordIssue.SLIP_NOT_ALLOWED -> "issue_slip_not_allowed"
+    RecordIssue.TOO_MANY_SLIPS -> "issue_too_many_slips"
+    RecordIssue.CATEGORY_NEEDED -> "issue_category_needed"
+}
+
+/** What the save is doing: its banner, the branch an unknown save belongs to, and the two ways out of an unknown result. */
+class RecordPhaseView(
+    val banner: Message?,
+    val error: Boolean,
+    val note: Message?,
+    val checkAgain: Boolean,
+    val checkEnabled: Boolean,
+    val discard: Boolean,
+)
+
+fun recordPhaseView(ui: RecordUi, failureText: (Message) -> String, branchName: (String) -> String): RecordPhaseView = when (val phase = ui.phase) {
+    SavePhase.Editing -> RecordPhaseView(null, false, null, false, false, false)
+    SavePhase.Saving -> RecordPhaseView(Message("record_saving"), false, null, false, false, false)
+    is SavePhase.Saved -> RecordPhaseView(
+        Message(
+            if (phase.entry.type == EntryType.INCOME) "record_saved_income" else "record_saved_expense",
+            listOf(savedAmountText(phase.entry.tenders, ui.currencies)),
+        ),
+        false, null, false, false, false,
+    )
+    is SavePhase.Unknown -> RecordPhaseView(
+        Message("record_unknown"), false,
+        ui.pendingBranch?.let { Message("record_unknown_branch", listOf(branchName(it))) },
+        true, ui.connected, true,
+    )
+    is SavePhase.Failed -> RecordPhaseView(Message("record_failed", listOf(failureText(phase.failure.message()))), true, null, false, false, false)
+}
+
+/** The amount the server will read from a payment line, or null when it is not an amount of [row]'s currency. */
+fun tenderShown(row: TenderRow, currencies: List<CurrencyInfo>): String? {
+    val currency = currencies.firstOrNull { it.code == row.currency } ?: return null
+    val minor = parseTypedAmount(row.amount, currency.exponent) ?: return null
+    return displayAmount(minor, currency.exponent) + " " + currency.code
+}
+
+class CheckBanner(val message: Message, val error: Boolean)
+
+/** What the bank said about a slip: the transfer it knows, one paid to another account, or one it does not know. */
+fun slipCheckBanner(check: SlipCheckDto, toText: (String) -> String = { it }): CheckBanner = when {
+    !check.known -> CheckBanner(Message("slip_check_unknown", listOf(check.source)), error = true)
+    check.toShop == false -> CheckBanner(Message("slip_check_not_shop", listOf(check.to ?: check.toAccount.orEmpty())), error = true)
+    else -> {
+        val details = listOfNotNull(
+            check.amount?.let { groupThousands(it) + (check.currency?.let { c -> " $c" } ?: "") },
+            check.time?.let(::bankTimeText),
+            check.to?.let(toText),
+        )
+        CheckBanner(Message("slip_check_known", listOf(check.source, details.joinToString(" · "))), error = false)
+    }
+}
+
+fun slipNoticeMessage(notice: SlipNotice, policy: RecordsPolicy): Message = when (notice) {
+    SlipNotice.TOO_MANY -> Message("notice_too_many", listOf(policy.slipMaxCount.toString()))
+    SlipNotice.TOO_BIG -> Message("notice_too_big", listOf(policy.slipMaxSizeKb.toString()))
+    SlipNotice.UNREADABLE -> Message("notice_unreadable")
+    SlipNotice.NO_QR -> Message("notice_no_qr")
+    SlipNotice.ALREADY_ADDED -> Message("slip_attached_twice")
+    SlipNotice.NOT_CONFIRMED -> Message("notice_not_confirmed")
+}
+
+// ---- History ----
+
+fun rangeProblemKey(problem: RangeProblem): String = when (problem) {
+    RangeProblem.NOT_A_DATE -> "range_not_a_date"
+    RangeProblem.BACKWARDS -> "range_backwards"
+    RangeProblem.TOO_LONG -> "range_too_long"
+}
+
+class DateGroup(val date: String, val entries: List<EntryDto>)
+
+/** The entries as the server sent them (newest first), with one heading per date. */
+fun historyGroups(entries: List<EntryDto>): List<DateGroup> =
+    entries.groupBy { it.date }.map { (date, rows) -> DateGroup(date, rows) }
+
+fun methodKey(method: TenderMethod): String = if (method == TenderMethod.CASH) "method_cash" else "method_online"
+
+/** An entry's item, or its category's name, or a dash when it has neither. */
+fun historyRowTitle(entry: EntryDto, categories: List<CategoryDto>, language: String): String =
+    entry.item.ifBlank { categoryName(categories, entry.category, language) ?: "—" }
+
+/** A change that did not happen; a cancelled PIN prompt already says "Not done", so it is not said twice. */
+fun notDoneMessage(failure: Failure): Message =
+    if (failure == Failure.Client(Problem.ReauthCancelled)) failure.message() else Message("detail_failed", detail = failure.message())

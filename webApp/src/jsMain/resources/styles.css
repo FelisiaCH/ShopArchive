@@ -54,6 +54,8 @@ form { display: flex; flex-direction: column; gap: 0.75rem; }
 .muted { color: var(--muted); font-size: 0.9rem; }
 
 .bar { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 1rem 0; }
+.nav { position: sticky; top: 0; z-index: 2; display: flex; gap: 0.5rem; padding: 0.5rem 1rem; margin-top: 0.5rem; background: var(--bg); border-bottom: 1px solid var(--line); }
+.nav .btn { flex: 1; align-self: stretch; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .stack { display: flex; flex-direction: column; gap: 0.5rem; }
 
@@ -87,6 +89,7 @@ form { display: flex; flex-direction: column; gap: 0.75rem; }
 .banner.error { background: var(--error-bg); color: var(--out); }
 
 .chip { padding: 0.25rem 0.7rem; border-radius: 999px; background: var(--info-bg); font-size: 0.9rem; }
+.chip.error { background: var(--error-bg); color: var(--out); }
 
 .card { padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: 0.75rem; background: var(--card); }
 .card h2 { margin: 0 0 0.25rem; }
@@ -96,6 +99,8 @@ form { display: flex; flex-direction: column; gap: 0.75rem; }
 .amount.out { color: var(--out); justify-content: flex-end; }
 
 .line { display: flex; justify-content: space-between; gap: 1rem; padding: 0.6rem 0; border-bottom: 1px solid var(--line); }
+.line.clickable { width: 100%; font: inherit; text-align: left; background: transparent; color: inherit; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+.slip-image { display: block; max-width: 100%; margin-top: 0.5rem; border-radius: 0.5rem; }
 
 @media (min-width: 720px) {
   .screen { padding: 1.5rem; }
