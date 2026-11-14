@@ -85,6 +85,7 @@ asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "asm" }
 jline-terminal-jna = { module = "org.jline:jline-terminal-jna", version.ref = "jline" }
 
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
+compose-html-core = { module = "org.jetbrains.compose.html:html-core", version.ref = "compose-multiplatform" }
 compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
 compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose-multiplatform" }
 navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigation-compose" }

@@ -69,6 +69,16 @@ val generateBuildInfo = tasks.register<GenerateBuildInfo>("generateBuildInfo") {
 }
 tasks.processResources { from(generateBuildInfo) }
 
+// -Pshoparchive.web: the web client (:webApp) goes into the jar under web/ and replaces the placeholder page in src/main/resources/web.
+// Without the flag no webApp task (and no Node download) runs and the placeholder stays.
+if (providers.gradleProperty("shoparchive.web").isPresent) {
+    sourceSets.main { resources.exclude("web/**") }
+    tasks.processResources {
+        dependsOn(":webApp:jsBrowserDistribution")
+        from(rootProject.layout.projectDirectory.dir("webApp/build/dist/js/productionExecutable")) { into("web") }
+    }
+}
+
 tasks.jar {
     manifest {
         attributes(

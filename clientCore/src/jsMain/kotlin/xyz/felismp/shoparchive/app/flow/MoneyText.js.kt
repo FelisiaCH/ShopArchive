@@ -3,8 +3,15 @@ package xyz.felismp.shoparchive.app.flow
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 
-private fun intlSeparator(type: String): String? =
-    js("(function (t) { var p = new Intl.NumberFormat(navigator.language).formatToParts(1234567.5); for (var i = 0; i < p.length; i++) { if (p[i].type === t) return p[i].value; } return null; })")(type) as String?
+// Intl.NumberFormat can be called without `new`; written this way the code the Kotlin compiler emits cannot be read as `new (a.b)()`.
+private fun intlSeparator(type: String): String? {
+    val parts = js("Intl.NumberFormat(navigator.language).formatToParts(1234567.5)")
+    val length = parts.length as Int
+    for (i in 0 until length) {
+        if (parts[i].type as String == type) return parts[i].value as String
+    }
+    return null
+}
 
 private fun browserLanguage(): String = js("navigator.language") as String
 

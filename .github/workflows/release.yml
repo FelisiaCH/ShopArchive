@@ -20,7 +20,7 @@ jobs:
           java-version: 21
       - uses: gradle/actions/setup-gradle@v6
       # serverZip builds the jar and the zip; check opens the zip and asserts its contents.
-      - run: ./gradlew :server-launcher:serverZip :server-launcher:checkServerZip
+      - run: ./gradlew -Pshoparchive.web :server-launcher:serverZip :server-launcher:checkServerZip
       - uses: actions/upload-artifact@v7
         with:
           name: shoparchive-server
