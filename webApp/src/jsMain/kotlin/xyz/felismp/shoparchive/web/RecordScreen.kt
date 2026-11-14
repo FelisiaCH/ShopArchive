@@ -115,7 +115,7 @@ private fun Slips(t: Translator, ws: Workspace, ui: RecordUi, record: RecordStat
             attr("multiple", "")
             if (!editable) disabled()
             onChange { event ->
-                val input = event.asDynamic().target.unsafeCast<HTMLInputElement>()
+                val input = event.nativeEvent.target.unsafeCast<HTMLInputElement>()
                 val files = input.files
                 if (files != null) {
                     val picked = (0 until files.length).map { files.item(it)!! }
