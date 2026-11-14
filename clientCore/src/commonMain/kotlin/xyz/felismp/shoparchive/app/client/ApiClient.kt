@@ -82,6 +82,9 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.concurrent.atomics.update
 import kotlin.time.Clock
 
+private const val WS_VERSION_PREFIX = "shoparchive.v"
+private const val WS_BEARER_PREFIX = "shoparchive.bearer."
+
 @PublishedApi
 internal val clientJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
@@ -99,6 +102,8 @@ class ApiClient(
     private val http: HttpClient,
     private val isPinFailure: (Throwable) -> Boolean,
     private val isConnectFailure: (Throwable) -> Boolean = { true },
+    /** True in a browser, which cannot set headers on a WebSocket: the version and token go in `Sec-WebSocket-Protocol` instead (the server's `Web.kt` reads them). */
+    private val webSocketSubprotocol: Boolean = false,
 ) : ServerApi {
     private val endpointList = AtomicReference(orderEndpoints(endpoints))
 
@@ -410,8 +415,12 @@ class ApiClient(
             var opened = false
             try {
                 http.webSocket("wss://$endpoint/api/v1/ws", request = {
-                    header(PROTOCOL_HEADER, PROTOCOL_VERSION.toString())
-                    header(HttpHeaders.Authorization, "Bearer $bearer")
+                    if (webSocketSubprotocol) {
+                        header(HttpHeaders.SecWebSocketProtocol, "$WS_VERSION_PREFIX$PROTOCOL_VERSION,$WS_BEARER_PREFIX$bearer")
+                    } else {
+                        header(PROTOCOL_HEADER, PROTOCOL_VERSION.toString())
+                        header(HttpHeaders.Authorization, "Bearer $bearer")
+                    }
                 }) {
                     opened = true
                     onOpen()

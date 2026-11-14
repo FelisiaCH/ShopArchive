@@ -13,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 
 /** The real Ktor/OkHttp socket against a pinned TLS server. */
 class WebSocketTest {
@@ -40,6 +41,34 @@ class WebSocketTest {
             assertEquals("$PROTOCOL_VERSION", upgrade.headers["X-ShopArchive-Protocol"])
             api.close()
         }
+    }
+
+    private fun upgradeRequest(subprotocol: Boolean) = runBlocking {
+        val listener = object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) { webSocket.close(1000, "bye") }
+        }
+        TlsServer { r -> if (r.target == "/api/v1/unlock") json(unlockOk) else MockResponse.Builder().webSocketUpgrade(listener).build() }.use { s ->
+            val api = ApiClient("sid", listOf(s.endpoint), pinnedHttpClient(s.pin, 5_000, 120_000), ::isPinFailure, webSocketSubprotocol = subprotocol)
+            api.unlock(unlockReq)
+            withTimeout(10_000) { api.webSocketSession({}, {}) }
+            api.close()
+            s.requests.last()
+        }
+    }
+
+    @Test fun defaultSendsHeadersAndNoSubprotocol() {
+        val upgrade = upgradeRequest(false)
+        assertEquals("Bearer TOKEN-1", upgrade.headers["Authorization"])
+        assertEquals("$PROTOCOL_VERSION", upgrade.headers["X-ShopArchive-Protocol"])
+        assertNull(upgrade.headers["Sec-WebSocket-Protocol"])
+    }
+
+    @Test fun subprotocolModeSendsVersionAndTokenInSubprotocolOnly() {
+        val upgrade = upgradeRequest(true)
+        val offered = upgrade.headers["Sec-WebSocket-Protocol"].orEmpty().split(',').map { it.trim() }
+        assertEquals(listOf("shoparchive.v$PROTOCOL_VERSION", "shoparchive.bearer.TOKEN-1"), offered)
+        assertNull(upgrade.headers["Authorization"])
+        assertNull(upgrade.headers["X-ShopArchive-Protocol"])
     }
 
     @Test fun rejectedUpgradeWith401ClearsTheTokenAndIsLocked() = runBlocking {

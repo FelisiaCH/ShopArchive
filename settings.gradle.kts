@@ -29,6 +29,7 @@ rootProject.name = "ShopArchive"
 
 include(":shared")
 include(":clientCore")
+include(":webApp")
 include(":shoparchive-api")
 include(":server-launcher")
 include(":server")
