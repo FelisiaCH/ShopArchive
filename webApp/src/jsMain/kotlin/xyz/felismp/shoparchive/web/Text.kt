@@ -13,4 +13,8 @@ class Translator(val language: String, private val tables: Map<String, Map<Strin
     }
 
     fun text(m: Message): String = t(m.key, *m.args.toTypedArray()) + (m.detail?.let { " " + text(it) } ?: "")
+
+    /** [key] in the plural item [language] itself has for [count]: `one` only for 1 where that language has it, else `other` (Thai and Lao have only "other"). */
+    fun plural(key: String, count: Int, vararg args: String): String =
+        t(if (count == 1 && tables[language]?.containsKey("$key.one") == true) "$key.one" else "$key.other", *args)
 }

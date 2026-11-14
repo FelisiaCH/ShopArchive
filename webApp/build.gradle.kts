@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// th / lo / en strings of composeApp as Kotlin maps (plain <string> only; plurals are left out). Format args (%1$s) stay as they are.
+// th / lo / en strings of composeApp as Kotlin maps (a plural item becomes `<name>.<quantity>`). Format args (%1$s) stay as they are.
 abstract class GenerateWebStrings : DefaultTask() {
     @get:InputFile @get:PathSensitive(PathSensitivity.NONE) abstract val en: RegularFileProperty
     @get:InputFile @get:PathSensitive(PathSensitivity.NONE) abstract val th: RegularFileProperty
@@ -33,8 +33,20 @@ abstract class GenerateWebStrings : DefaultTask() {
         val nodes = javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file).documentElement.childNodes
         return (0 until nodes.length).map { nodes.item(it) }
             .filterIsInstance<org.w3c.dom.Element>()
-            .filter { it.tagName == "string" }
-            .map { it.getAttribute("name") to unescape(it.textContent) }
+            .flatMap { node ->
+                when (node.tagName) {
+                    "string" -> listOf(node.getAttribute("name") to unescape(node.textContent))
+                    "plurals" -> {
+                        val name = node.getAttribute("name")
+                        val items = node.childNodes
+                        (0 until items.length).map { items.item(it) }
+                            .filterIsInstance<org.w3c.dom.Element>()
+                            .filter { it.tagName == "item" }
+                            .map { "$name.${it.getAttribute("quantity")}" to unescape(it.textContent) }
+                    }
+                    else -> emptyList()
+                }
+            }
     }
 
     private fun literal(s: String) =

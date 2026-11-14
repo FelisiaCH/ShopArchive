@@ -63,6 +63,8 @@ class RecordViewsTest {
         assertEquals(listOf("nav_today", "nav_record", "nav_history"), all.map { it.label })
         assertEquals(listOf(Destination.TODAY, Destination.RECORD, Destination.HISTORY), all.map { it.destination })
         assertEquals(listOf("nav_today", "nav_record"), navItems(Capabilities(setOf(PermissionNodes.ENTRY_CREATE))).map { it.label })
+        assertEquals(listOf("nav_today", "nav_notes"), navItems(Capabilities(setOf(PermissionNodes.NOTE_CREATE))).map { it.label })
+        assertEquals(listOf("nav_today", "nav_notes"), navItems(Capabilities(setOf(PermissionNodes.NOTE_READ))).map { it.label })
     }
 
     // ---- Record ----

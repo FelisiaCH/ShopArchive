@@ -60,7 +60,7 @@ form { display: flex; flex-direction: column; gap: 0.75rem; }
 .stack { display: flex; flex-direction: column; gap: 0.5rem; }
 
 .field { display: flex; flex-direction: column; gap: 0.25rem; }
-.field input {
+.field input, .field textarea {
   font: inherit;
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--line);
@@ -68,7 +68,8 @@ form { display: flex; flex-direction: column; gap: 0.75rem; }
   background: var(--card);
   color: var(--text);
 }
-.field input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.field textarea { resize: vertical; min-height: 5rem; }
+.field input:focus-visible, .field textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .btn {
   font: inherit;

@@ -15,6 +15,7 @@ import xyz.felismp.shoparchive.app.flow.AppState
 import xyz.felismp.shoparchive.app.flow.ConfigState
 import xyz.felismp.shoparchive.app.flow.Destination
 import xyz.felismp.shoparchive.app.flow.OpenDayPhase
+import xyz.felismp.shoparchive.app.flow.ReportsTab
 import xyz.felismp.shoparchive.app.flow.Workspace
 
 /** After unlock: the connection banner, the branch to work in, the nav bar, and the chosen screen. */
@@ -28,7 +29,10 @@ fun Shell(t: Translator, s: AppState.Unlocked, flow: AppFlow, ws: Workspace) {
     Div(attrs = { classes("shell") }) {
         Div(attrs = { classes("bar") }) {
             Span(attrs = { classes("muted") }) { Text(s.username) }
-            Btn(t.t("lock_now"), primary = false) { flow.lockNow() }
+            Div(attrs = { classes("row") }) {
+                Btn(t.t("nav_settings"), primary = false) { flow.openSettings() }
+                Btn(t.t("lock_now"), primary = false) { flow.lockNow() }
+            }
         }
         connectionBanner(status)?.let { Banner(t.text(it), error = status == ConnectionStatus.OFFLINE) }
         // `config` is read so the branches below follow it.
@@ -57,6 +61,9 @@ fun Shell(t: Translator, s: AppState.Unlocked, flow: AppFlow, ws: Workspace) {
                     Destination.OPEN_DAY -> OpenDayScreen(t, ws)
                     Destination.RECORD -> RecordScreen(t, ws)
                     Destination.HISTORY -> HistoryScreen(t, ws)
+                    // Close day is the only Reports tab on the web so far.
+                    Destination.REPORTS -> CloseDayScreen(t, ws)
+                    Destination.NOTES -> NotesScreen(t, ws)
                     else -> TodayScreen(t, ws)
                 }
             }
@@ -89,6 +96,7 @@ fun TodayScreen(t: Translator, ws: Workspace) {
                 if (view.chips.isNotEmpty()) Div(attrs = { classes("row") }) { view.chips.forEach { Span(attrs = { classes("chip") }) { Text(t.text(it)) } } }
                 if (view.needsConnection) Note(t.t("needs_connection"))
                 view.openButton?.let { Btn(t.t(it.label), enabled = it.enabled, primary = it.primary) { ws.go(Destination.OPEN_DAY) } }
+                view.closeButton?.let { Btn(t.t(it.label), enabled = it.enabled, primary = it.primary) { ws.openReports(ReportsTab.CLOSE_DAY) } }
                 view.statsBanner?.let { Banner(t.text(it), error = true) }
                 view.cards.forEach { c ->
                     Div(attrs = { classes("card") }) {

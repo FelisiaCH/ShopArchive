@@ -64,6 +64,9 @@ enum class FieldKind {
     Pin,
     Password,
     Amount,
+
+    /** Several lines (a note). */
+    Multiline,
 }
 
 /** A text box with its label above. */
@@ -72,18 +75,27 @@ fun Field(label: String, text: String, onChange: (String) -> Unit, kind: FieldKi
     val type: InputType<String> = if (kind == FieldKind.Pin || kind == FieldKind.Password) InputType.Password else InputType.Text
     Label(attrs = { classes("field") }) {
         Span { Text(label) }
-        Input(type = type, attrs = {
-            value(text)
-            onInput { onChange(it.value) }
-            if (!enabled) disabled()
-            when (kind) {
-                FieldKind.Plain -> attr("autocomplete", "off")
-                FieldKind.Pin -> { attr("inputmode", "numeric"); attr("autocomplete", "off") }
-                FieldKind.Password -> attr("autocomplete", "off")
-                FieldKind.Amount -> { attr("inputmode", "decimal"); attr("autocomplete", "off") }
-                FieldKind.Text -> attr("autocomplete", "username")
-            }
-        })
+        if (kind == FieldKind.Multiline) {
+            TextArea(value = text, attrs = {
+                onInput { onChange(it.value) }
+                if (!enabled) disabled()
+                attr("autocomplete", "off")
+            })
+        } else {
+            Input(type = type, attrs = {
+                value(text)
+                onInput { onChange(it.value) }
+                if (!enabled) disabled()
+                when (kind) {
+                    FieldKind.Plain -> attr("autocomplete", "off")
+                    FieldKind.Pin -> { attr("inputmode", "numeric"); attr("autocomplete", "off") }
+                    FieldKind.Password -> attr("autocomplete", "off")
+                    FieldKind.Amount -> { attr("inputmode", "decimal"); attr("autocomplete", "off") }
+                    FieldKind.Text -> attr("autocomplete", "username")
+                    FieldKind.Multiline -> Unit
+                }
+            })
+        }
     }
 }
 

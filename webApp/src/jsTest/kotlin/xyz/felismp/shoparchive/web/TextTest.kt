@@ -41,6 +41,27 @@ class TextTest {
     }
 
     @Test
+    fun aPluralUsesTheOnlyFormTheLanguageItselfHas() {
+        val en = Translator("en", mapOf("en" to mapOf("k.one" to "%1\$d note", "k.other" to "%1\$d notes")))
+        assertEquals("1 note", en.plural("k", 1, "1"))
+        assertEquals("2 notes", en.plural("k", 2, "2"))
+
+        // Thai has only "other": the English "one" would be wrong.
+        val th = Translator("th", mapOf("en" to mapOf("k.one" to "%1\$d note", "k.other" to "notes"), "th" to mapOf("k.other" to "%1\$d โน้ต")))
+        assertEquals("1 โน้ต", th.plural("k", 1, "1"))
+
+        assertEquals("other", Translator("en", mapOf("en" to mapOf("k.other" to "other"))).plural("k", 1))
+    }
+
+    @Test
+    fun theGeneratedPluralsAreThere() {
+        assertTrue(WebStrings.en.getValue("notes_count.one").contains("note"))
+        assertTrue(WebStrings.en.getValue("notes_count.other").contains("notes"))
+        assertTrue(WebStrings.th["notes_count.one"] == null)
+        assertTrue(WebStrings.lo["notes_count.one"] == null)
+    }
+
+    @Test
     fun everyProblemHasWordsInEveryLanguage() {
         val problems = listOf(
             Problem.Unreachable, Problem.TooManyAttempts(5), Problem.TooManyAttempts(null), Problem.Banned, Problem.WrongCredentials,
@@ -113,5 +134,24 @@ class TextTest {
             "detail_move", "detail_move_date", "detail_move_to", "detail_move_yes", "detail_failed",
         )
         keys.forEach(::assertWorded)
+    }
+
+    /** Every key the Close day, Notes and Settings screens use, in all three languages. */
+    @Test
+    fun theKeysTheCloseNotesAndSettingsScreensUseExist() {
+        val keys = listOf(
+            "closeday_btn", "closeday_hint", "closeday_counted", "closeday_counted_short", "closeday_expected", "closeday_variance",
+            "closeday_matches", "closeday_short", "closeday_over", "closeday_keep", "closeday_handover", "closeday_below_float",
+            "closeday_below_float_done", "closeday_note", "closeday_note_required", "closeday_note_needed", "closeday_no_preview",
+            "closeday_confirm", "closeday_failed", "closeday_none", "closeday_done", "closeday_note_is", "go_today",
+            "nav_notes", "notes_title", "notes_sub", "notes_list_h", "notes_unread_n", "notes_unread", "notes_mark_read",
+            "notes_mark_all", "notes_read_at", "notes_seen_owner", "notes_not_seen", "notes_empty_h", "notes_empty_p",
+            "notes_composer", "notes_post", "notes_posting", "notes_post_failed_h", "notes_post_failed_p", "notes_foot",
+            "notes_prev_day", "notes_next_day", "notes_load_failed", "notes_mark_failed",
+            "nav_settings", "language_label", "lang_system", "lang_en", "lang_lo", "lang_th", "record_start_label",
+            "record_start_last", "lock_now", "back",
+        )
+        keys.forEach(::assertWorded)
+        assertTrue(WebStrings.en.containsKey("notes_count.one") && WebStrings.en.containsKey("notes_count.other"))
     }
 }
