@@ -45,7 +45,7 @@ fun App(flow: AppFlow) {
         is AppState.Login -> LoginScreen(t, s, flow)
         is AppState.Locked -> LockedScreen(t, s, flow)
         is AppState.Unlocked -> flow.workspace?.let { Shell(t, s, flow, it) }
-        is AppState.Settings -> Unit // never opened: the page has no Settings yet
+        is AppState.Settings -> SettingsScreen(t, flow)
         is AppState.CertChanged -> CertChangedScreen(t, s, flow)
         is AppState.ProtocolMismatch -> ProtocolMismatchScreen(t, s)
     }

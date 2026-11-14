@@ -1,6 +1,7 @@
 package xyz.felismp.shoparchive.web
 
 import xyz.felismp.shoparchive.app.client.ConnectionStatus
+import xyz.felismp.shoparchive.app.client.RecordStart
 import xyz.felismp.shoparchive.app.flow.AppState
 import xyz.felismp.shoparchive.app.flow.Capabilities
 import xyz.felismp.shoparchive.app.flow.ConfigState
@@ -83,7 +84,7 @@ class ViewsTest {
         assertTrue(v.notOpened)
         assertEquals("openday_card_body", v.body?.key)
         assertEquals("openday_btn", v.openButton?.label)
-        assertTrue(v.openButton!!.enabled && v.openButton!!.primary)
+        assertTrue(v.openButton!!.enabled && v.openButton.primary)
         val other = view(today(DayStatus.NotOpened), can = nobody)
         assertEquals("openday_card_body_other", other.body?.key)
         assertNull(other.openButton)
@@ -104,6 +105,25 @@ class ViewsTest {
         assertFalse(v.openButton!!.enabled)
         assertTrue(v.needsConnection)
         assertFalse(view(today(DayStatus.Open(session)), canWrite = false).needsConnection)
+    }
+
+    @Test
+    fun anOpenDayOffersClosingOnlyToSomeoneWhoMay() {
+        val closer = Capabilities(setOf(PermissionNodes.DAY_CLOSE))
+        val v = view(today(DayStatus.Open(session)), can = closer)
+        assertEquals("closeday_btn", v.closeButton?.label)
+        assertFalse(v.closeButton!!.primary)
+        assertTrue(view(today(DayStatus.Open(session), staleFrom = "2026-11-12"), can = closer).closeButton!!.primary)
+        assertNull(view(today(DayStatus.Open(session))).closeButton)
+        assertNull(view(today(DayStatus.Closed(session)), can = closer).closeButton)
+    }
+
+    @Test
+    fun theSettingsOptionsAreTheAppsOrder() {
+        assertEquals(listOf(null, "en", "lo", "th"), languageOptions.map { it.tag })
+        assertEquals(listOf("lang_system", "lang_en", "lang_lo", "lang_th"), languageOptions.map { it.label })
+        assertEquals(listOf(RecordStart.INCOME, RecordStart.EXPENSE, RecordStart.LAST), recordStartOptions.map { it.start })
+        assertEquals(listOf("type_income", "type_expense", "record_start_last"), recordStartOptions.map { it.label })
     }
 
     @Test

@@ -1,24 +1,46 @@
 package xyz.felismp.shoparchive.web
 
 import xyz.felismp.shoparchive.app.client.ConnectionStatus
+import xyz.felismp.shoparchive.app.client.RecordStart
 import xyz.felismp.shoparchive.app.flow.AppState
 import xyz.felismp.shoparchive.app.flow.Capabilities
+import xyz.felismp.shoparchive.app.flow.CloseBlock
+import xyz.felismp.shoparchive.app.flow.ClosePhase
+import xyz.felismp.shoparchive.app.flow.CloseUi
 import xyz.felismp.shoparchive.app.flow.ConfigState
 import xyz.felismp.shoparchive.app.flow.DayStatus
+import xyz.felismp.shoparchive.app.flow.Destination
 import xyz.felismp.shoparchive.app.flow.Failure
+import xyz.felismp.shoparchive.app.flow.NotesUi
 import xyz.felismp.shoparchive.app.flow.OpenDayBlock
 import xyz.felismp.shoparchive.app.flow.OpenDayPhase
 import xyz.felismp.shoparchive.app.flow.OpenDayUi
 import xyz.felismp.shoparchive.app.flow.Problem
+import xyz.felismp.shoparchive.app.flow.RangeProblem
+import xyz.felismp.shoparchive.app.flow.RecordIssue
+import xyz.felismp.shoparchive.app.flow.RecordUi
+import xyz.felismp.shoparchive.app.flow.SavePhase
+import xyz.felismp.shoparchive.app.flow.SlipNotice
+import xyz.felismp.shoparchive.app.flow.TenderRow
 import xyz.felismp.shoparchive.app.flow.TodayData
+import xyz.felismp.shoparchive.app.flow.Workspace
+import xyz.felismp.shoparchive.app.flow.bankTimeText
 import xyz.felismp.shoparchive.app.flow.displayAmount
 import xyz.felismp.shoparchive.app.flow.groupThousands
 import xyz.felismp.shoparchive.app.flow.parseTypedAmount
+import xyz.felismp.shoparchive.app.flow.savedAmountText
+import xyz.felismp.shoparchive.shared.CategoryDto
+import xyz.felismp.shoparchive.shared.CurrencyInfo
 import xyz.felismp.shoparchive.shared.DashboardCurrency
 import xyz.felismp.shoparchive.shared.EntryDto
 import xyz.felismp.shoparchive.shared.EntryType
 import xyz.felismp.shoparchive.shared.ErrorCode
 import xyz.felismp.shoparchive.shared.LocalizedName
+import xyz.felismp.shoparchive.shared.NoteDto
+import xyz.felismp.shoparchive.shared.RecordsPolicy
+import xyz.felismp.shoparchive.shared.SessionClose
+import xyz.felismp.shoparchive.shared.SlipCheckDto
+import xyz.felismp.shoparchive.shared.TenderMethod
 
 // What each screen shows, worked out from clientCore's state without touching the DOM (so Node can test it). Same rules as composeApp's screens.
 
@@ -116,6 +138,18 @@ fun connectionBanner(status: ConnectionStatus): Message? = when (status) {
     ConnectionStatus.OFFLINE -> Message("offline_banner")
 }
 
+// ---- navigation ----
+
+class NavItem(val destination: Destination, val label: String)
+
+/** Today, then the screens the person's rights allow; the shell shows only these. */
+fun navItems(can: Capabilities): List<NavItem> = listOf(
+    NavItem(Destination.TODAY, "nav_today"),
+    NavItem(Destination.RECORD, "nav_record"),
+    NavItem(Destination.HISTORY, "nav_history"),
+    NavItem(Destination.NOTES, "nav_notes"),
+).filter { can.allows(it.destination) }
+
 // ---- Today ----
 
 /** `08:12` from a server timestamp like `2026-10-04T08:12:30+07:00` (the shop's own time); the text itself if it is not one. */
@@ -139,6 +173,7 @@ class Line(val title: String, val caption: String, val amounts: List<Amount>)
 /**
  * What Today shows. [chips]: the day's status and the round ("Round N of today" from the second one on). [notOpened] with its [body]: the card that
  * says the day is not open. [openButton] is the way to the Open day form (null for someone who may not open it, and while the day is open).
+ * [closeButton] is the way to Close day, only while the day is open and the person may close it.
  */
 class TodayView(
     val banners: List<Message>,
@@ -147,6 +182,7 @@ class TodayView(
     val body: Message?,
     val needsConnection: Boolean,
     val openButton: DayButton?,
+    val closeButton: DayButton?,
     val cards: List<CurrencyCard>,
     val linesTitle: String?,
     val lines: List<Line>,
@@ -181,6 +217,7 @@ fun todayView(data: TodayData, can: Capabilities, canWrite: Boolean, categoryNam
     val round = data.round.takeIf { it >= 2 }?.let { Message("day_round", listOf(it.toString())) }
     var body: Message? = null
     var button: DayButton? = null
+    var closeButton: DayButton? = null
     val notOpened = data.status == DayStatus.NotOpened
     when (val status = data.status) {
         DayStatus.NotOpened -> {
@@ -191,6 +228,7 @@ fun todayView(data: TodayData, can: Capabilities, canWrite: Boolean, categoryNam
             chips += Message("day_open_by", listOf(clockTime(status.session.openedAt), status.session.openedBy.name))
             round?.let { chips += it }
             data.staleFrom?.let { banners += Message(if (can.closeDay) "day_stale" else "day_stale_other", listOf(it)) }
+            if (can.closeDay) closeButton = DayButton("closeday_btn", enabled = true, primary = data.staleFrom != null)
         }
         is DayStatus.Closed -> {
             chips += Message("day_closed")
@@ -219,7 +257,7 @@ fun todayView(data: TodayData, can: Capabilities, canWrite: Boolean, categoryNam
             lines = data.recent.take(10).map { line(it, categoryName) }
         }
     }
-    return TodayView(banners, chips, notOpened, body, needsConnection = button != null && !canWrite, openButton = button, cards, title, lines, empty, statsBanner)
+    return TodayView(banners, chips, notOpened, body, needsConnection = button != null && !canWrite, openButton = button, closeButton = closeButton, cards, title, lines, empty, statsBanner)
 }
 
 // ---- Open day ----
@@ -269,3 +307,251 @@ fun openDayView(ui: OpenDayUi): OpenDayView {
         confirmEnabled = ui.blocked == null && !saving, saving = saving,
     )
 }
+
+// ---- Close day ----
+
+/** `+1,500` / `-1,500` for [minor] units of a currency with [exponent] decimals; a plain `0` for zero. */
+fun signedAmount(minor: Long, exponent: Int): String = (if (minor > 0) "+" else "") + displayAmount(minor, exponent)
+
+/** [text]: the signed amount with its currency (null when the count matches); [words]: matches / short / over, said below the line when it does not. */
+class CloseVariance(val text: String?, val words: Message)
+
+/**
+ * One currency of the drawer: the amount typed, what the server expects, the difference, and — once something is counted — what stays as change and what is
+ * handed over. [belowFloor]: less is in the drawer than the change that must stay.
+ */
+class CloseRowView(
+    val code: String,
+    val text: String,
+    val invalid: Boolean,
+    val expected: String?,
+    val variance: CloseVariance?,
+    val keep: String?,
+    val handover: String?,
+    val belowFloor: Boolean,
+)
+
+class CloseBanner(val message: Message, val error: Boolean)
+
+/**
+ * The Close day form. [noteLabel] is the key of the note's label (required while the count differs); [noteNeeded] says the required note is still empty.
+ * [confirmEnabled] is off while saving, offline, with a wrong amount, or without the note the difference needs.
+ */
+class CloseDayView(
+    val hint: Message,
+    val previewBanner: Message?,
+    val rows: List<CloseRowView>,
+    val noteLabel: String,
+    val noteNeeded: Boolean,
+    val banner: CloseBanner?,
+    val needsConnection: Boolean,
+    val confirmEnabled: Boolean,
+    val saving: Boolean,
+)
+
+fun closeDayView(ui: CloseUi): CloseDayView {
+    val rows = ui.rows.map { row ->
+        val code = row.currency.code
+        fun money(minor: Long) = displayAmount(minor, row.currency.exponent) + " " + code
+        val variance = row.variance?.let { v ->
+            val words = when {
+                v == 0L -> Message("closeday_matches")
+                v < 0 -> Message("closeday_short", listOf(money(-v)))
+                else -> Message("closeday_over", listOf(money(v)))
+            }
+            CloseVariance(if (v == 0L) null else signedAmount(v, row.currency.exponent) + " " + code, words)
+        }
+        CloseRowView(
+            code, row.text, row.invalid, row.expected?.let(::money), variance,
+            keep = row.counted?.let { money(row.float) },
+            handover = row.counted?.let { money(row.handover ?: 0L) },
+            belowFloor = row.belowFloor,
+        )
+    }
+    val saving = ui.phase is ClosePhase.Saving
+    val banner = when (val p = ui.phase) {
+        ClosePhase.Saving -> CloseBanner(Message("working"), error = false)
+        is ClosePhase.Failed -> CloseBanner(Message("closeday_failed", detail = p.failure.message()), error = true)
+        else -> null
+    }
+    return CloseDayView(
+        hint = Message("closeday_hint", listOf(ui.session?.businessDate.orEmpty())),
+        previewBanner = ui.previewFailure?.let { Message("closeday_no_preview", detail = it.message()) },
+        rows = rows,
+        noteLabel = if (ui.noteRequired) "closeday_note_required" else "closeday_note",
+        noteNeeded = ui.noteRequired && ui.note.isBlank(),
+        banner = banner,
+        needsConnection = ui.blocked == CloseBlock.OFFLINE,
+        confirmEnabled = ui.canClose,
+        saving = saving,
+    )
+}
+
+/** One currency as the server closed it. [variance] has a sign when it is not zero; [belowFloor] can still be true with nothing to hand over. */
+class CloseResultCard(
+    val code: String,
+    val counted: String,
+    val expected: String,
+    val variance: String,
+    val handover: String,
+    val belowFloor: Boolean,
+)
+
+/** What the server worked out at the close: [done] says who closed the day, [note] is the one left with it (null when empty). */
+class CloseResultView(val done: Message, val cards: List<CloseResultCard>, val note: Message?)
+
+fun closeResultView(date: String, close: SessionClose): CloseResultView = CloseResultView(
+    done = Message("closeday_done", listOf(date, close.closedBy.name)),
+    cards = close.counted.keys.map { code ->
+        fun money(map: Map<String, String>) = groupThousands(map[code] ?: "0") + " " + code
+        val variance = close.variance[code] ?: "0"
+        val sign = if (variance.startsWith("-") || variance.trim('0', '.').isEmpty()) "" else "+"
+        CloseResultCard(code, money(close.counted), money(close.expected), sign + groupThousands(variance) + " " + code, money(close.handover), code in close.belowFloor)
+    },
+    note = close.note.takeIf { it.isNotBlank() }?.let { Message("closeday_note_is", listOf(it)) },
+)
+
+// ---- Notes ----
+
+/** What the line under a note says or offers: when the reader read it, the button to mark it read, whether the owner saw the writer's note, or nothing. */
+sealed interface NoteFoot {
+    data class ReadAt(val time: String) : NoteFoot
+    data class MarkRead(val id: String, val enabled: Boolean) : NoteFoot
+    data class Seen(val time: String) : NoteFoot
+    data object NotSeen : NoteFoot
+    data object None : NoteFoot
+}
+
+/** The reader sees when they read it, or the button that says they did; the writer sees whether the owner has. The owner's own notes show neither. */
+fun noteFoot(ui: NotesUi, note: NoteDto): NoteFoot {
+    val own = note.createdBy.id == ui.userId
+    return when {
+        ui.canRead && !own -> ui.readAt(note)?.let { NoteFoot.ReadAt(clockTime(it)) }
+            ?: NoteFoot.MarkRead(note.id, enabled = ui.connected && note.id !in ui.marking)
+        own && !ui.canRead -> note.reads.firstOrNull { it.by.id != ui.userId }?.let { NoteFoot.Seen(clockTime(it.at)) } ?: NoteFoot.NotSeen
+        else -> NoteFoot.None
+    }
+}
+
+// ---- Settings ----
+
+class LanguageOption(val tag: String?, val label: String)
+
+/** The app's order: the system's language first, then each one it can show. */
+val languageOptions = listOf(
+    LanguageOption(null, "lang_system"),
+    LanguageOption("en", "lang_en"),
+    LanguageOption("lo", "lang_lo"),
+    LanguageOption("th", "lang_th"),
+)
+
+class RecordStartOption(val start: RecordStart, val label: String)
+
+/** What Record starts with: income, expense, or the kind used last. */
+val recordStartOptions = listOf(
+    RecordStartOption(RecordStart.INCOME, "type_income"),
+    RecordStartOption(RecordStart.EXPENSE, "type_expense"),
+    RecordStartOption(RecordStart.LAST, "record_start_last"),
+)
+
+// ---- Record ----
+
+/** The branch's name on this device, or its key when the shop no longer lists it. */
+fun Workspace.branchName(key: String): String = branches.firstOrNull { it.key == key }?.displayName ?: key
+
+/** A category's name in the page's language, or the key when the shop no longer lists it. Null for no category. */
+fun categoryName(categories: List<CategoryDto>, key: String?, language: String): String? =
+    key?.let { k -> categories.firstOrNull { it.key == k }?.name?.pick(language) ?: k }
+
+fun recordIssueKey(issue: RecordIssue): String = when (issue) {
+    RecordIssue.AMOUNT_MISSING -> "issue_amount_missing"
+    RecordIssue.AMOUNT_INVALID -> "issue_amount_invalid"
+    RecordIssue.SLIP_NEEDED -> "issue_slip_needed"
+    RecordIssue.SLIP_NOT_ALLOWED -> "issue_slip_not_allowed"
+    RecordIssue.TOO_MANY_SLIPS -> "issue_too_many_slips"
+    RecordIssue.CATEGORY_NEEDED -> "issue_category_needed"
+}
+
+/** What the save is doing: its banner, the branch an unknown save belongs to, and the two ways out of an unknown result. */
+class RecordPhaseView(
+    val banner: Message?,
+    val error: Boolean,
+    val note: Message?,
+    val checkAgain: Boolean,
+    val checkEnabled: Boolean,
+    val discard: Boolean,
+)
+
+fun recordPhaseView(ui: RecordUi, failureText: (Message) -> String, branchName: (String) -> String): RecordPhaseView = when (val phase = ui.phase) {
+    SavePhase.Editing -> RecordPhaseView(null, false, null, false, false, false)
+    SavePhase.Saving -> RecordPhaseView(Message("record_saving"), false, null, false, false, false)
+    is SavePhase.Saved -> RecordPhaseView(
+        Message(
+            if (phase.entry.type == EntryType.INCOME) "record_saved_income" else "record_saved_expense",
+            listOf(savedAmountText(phase.entry.tenders, ui.currencies)),
+        ),
+        false, null, false, false, false,
+    )
+    is SavePhase.Unknown -> RecordPhaseView(
+        Message("record_unknown"), false,
+        ui.pendingBranch?.let { Message("record_unknown_branch", listOf(branchName(it))) },
+        true, ui.connected, true,
+    )
+    is SavePhase.Failed -> RecordPhaseView(Message("record_failed", listOf(failureText(phase.failure.message()))), true, null, false, false, false)
+}
+
+/** The amount the server will read from a payment line, or null when it is not an amount of [row]'s currency. */
+fun tenderShown(row: TenderRow, currencies: List<CurrencyInfo>): String? {
+    val currency = currencies.firstOrNull { it.code == row.currency } ?: return null
+    val minor = parseTypedAmount(row.amount, currency.exponent) ?: return null
+    return displayAmount(minor, currency.exponent) + " " + currency.code
+}
+
+class CheckBanner(val message: Message, val error: Boolean)
+
+/** What the bank said about a slip: the transfer it knows, one paid to another account, or one it does not know. */
+fun slipCheckBanner(check: SlipCheckDto, toText: (String) -> String = { it }): CheckBanner = when {
+    !check.known -> CheckBanner(Message("slip_check_unknown", listOf(check.source)), error = true)
+    check.toShop == false -> CheckBanner(Message("slip_check_not_shop", listOf(check.to ?: check.toAccount.orEmpty())), error = true)
+    else -> {
+        val details = listOfNotNull(
+            check.amount?.let { groupThousands(it) + (check.currency?.let { c -> " $c" } ?: "") },
+            check.time?.let(::bankTimeText),
+            check.to?.let(toText),
+        )
+        CheckBanner(Message("slip_check_known", listOf(check.source, details.joinToString(" · "))), error = false)
+    }
+}
+
+fun slipNoticeMessage(notice: SlipNotice, policy: RecordsPolicy): Message = when (notice) {
+    SlipNotice.TOO_MANY -> Message("notice_too_many", listOf(policy.slipMaxCount.toString()))
+    SlipNotice.TOO_BIG -> Message("notice_too_big", listOf(policy.slipMaxSizeKb.toString()))
+    SlipNotice.UNREADABLE -> Message("notice_unreadable")
+    SlipNotice.NO_QR -> Message("notice_no_qr")
+    SlipNotice.ALREADY_ADDED -> Message("slip_attached_twice")
+    SlipNotice.NOT_CONFIRMED -> Message("notice_not_confirmed")
+}
+
+// ---- History ----
+
+fun rangeProblemKey(problem: RangeProblem): String = when (problem) {
+    RangeProblem.NOT_A_DATE -> "range_not_a_date"
+    RangeProblem.BACKWARDS -> "range_backwards"
+    RangeProblem.TOO_LONG -> "range_too_long"
+}
+
+class DateGroup(val date: String, val entries: List<EntryDto>)
+
+/** The entries as the server sent them (newest first), with one heading per date. */
+fun historyGroups(entries: List<EntryDto>): List<DateGroup> =
+    entries.groupBy { it.date }.map { (date, rows) -> DateGroup(date, rows) }
+
+fun methodKey(method: TenderMethod): String = if (method == TenderMethod.CASH) "method_cash" else "method_online"
+
+/** An entry's item, or its category's name, or a dash when it has neither. */
+fun historyRowTitle(entry: EntryDto, categories: List<CategoryDto>, language: String): String =
+    entry.item.ifBlank { categoryName(categories, entry.category, language) ?: "—" }
+
+/** A change that did not happen; a cancelled PIN prompt already says "Not done", so it is not said twice. */
+fun notDoneMessage(failure: Failure): Message =
+    if (failure == Failure.Client(Problem.ReauthCancelled)) failure.message() else Message("detail_failed", detail = failure.message())
