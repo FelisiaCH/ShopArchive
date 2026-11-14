@@ -70,6 +70,7 @@ kotlin {
         browser {
             commonWebpackConfig { outputFileName = "webapp.js" }
         }
+        nodejs() // :webApp:jsNodeTest: the tests run under Node (no Chrome needed); they touch no DOM
         binaries.executable()
     }
 
@@ -79,8 +80,27 @@ kotlin {
                 implementation(project(":clientCore"))
                 implementation(libs.compose.runtime)
                 implementation(libs.compose.html.core)
+                implementation(libs.ktor.client.js)
+                implementation(libs.ktor.client.websockets)
             }
             kotlin.srcDir(generateWebStrings.flatMap { it.outputDir })
         }
+        named("jsTest").configure {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
     }
 }
+
+// Nothing is put on the page as an HTML string, only through the DOM / Compose HTML (the server's CSP assumes it).
+val checkNoInnerHtml = tasks.register("checkNoInnerHtml") {
+    val sources = fileTree("src/jsMain/kotlin") { include("**/*.kt") }
+    doLast {
+        val bad = Regex("innerHTML|outerHTML|insertAdjacentHTML")
+        val hits = sources.files.flatMap { f -> f.readLines().withIndex().filter { bad.containsMatchIn(it.value) }.map { "${f.name}:${it.index + 1}" } }
+        check(hits.isEmpty()) { "innerHTML / outerHTML / insertAdjacentHTML are not allowed in :webApp: $hits" }
+    }
+}
+tasks.named("check") { dependsOn(checkNoInnerHtml) }
