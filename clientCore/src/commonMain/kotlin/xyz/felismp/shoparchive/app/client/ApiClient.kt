@@ -416,7 +416,9 @@ class ApiClient(
             try {
                 http.webSocket("wss://$endpoint/api/v1/ws", request = {
                     if (webSocketSubprotocol) {
-                        header(HttpHeaders.SecWebSocketProtocol, "$WS_VERSION_PREFIX$PROTOCOL_VERSION,$WS_BEARER_PREFIX$bearer")
+                        // Two values, not one comma-joined text: Ktor's JS engine hands each value to `new WebSocket(url, protocols)` as one protocol, and a protocol with a comma in it is refused by the browser.
+                        header(HttpHeaders.SecWebSocketProtocol, "$WS_VERSION_PREFIX$PROTOCOL_VERSION")
+                        header(HttpHeaders.SecWebSocketProtocol, "$WS_BEARER_PREFIX$bearer")
                     } else {
                         header(PROTOCOL_HEADER, PROTOCOL_VERSION.toString())
                         header(HttpHeaders.Authorization, "Bearer $bearer")
